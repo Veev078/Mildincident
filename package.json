@@ -1,0 +1,17 @@
+{
+  "name": "mildincident",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Private editorial production and draft-handoff safeguards for MILDINCIDENT",
+  "engines": { "node": ">=24.17.0 <25" },
+  "scripts": {
+    "test": "node --test --test-isolation=none test/*.test.js",
+    "check": "node scripts/check.mjs",
+    "preflight": "node src/cli.js prepare",
+    "ledger": "node src/cli.js ledger",
+    "studio": "node src/studio.js",
+    "audit:n8n": "node --use-env-proxy --use-system-ca src/audit.js"
+  },
+  "dependencies": { "sharp": "0.35.5" }
+}

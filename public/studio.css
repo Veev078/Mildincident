@@ -1,0 +1,43 @@
+:root { color-scheme: dark; --paper: #eee9df; --ink: #171917; --quiet: #b5b7aa; --line: #45483e; --accent: #d9f27d; font-family: system-ui, sans-serif; background: var(--ink); color: var(--paper); }
+* { box-sizing: border-box; }
+body { margin: 0; }
+a { color: inherit; text-underline-offset: .3em; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 5px; }
+header, main, footer { max-width: 1240px; margin: auto; padding-left: 42px; padding-right: 42px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-top: 36px; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
+.masthead { font-weight: 850; font-size: clamp(22px, 3vw, 32px); letter-spacing: -.06em; text-decoration: none; }
+.masthead span { display: block; font-size: 10px; font-weight: 450; letter-spacing: .13em; text-transform: uppercase; padding-top: 8px; }
+.studio-link { font-size: 13px; white-space: nowrap; }
+.intro { padding: 70px 0 44px; }
+.eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: 11px; line-height: 1.7; color: var(--quiet); }
+h1 { font-size: clamp(55px, 7.8vw, 104px); line-height: 1.02; font-weight: 450; letter-spacing: -.055em; margin: 28px 0; }
+h1 em { font-family: Georgia, serif; font-weight: 400; color: var(--accent); }
+.deck { font-size: 19px; line-height: 1.6; max-width: 600px; color: var(--quiet); }
+.connection { border: 1px solid var(--line); padding: 22px 26px; margin: 0 0 62px; max-width: 860px; }
+.connection strong { color: var(--accent); font-size: 13px; }
+.connection p { font-size: 13px; color: var(--quiet); line-height: 1.7; margin-bottom: 0; }
+.section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); padding: 0 0 18px; }
+.section-title h2 { font-size: 20px; font-weight: 500; margin: 0; letter-spacing: -.02em; }
+.section-title span { font-size: 11px; color: var(--quiet); }
+.story { display: grid; grid-template-columns: 140px 1fr; padding: 36px 0 40px; border-bottom: 1px solid var(--line); gap: 34px; }
+.date { display: flex; flex-direction: column; gap: 12px; }
+.date span { font-size: 21px; letter-spacing: -.04em; }
+.date small { color: var(--quiet); font-size: 10px; letter-spacing: .12em; }
+.story .eyebrow { margin: 0 0 14px; }
+.story h2 { font-family: Georgia, serif; font-size: clamp(28px, 4vw, 44px); font-weight: 400; line-height: 1.1; letter-spacing: -.035em; max-width: 700px; margin: 0 0 22px; }
+.story p { font-size: 14px; line-height: 1.75; color: var(--quiet); max-width: 650px; }
+.story .stage { color: var(--accent); font-size: 12px; }
+.story a { font-size: 12px; }
+details { margin-top: 24px; font-size: 11px; color: var(--quiet); overflow-wrap: anywhere; }
+details p { font-size: 11px !important; }
+summary { cursor: pointer; width: fit-content; }
+.review { margin: 70px 0; padding: 28px 32px; background: #24271f; border-left: 2px solid var(--accent); }
+.review h2 { font-family: Georgia, serif; font-size: 34px; font-weight: 400; letter-spacing: -.03em; margin: 14px 0; }
+.review p:last-child { font-size: 14px; color: var(--quiet); max-width: 740px; line-height: 1.8; }
+.steps { list-style: decimal-leading-zero; margin: 0 0 70px; padding-left: 26px; }
+.steps li { padding: 22px 0 22px 10px; border-bottom: 1px solid var(--line); }
+.steps li::marker { color: var(--accent); font-size: 12px; }
+.steps strong { font-size: 15px; font-weight: 500; }
+.steps span { display: block; font-size: 13px; color: var(--quiet); margin-top: 8px; line-height: 1.7; }
+footer { color: var(--quiet); padding-top: 20px; padding-bottom: 30px; font-size: 10px; border-top: 1px solid var(--line); letter-spacing: .04em; }
+@media (max-width: 640px) { header, main, footer { padding-left: 22px; padding-right: 22px; } header { flex-wrap: wrap; padding-top: 25px; } .intro { padding-top: 40px; } .section-title { align-items: flex-start; flex-direction: column; gap: 10px; } .story { grid-template-columns: 1fr; gap: 22px; } .date { flex-direction: row; align-items: baseline; justify-content: space-between; } .connection { margin-bottom: 42px; padding: 18px; } .review { padding: 22px; } }
