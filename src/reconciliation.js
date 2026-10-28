@@ -18,6 +18,7 @@ export function projectLifecycle({ manualStatus, posts, complete, instagramEvide
     // A permalink reported by Buffer is evidence to investigate, not an Instagram availability check.
     reportedInstagramLinks: posts.filter(p => p.externalLink).map(p => ({ postId: p.id, url: p.externalLink })),
     requiresReview: observed === 'unknown' || complete !== true || posts.length > 1 || statuses.includes('error') ||
+      (statuses.includes('sent') && !posts.some(p => ids.has(p.id))) ||
       (manualStatus === 'posted' && !posts.some(p => ids.has(p.id))),
   };
 }

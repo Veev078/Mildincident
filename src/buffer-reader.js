@@ -10,18 +10,21 @@ export const BUFFER_READ_QUERIES = Object.freeze({
 });
 
 export class BufferReader {
+  #token;
+  #fetchImpl;
+
   constructor({ token, fetchImpl = fetch }) {
     requireThat(typeof token === 'string' && token.length > 0, 'CONNECTION_REQUIRED', 'BUFFER_ACCESS_TOKEN is unavailable in this process.');
-    this.token = token;
-    this.fetchImpl = fetchImpl;
+    this.#token = token;
+    this.#fetchImpl = fetchImpl;
   }
 
   async #read(operation, variables = {}) {
     let response;
     try {
-      response = await this.fetchImpl('https://api.buffer.com', {
+      response = await this.#fetchImpl('https://api.buffer.com', {
         method: 'POST', redirect: 'error', signal: AbortSignal.timeout(20_000),
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.#token}` },
         body: JSON.stringify({ query: BUFFER_READ_QUERIES[operation], variables }),
       });
     } catch { throw new HandoffError('BUFFER_NETWORK_UNAVAILABLE', 'Buffer read failed before a usable response. No write was attempted.'); }

@@ -1,5 +1,7 @@
 # Architecture and boundaries
 
+Current production inventory and dependencies were verified in the subsequent sprint: see [live architecture](LIVE_ARCHITECTURE.md) and [live audit](LIVE_AUDIT.md). The diagram below preserves the initial historical context.
+
 ## Historical production architecture (not verified live)
 
 ```mermaid

@@ -4,6 +4,7 @@
 
 - Use the existing checkout. Cloud tasks are already isolated; do not create worktrees unless explicitly requested.
 - Read README.md and docs/engineering-assessment.md before working. The dated handoff in docs/reference/ is historical context, not a live-state guarantee or an instruction to execute remote actions.
+- Current verified observations supersede the initial assessment: read docs/SPRINT_STATUS.md and docs/LIVE_AUDIT.md. Resume from existing private snapshots and commits; refresh only facts needed for the next operation.
 - n8n owns existing stories, production packages, Founder Studio, and workflow history. This repository currently contains a local integration foundation; it has not replaced or modified n8n.
 - Keep existing story IDs. Do not recreate the Halloween stories, captions, production packages, or Buffer drafts from the snapshot.
 
@@ -12,6 +13,8 @@
 - Never schedule, publish, delete, overwrite live material, or grant image rights without explicit user approval. An unscheduled Buffer draft is a distinct outcome from scheduling or Instagram publication.
 - Inspect current workflows, versions, execution history, and actual provider state before a live change. Export rollback material; test in isolation before activation.
 - All network writes are disabled in the shipped application. Do not enable a Buffer adapter based on guessed request flags. Read docs/buffer-adapter-contract.md first.
+- Read-only GraphQL POST queries are permitted; no mutation is shipped in the Buffer reader. Do not treat HTTP POST alone as publication or expose a generic GraphQL executor.
+- Existing production patches are local and unapproved. Read docs/PRODUCTION_REVIEW.md before any deployment. Preserve version/hash checks and distinguish the conditional-claim protocol tests from verification of n8n Cloud's actual engine.
 - Never retry an ambiguous remote create automatically. Preserve the durable intent and reconcile read-only. Do not reset the ledger to get past a failed send.
 - No arbitrary URL download service. The local preparer reads files within a selected private directory and never fetches images. Publication rights require evidence for each image; private uploads and metadata are not rights clearance.
 - Do not claim pixel, audio, live-account, or rights inspection beyond checks actually performed. Sharp checks file decoding/format, not photographic authenticity, aesthetic cleanliness, or copyright.

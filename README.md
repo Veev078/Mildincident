@@ -4,6 +4,8 @@ Private editorial production for an independent archival publication.
 
 This repository now contains a **local draft-handoff foundation**, a read-only Halloween launch brief, and a read-only n8n audit tool. It does not replace the working Founder Studio. **No live workflow, story, Buffer item, schedule, or Instagram post has been changed.**
 
+The autonomous sprint connected both APIs and inspected the actual production system. Start with [current live findings](docs/LIVE_AUDIT.md), [sprint checkpoint](docs/SPRINT_STATUS.md), [Halloween review](docs/HALLOWEEN_REVIEW.md), and [proposed production changes](docs/PRODUCTION_REVIEW.md). The connection failures described in the initial assessment are resolved.
+
 The starting checkout contained only a blank `01-Central` file. The supplied [handoff](docs/reference/handoff-2026-10-28.md) is a dated historical source, not verified live data. See the [engineering assessment](docs/engineering-assessment.md), [architecture](docs/architecture.md), and [backlog](docs/backlog.md).
 
 ## Develop
@@ -77,13 +79,27 @@ The ChatGPT apps **BUFFER** and **Business HQ – N8N** are visible in the suppl
 
 If those apps can be attached here, use them for read-only inspection first. The environment draft also declares secure `N8N_API_KEY` and `BUFFER_ACCESS_TOKEN` requirements. Enter rotated credentials in **environment settings**, never in repository files, logs, or chat. Draft saving is separate from applying/publishing configuration. Cloudinary signing credentials are not needed for the local implementation and are not configured.
 
-With n8n access actually configured:
+Both n8n and Buffer access were verified after the new environment was published. Use the existing configured credentials; no new token is needed. Commands remain read-only:
 
 ```sh
 npm run audit:n8n
+npm run audit:production
+npm run audit:buffer
 ```
 
 The audit uses the platform HTTPS proxy and system CA trust. It issues only GET requests to the eight known n8n workflow IDs and their recent execution summaries. Redirects are rejected. Raw workflow snapshots go under private, ignored `.local/audits/`; summaries keep saved vs active version IDs distinct and omit raw code, credential values, and execution payloads. This is a starting audit, not a completed inspection of workflow history, tables, Buffer, or Instagram. It fails clearly when access is missing.
+
+`audit:production` inventories all workflows and table schemas/rows with pagination and records the complete retained error listing. `audit:buffer` discovers the exact existing Instagram channel and reads every post page through fixed GraphQL queries. It cannot create/edit/delete/schedule posts. Reports include observed timestamps; recheck relevant provider records before action. A Buffer permalink is reported evidence, not an independently verified Instagram page.
+
+To review captured records or generate private, version-bound workflow patches:
+
+```sh
+node scripts/review-production-snapshot.mjs .local/audits/production-RUN .local/audits/buffer-RUN/posts.json .local/review.json
+node scripts/prepare-production-patch.mjs .local/audits/production-RUN/workflow-BzMqQS8lfkwN7peQ.json .local/patches
+node scripts/validate-private-workflow-snapshots.mjs .local/audits/production-RUN
+```
+
+Replace RUN paths with actual audit outputs. Generated patches stay private because workflow code/metadata can contain sensitive material. Patch preparation has no remote update/activation function. The existing-table atomic claim contract is a tested protocol, not a verified deployed migration. Local SQLite is not a second production backend.
 
 ## Next publishing action
 

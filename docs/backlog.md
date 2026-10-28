@@ -1,5 +1,7 @@
 # Prioritized backlog
 
+**Updated after live audit:** n8n/Buffer access is working. Complete paginated read-only inventory, relationship checks, Buffer reconciliation, private patch generation and 47 regression tests are complete. See [current status](SPRINT_STATUS.md) for completed work and remaining release blockers. Entries below retain the original baseline; connection-blocked labels are superseded.
+
 | Priority | Task | Current state / exit condition |
 | --- | --- | --- |
 | P0 | Read-only n8n/Buffer/Instagram audit | Blocked on tools or secure runtime access. Record observed versions, executions, current packages, channel, and actual post evidence. Local n8n audit utility is ready. |

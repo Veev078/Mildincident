@@ -1,5 +1,7 @@
 # Engineering assessment — October 28, 2026
 
+**Initial pre-connection assessment, retained as history.** Both API connections now work. See [the subsequent live audit](LIVE_AUDIT.md) and [current sprint status](SPRINT_STATUS.md); do not repeat credential setup based on the historical blockers below.
+
 ## Verified in this session
 
 | Area | Observation | Consequence |

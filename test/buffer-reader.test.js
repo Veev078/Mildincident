@@ -14,6 +14,7 @@ test('Buffer reader authenticates only fixed queries, discovers channels, reads 
     return Response.json({ data: { posts: { edges: [{ node: { id: more ? 'first' : 'second', channelId: 'channel', status: 'draft' } }], pageInfo: { hasNextPage: more, endCursor: more ? 'page-2' : null } } } });
   } });
   assert.equal((await reader.account()).organizations[0].id, 'org');
+  assert.equal(JSON.stringify(reader), '{}'); // Accidental object logging cannot serialize the token.
   assert.equal((await reader.channels('org'))[0].id, 'channel');
   assert.equal((await reader.post('existing')).id, 'existing');
   const result = await reader.posts({ organizationId: 'org', channelId: 'channel' });
