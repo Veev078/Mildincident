@@ -1,3 +1,19 @@
+# Recovery and release readiness — 2026-10-29 UTC
+
+Major development paused. See [the audited release baseline](release/READINESS_2026-10-29.md) for the feature/status table and hosting blockers.
+
+- Original development branch preserved at `eb082a4`. Interrupted source preserved in recovery branch `recovery/interrupted-photography-20261029`, commit `7d94c18`.
+- Current stable branch: `staging/release-readiness-20261029`; repair `0bdffe3` removes dangling imports/calls/route for absent `src/image-curation.js`. Five local-preview backend tests retained; unfinished UI/curation/proposal-review work is not claimed delivered.
+- Validation: syntax passed; **102 automated tests and 16 Chromium workflows passed**. Actual-source 13-route smoke passed without JS errors or actual draft edits. Fresh n8n/Buffer read-only snapshot: 18 stories, 264 media, 11 Buffer posts at 2026-10-29T03:07:25Z.
+- Thumbnail blocker confirmed: actual library check loaded 0 images (8 failed; 224 pending/lazy). Upload UI and relative-preview rendering integration remain incomplete.
+- GitHub initially had only the blank main commit. Staging push succeeded; verify final remote SHA against current HEAD. Main was not changed; no force push.
+- Start original app: `cd /workspace/Mildincident && npm run workspace` (private loopback 4174). This audit started repaired app on 4175 because an earlier temporary stable-copy server used 4174. These are internal addresses, not user-accessible websites. Codex exposes no usable forwarding tool/URL here.
+- Render Free: **NO as-is**. No auth, public-origin support or durable SQLite/blob storage. See release report before any staging work. Render account is connected but no deployment was performed.
+- Exact next work: choose authenticated Free read-only staging versus paid persistent editor; implement only approved hosting/auth/origin/storage boundary, test it, then request/obtain deployment approval. Preserve private `.local/` state. Do not resume photography/curation sprint until accessible tested baseline is established.
+- No environment publication, production workflow mutation, scheduling, publication or deletion occurred.
+
+---
+
 # Autonomous sprint checkpoint — October 28, 2026
 
 ## Active photography sprint — in progress
