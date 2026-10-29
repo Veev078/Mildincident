@@ -1,3 +1,11 @@
+# Taste sprint: explicit founder feedback and request context — 2026-10-29
+
+Recorded Wendy2258 as founder/editorial_taste rejection, explicitly not factual error/objective attractiveness. Original native candidate, corrected local version2, prior editor reviews and2254/version3 are intact. Typed review basis/reviewer now persist in the existing append-only job ledger. Recent founder taste feedback survives later source/editor reviews.
+
+Future queues freeze a bounded founder-context snapshot into their identity/hash and optional editorial_context_json on the EXISTING development jobs table (one column added, no rows/production changed). Legacy job hashes remain exact. Current preset selection is preserved; context is quoted as specific judgments, not blanket bans.16 focused checks pass. Next: replace first-lead acceptance with a small comparative shortlist and a pre-draft cultural/visual suitability gate. No paid calls or activation.
+
+---
+
 # First proactive paid test consumed — 2026-10-29
 
 Executed the ONE new approved proactive discovery as2258 under actual forgotten_pop_culture/visual_first. Worker deactivated in finally; no repeat. Result: Wendy Phillips/Library of Congress mystery portrait. Actual PNG inspected/cached through non-AI2259. Original AI title/caption miscredit subject alone; source names reader James Owen. Local working title “One portrait, dozens of wrong guesses,” corrected attributed caption, single image, silent sound brief, needs_research feedback; version2 preserves first working revision. Old2254/version3 untouched.

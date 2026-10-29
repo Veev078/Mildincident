@@ -58,5 +58,11 @@ export class LocalResearchStore {
   }
   claimEngineDispatch(id,version,dispatchId){const previous=this.engineJob(id);requireThat(previous?.state==='queued'&&!previous.dispatchId&&!previous.receiptExecutionId&&!previous.executionId,'ENGINE_ALREADY_DISPATCHED','Only an undispatched queued job can start. Reconcile existing work.');return this.recordEngineState(id,'dispatching',{dispatchId},version);}
   engineHistory(id){return this.db.prepare('SELECT version,state,created_at FROM research_engine_events WHERE request_id=? ORDER BY version DESC LIMIT 30').all(id).map(r=>({version:r.version,state:r.state,createdAt:r.created_at}));}
+  founderTasteFeedback(){
+    const byCandidate=new Map();
+    const rows=this.db.prepare("SELECT request_id,data_json FROM research_engine_events WHERE json_type(data_json,'$.reviewDecisions')='object' ORDER BY rowid DESC LIMIT 2000").all();
+    for(const row of rows){const data=JSON.parse(row.data_json);for(const [candidateId,review] of Object.entries(data.reviewDecisions||{}))if(review.reviewer==='founder'&&review.basis==='editorial_taste'&&!byCandidate.has(candidateId)){const candidate=this.engineJob(row.request_id)?.candidates?.find(c=>c.id===candidateId);if(candidate)byCandidate.set(candidateId,{candidateId,subject:candidate.subject||candidate.title,decision:review.decision,reason:review.reason.slice(0,700),basis:review.basis,reviewer:'founder',createdAt:review.createdAt});}}
+    return [...byCandidate.values()].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,6);
+  }
   close(){this.db.close();}
 }

@@ -8,14 +8,15 @@ export class EditorialEngineService {
   constructor({research,client}){this.research=research;this.client=client;this.inspection={configured:Boolean(client),generationAvailable:false,generationApproved:false,workerActive:false};this.refreshing=null;}
   status(){return {...this.inspection};}
   async inspect(){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');this.inspection=await this.client.inspect();return this.status();}
-  async queue(id){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');const request=this.research.get(id);requireThat(request,'RESEARCH_REQUEST_NOT_FOUND','Research request is unavailable.');const claim=this.research.claimEngineQueue(id,requestFingerprint(request));if(!claim.claimed)return claim.job;
-    try{const row=await this.client.queue(request);requireThat(REMOTE_STATES.has(row.status),'INVALID_ENGINE_RESULT','Remote job status is unknown.');return this.research.recordEngineState(id,row.status,{remoteRowId:String(row.id),executionId:String(row.execution_id||''),lastError:null});}
+  async queue(id){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');const request=this.research.get(id);requireThat(request,'RESEARCH_REQUEST_NOT_FOUND','Research request is unavailable.');const scoped=this.requestForEngine(request);if(!request.engineJob){const context=this.editorialContext();if(context.feedback.length)scoped.editorialContext=context;}const claim=this.research.claimEngineQueue(id,requestFingerprint(scoped));if(!claim.claimed)return claim.job;
+    if(scoped.editorialContext)this.research.recordEngineState(id,'queueing',{editorialContext:scoped.editorialContext});
+    try{const row=await this.client.queue(scoped);requireThat(REMOTE_STATES.has(row.status),'INVALID_ENGINE_RESULT','Remote job status is unknown.');return this.research.recordEngineState(id,row.status,{remoteRowId:String(row.id),executionId:String(row.execution_id||''),lastError:null});}
     catch(error){this.research.recordEngineState(id,'queue_uncertain',{lastError:error.code||'ENGINE_REQUEST_FAILED'});throw error;}
   }
   async refresh(){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');if(this.refreshing)return this.refreshing;
     this.refreshing=(async()=>{await this.inspect();const jobs=await this.client.rows(this.client.connection.jobsTableId);const candidates=await this.client.rows(this.client.connection.candidatesTableId);const {sanitizeDevelopmentCandidate}=await import('./editorial-engine-client.js');
       for(const request of this.research.all()){const local=request.engineJob;if(!local)continue;const matches=jobs.filter(row=>row.job_id===request.id);requireThat(matches.length<=1,'AMBIGUOUS_ENGINE_JOB','Multiple remote rows share a request identity.');const row=matches[0];if(!row)continue;
-        requireThat(row.request_hash===requestFingerprint(request)&&REMOTE_STATES.has(row.status),'INVALID_ENGINE_RESULT','Remote request identity or status does not match.');
+        requireThat(row.request_hash===requestFingerprint(this.requestForEngine(request))&&REMOTE_STATES.has(row.status),'INVALID_ENGINE_RESULT','Remote request identity or status does not match.');
         const result=candidates.filter(c=>c.job_id===request.id).map(sanitizeDevelopmentCandidate);requireThat(result.length<=1,'AMBIGUOUS_ENGINE_RESULT','Development job produced more than its one-candidate budget.');
         const executionId=String(row.execution_id||local.receiptExecutionId||local.executionId||'');
         requireThat(!local.receiptExecutionId||!row.execution_id||String(row.execution_id)===local.receiptExecutionId,'INVALID_ENGINE_RESULT','Remote execution differs from the accepted dispatch receipt.');
@@ -32,14 +33,21 @@ export class EditorialEngineService {
       }return this.status();})();try{return await this.refreshing;}finally{this.refreshing=null;}
   }
   async captureEvidence(id){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The development connection is unavailable.');const request=this.research.get(id);const job=request?.engineJob;requireThat(job?.executionId&&job.candidates?.length===1,'INVALID_ENGINE_RESULT','Reconcile one completed candidate before inspecting its execution.');
-    const execution=await this.client.executionDetails(job.executionId);const candidate=job.candidates[0];const evidence=captureEditorialEvidence(execution,{workerId:this.client.connection.editorialWorkerId,jobId:id,requestHash:requestFingerprint(request),candidate});
+    const execution=await this.client.executionDetails(job.executionId);const candidate=job.candidates[0];const evidence=captureEditorialEvidence(execution,{workerId:this.client.connection.editorialWorkerId,jobId:id,requestHash:job.requestHash,candidate});
     return this.research.recordEngineState(id,job.state,{evidence:{...(job.evidence||{}),[candidate.id]:evidence}},job.version);
   }
   review(id,input){
-    requireThat(input&&Object.keys(input).every(k=>['candidateId','decision','reason','expectedVersion'].includes(k))&&['approved','rejected','needs_research'].includes(input.decision)&&typeof input.reason==='string'&&input.reason.trim().length>=10&&input.reason.length<=2000&&Number.isSafeInteger(input.expectedVersion),'INVALID_ENGINE_REVIEW','Choose an editorial decision, reason and current job version.');
+    requireThat(input&&Object.keys(input).every(k=>['candidateId','decision','reason','expectedVersion','basis','reviewer'].includes(k))&&['approved','rejected','needs_research'].includes(input.decision)&&typeof input.reason==='string'&&input.reason.trim().length>=10&&input.reason.length<=2000&&Number.isSafeInteger(input.expectedVersion),'INVALID_ENGINE_REVIEW','Choose an editorial decision, reason and current job version.');
+    requireThat(input.basis===undefined||['editorial_taste','source_accuracy','visual_relevance','rights','general'].includes(input.basis),'INVALID_ENGINE_REVIEW','Choose a supported decision basis.');
+    requireThat(input.reviewer===undefined||['founder','editor'].includes(input.reviewer),'INVALID_ENGINE_REVIEW','Choose founder or editor feedback.');
     const job=this.research.engineJob(id);requireThat(job?.candidates?.some(c=>c.id===input.candidateId),'INVALID_ENGINE_REVIEW','Review an existing correlated development result.');
-    return this.research.recordEngineState(id,job.state,{reviewDecisions:{...(job.reviewDecisions||{}),[input.candidateId]:{decision:input.decision,reason:input.reason.trim(),createdAt:new Date().toISOString()}}},input.expectedVersion);
+    return this.research.recordEngineState(id,job.state,{reviewDecisions:{...(job.reviewDecisions||{}),[input.candidateId]:{decision:input.decision,reason:input.reason.trim(),basis:input.basis||'general',reviewer:input.reviewer||'editor',createdAt:new Date().toISOString()}}},input.expectedVersion);
   }
+  requestForEngine(request){return {...request,...(request.engineJob?.editorialContext?{editorialContext:request.engineJob.editorialContext}:{})};}
+  editorialContext(){
+    return {schemaVersion:1,feedback:this.research.founderTasteFeedback(),interpretation:'Specific editorial judgments, not factual findings, objective aesthetic measurements, or blanket genre bans.'};
+  }
+
   async acceptReceipt(id,dispatchId,receipt){
     const current=this.research.engineJob(id);requireThat(current?.dispatchId===dispatchId,'EDIT_CONFLICT','Dispatch ownership changed; reconcile read-only.');
     requireThat(!current.executionId||current.executionId===receipt.executionId,'INVALID_ENGINE_RESULT','Receipt execution conflicts with the observed job.');
@@ -50,7 +58,7 @@ export class EditorialEngineService {
   }
   async start(id,expectedVersion){requireThat(Number.isSafeInteger(expectedVersion),'EDIT_CONFLICT','An expected engine-job version is required.');const inspection=await this.inspect();requireThat(inspection.generationAvailable,'GENERATION_NOT_APPROVED','The bounded AI worker is inactive or its exact version/spend has not been approved. Queueing alone does not spend credits.');const request=this.research.get(id);requireThat(request,'RESEARCH_REQUEST_NOT_FOUND','Research request is unavailable.');const dispatchId=randomUUID();const claimed=this.research.claimEngineDispatch(id,expectedVersion,dispatchId);
     // Durable claim precedes the external call. Never automatically redispatch after a timeout or process restart.
-    this.client.dispatch(request,dispatchId).then(receipt=>this.acceptReceipt(id,dispatchId,receipt)).catch(error=>{const current=this.research.engineJob(id);if(['dispatching','generating'].includes(current?.state))this.research.recordEngineState(id,'dispatch_uncertain',{lastError:error.code||'ENGINE_DISPATCH_UNCERTAIN'});});
+    this.client.dispatch(this.requestForEngine(request),dispatchId).then(receipt=>this.acceptReceipt(id,dispatchId,receipt)).catch(error=>{const current=this.research.engineJob(id);if(['dispatching','generating'].includes(current?.state))this.research.recordEngineState(id,'dispatch_uncertain',{lastError:error.code||'ENGINE_DISPATCH_UNCERTAIN'});});
     return claimed;
   }
 }

@@ -593,7 +593,7 @@ document.addEventListener('click', async event=>{
 });
 document.addEventListener('submit',async event=>{
   const form=event.target.closest('[data-engine-review]');if(!form)return;event.preventDefault();const button=form.querySelector('button[type="submit"]');button.disabled=true;
-  try{await api(`/api/research/requests/${form.dataset.request}/engine/review`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({candidateId:form.dataset.candidate,expectedVersion:Number(form.dataset.version),decision:form.elements.decision.value,reason:form.elements.reason.value})});await loadWorkspace({quiet:true});toast('Development editorial decision saved. Production and rights remain unchanged.');}catch(error){form.querySelector('[data-engine-status]').textContent=error.message;}finally{button.disabled=false;}
+  try{await api(`/api/research/requests/${form.dataset.request}/engine/review`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({candidateId:form.dataset.candidate,expectedVersion:Number(form.dataset.version),decision:form.elements.decision.value,reason:form.elements.reason.value,...(form.elements.basis?{basis:form.elements.basis.value}:{})})});await loadWorkspace({quiet:true});toast('Development editorial decision saved. Production and rights remain unchanged.');}catch(error){form.querySelector('[data-engine-status]').textContent=error.message;}finally{button.disabled=false;}
 });
 
 document.addEventListener('click', event => {
@@ -619,7 +619,7 @@ document.addEventListener('submit', async event => {
   event.preventDefault(); const button = form.querySelector('button[type="submit"]'); const status = form.querySelector('[data-review-status]');
   button.disabled=true; status.textContent='Saving your editorial judgment…';
   try {
-    await api(`/api/stories/${encodeURIComponent(form.dataset.story)}/assets/${encodeURIComponent(form.dataset.asset)}/review`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({expectedVersion:Number(form.dataset.version),decision:form.elements.decision.value,reason:form.elements.reason.value})});
+    await api(`/api/stories/${encodeURIComponent(form.dataset.story)}/assets/${encodeURIComponent(form.dataset.asset)}/review`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({expectedVersion:Number(form.dataset.version),decision:form.elements.decision.value,reason:form.elements.reason.value,...(form.elements.basis?{basis:form.elements.basis.value}:{})})});
     await loadWorkspace({quiet:true});const story=storyById(form.dataset.story);const asset=story?.media.find(a=>a.id===form.dataset.asset);
     if(form.isConnected&&asset)openDialog(views.assetDialog(story,asset));
     toast('Editorial review saved locally. Image rights and carousel selection are unchanged.');
