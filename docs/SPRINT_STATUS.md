@@ -1,3 +1,13 @@
+# Approved n8n engine integration — 2026-10-29
+
+User explicitly approved inactive sandbox, supporting development endpoints/connections/schemas and bounded tests. Created inactive sandbox3GKf8xnHA6JmnAJP. Created independent header-auth development replay runnerqyoKwV3QFLhqA4Qj; it is active with no schedule/AI/database/publishing nodes. n8n requires referenced subworkflows to be published, so runner inlines the sandbox's five Code nodes while the sandbox stays inactive. Actual engine execution2249 succeeded with7 references; unauthenticated request403. Production sourcing saved/active versions unchanged on read-back.
+
+Created isolated tables `mildincident_dev_editorial_jobs` and `mildincident_dev_editorial_candidates`. No existing production tables changed. Development header credential was newly created; no existing credential modified. Secret connection config, workflow snapshots and execution evidence remain private under `.local/engine-build/`; no values in Git.
+
+Next implementation in progress: clone the ACTIVE research graph into an authenticated development-only job worker, with all writes routed to the two new tables and bounded model calls. Then persist/track correlated results in Studio. No paid generation run or recurring schedule has been started yet. User has postponed Windows testing; continue implementation rather than requesting it.
+
+---
+
 # Full-stack development checkpoint — 2026-10-29
 
 Branch `development/photography-review-20261029`; original baseline9702ce1 preserved. Increments: c0cfe58 active-version n8n sandbox builder;879e04f persistent research/discovery handoffs and review slate;0eb995c carousel rehearsal and image taste history; final increment adds editorial filters, request retry idempotency, unsaved-brief preservation and stable accessible labels.
