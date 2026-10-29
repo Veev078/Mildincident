@@ -26,3 +26,7 @@ test('worker refuses ambiguous duplicate-row claim before any model work',()=>{
  const row={job_id:'same',lease_token:'lease',status:'generating',kind:'brief',prompt:'A valid creative research request'};
  const out=vm.runInNewContext(`(function(){${code}})()`,{$input:{first:()=>({json:row}),all:()=>[{json:row},{json:row}]},$:()=>({first:()=>({json:{job_id:'same',dispatch_id:'lease'}})})});assert.equal(out[0].json.claimed,false);
 });
+
+test('context table readers execute once instead of multiplying downstream reads per archive item',()=>{
+ const {workflow}=buildEditorialDevelopmentEngine(fixture());const readers=workflow.nodes.filter(n=>n.type==='n8n-nodes-base.dataTable'&&n.parameters.operation==='get');assert.equal(readers.length,9);for(const reader of readers){assert.equal(reader.executeOnce,true,reader.name);assert.equal(reader.alwaysOutputData,true,reader.name);}
+});

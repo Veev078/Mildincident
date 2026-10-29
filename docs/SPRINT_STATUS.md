@@ -1,3 +1,15 @@
+# Single paid test consumed — 2026-10-29
+
+The user's ONE approved live generation completed as n8n2254, job99de2099-d762-40d5-85d9-222ba3c241db. Exactlyone Research Candidates node andone Draft Editorial Concept node ran. Candidate: Deneuve/Yves Saint Laurent/Belle de Jour; original generated record is preserved in development storage. Worker deactivated in finally and verified inactive. DO NOT run another paid generation under this approval. Durable one-shot marker/private response/execution: `.local/engine-build/approved-single-run*` and approved-generation-execution.json.
+
+n8n-reported usage:19665 input +2309 output tokens total (research16837/1749; draft2828/560). Currency price and actual web-search call count were not retained in simplified output; do not invent them.
+
+First non-paid fix: source context fan-out. Set executeOnce on9 read nodes. Actual temporary read-only n8n replayPNBDCLUEqfPeDSXx verified current-seed1/presets4/idea-bank8 instead of37/148/1184. Replay deactivated; development generation worker remains inactive. No production change or additional AI call.
+
+Quality findings to address next: photograph is1974 vs film1967; generic cover and unrelated1962/1998/2002 photos included; caption contains audience-pitch text; Studio hard-codes carousel5 although model chose single_image. Primary museum page captured200 supports the costume claim; two Cinémathèque references returned503 maintenance pages. Evidence/provenance and format repair are in progress in the working tree; finish/test/commit rather than recreate them.
+
+---
+
 # Durable development jobs + Studio result integration — 2026-10-29
 
 Approved sandbox work proceeded. Commits32c7c7f (native replay),6671a77 (lease + inactive worker) preserved. Four development workflows exist and are ALL INACTIVE after zero-AI tests. Actual replay2249 returned7 references; concurrent native claim2252 won1/4; existing source/research production versions unchanged. New development job/result tables and isolated header credential only.
