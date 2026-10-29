@@ -58,3 +58,12 @@ test('editorial rejection retains paid draft text and images, and never marks an
  const revised=replay(workflow,'Quality Gate',[{draft:{...draft,caption:'A documentary photograph from Paris, 1974.'}}],{'Prepare Visual Draft Context':[context]})[0].json;assert.equal(revised.decision,'advance');
  const stillOpen=JSON.parse(replay(workflow,'Finalize Development Candidate',[revised],{'Verify Development Claim':[job],'Build Research Prompt':[{}],'Quality Gate':[revised],'Extract Original-Page Image Previews':[media]})[0].json.candidate_json);assert.equal(stillOpen.status,'needs_research');assert.ok(stillOpen.gaps.some(g=>g.includes('unconfirmed')));
 });
+
+test('captured passages reach drafting but all-blocked or maintenance sources stop before drafting spend',()=>{
+ const input=fixture();input.researchWorkflow.activeVersion.nodes.find(n=>n.name==='Collect Link Checks').parameters.jsCode="return $('Parse Research').all().map(i=>({json:JSON.parse(JSON.stringify(i.json))}));";
+ const {workflow}=buildEditorialDevelopmentEngine(input);const c={candidate_id:'candidate',prechecks_passed:true,reasons:[],claims:[{claim:'An original costume record from 1967',source_url:'https://archive.example.org/record'}]};
+ const records={'Parse Research':[c],'Expand Claims for Link Check':[{candidate_id:'candidate',claim_index:0,url:c.claims[0].source_url}],'Check Source Links':[{statusCode:200,data:'<title>Archive record</title><p>The original costume record dates to1967.</p>'}]};
+ const good=replay(workflow,'Collect Link Checks',records['Check Source Links'],records)[0].json;assert.equal(good.prechecks_passed,true);assert.match(good.sourceEvidence[0].textExcerpt,/1967/);
+ records['Check Source Links']=[{statusCode:200,data:'<title>Under maintenance</title>Temporary service'}];const blocked=replay(workflow,'Collect Link Checks',records['Check Source Links'],records)[0].json;assert.equal(blocked.prechecks_passed,false);assert.equal(blocked.claims[0].link_status,'unconfirmed');assert.ok(blocked.reasons.some(r=>r.includes('NO_USABLE_SOURCE_TEXT')));
+ assert.match(workflow.nodes.find(n=>n.name==='Draft Editorial Concept').parameters.responses.values[0].content,/sourceEvidence/);
+});

@@ -331,6 +331,7 @@ try {
   checks.push('Studio queues a correlated development job while disabled generation cannot start or spend credits');
   const queued=engineFixture.jobs[0];queued.status='ready_to_review';queued.execution_id='2500';
   const fixtureCandidate={id:'DEV-'+queued.job_id+'-1',jobId:queued.job_id,status:'ready_to_review',story:{title:'Synthetic generated development candidate — fixture only',subject:'Fixture photography',hook:'A fixture-only cultural connection'},captionDraft:'Synthetic candidate caption, not researched content.',carouselOutline:'Opening / context / payoff',claims:[{claim:'A labeled fixture claim',claim_type:'hypothesis',source_name:'Fixture source',source_url:'https://example.org/source'}],media:[{asset_id:'dev-photo-1',title:'Synthetic fixture photograph',source_page_url:'https://example.org/source',thumb_url:'https://example.org/thumb/fixture.jpg',provider:'synthetic_fixture'}],gaps:['Synthetic fixture only; no live generation'],musicGap:'Not verified',provenance:{kind:research.get(queued.job_id).kind,executionId:'2500',generatedAt:new Date().toISOString()}};
+  fixtureCandidate.sourceEvidence=[{claimIndex:0,url:'https://example.org/source',title:'Synthetic captured source',httpStatus:200,access:'source_text_captured',textExcerpt:'A labeled source-text fixture, not real editorial research.'}];
   fixtureCandidate.story.format='single_image';fixtureCandidate.proposedAssetIds=['dev-photo-1'];
   Object.assign(fixtureCandidate.media[0],{source_caption:'Synthetic fixture photograph, 1974.',credit_at_source:'Fixture generator',source_years:[1974],source_relation:'subject_caption_match',material_kind:'photograph_reference'});
   for(const name of ['drawing','trench'])fixtureCandidate.media.push({asset_id:'dev-'+name,thumb_url:'https://example.org/'+name+'.jpg',source_page_url:'https://example.org/source',source_caption:'Synthetic fixture costume document, 1967.',credit_at_source:'Fixture museum',source_years:[1967],source_relation:'subject_caption_match',material_kind:'design_documentation'});
@@ -339,6 +340,10 @@ try {
   await page.getByRole('link',{name:'Open candidate in Studio →',exact:true}).click();
   await page.getByText('n8n development candidate',{exact:true}).waitFor();
   const devStoryId='CON-DEV-'+queued.job_id;
+  await page.goto(`${origin}/#/story/${devStoryId}/research`);
+  await page.getByText('Read the recorded source excerpt',{exact:true}).click();
+  await page.getByText('A labeled source-text fixture, not real editorial research.',{exact:true}).waitFor();
+  checks.push('native captured-source packet opens in Studio research without another fetch or asserting human verification');
   await page.goto(`${origin}/#/story/${devStoryId}/caption`);
   await page.getByLabel('Local caption draft').fill('Edited fixture development caption using the normal Studio editor.');
   await page.waitForFunction(()=>document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));

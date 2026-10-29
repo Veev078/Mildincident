@@ -1,3 +1,4 @@
+import {recordedSourceEvidence} from './source-evidence.js';
 import {createHash} from 'node:crypto';
 import {requireThat} from './errors.js';
 import {safePhotoReference} from './n8n/photo-url-guard.js';
@@ -63,9 +64,8 @@ export function captureEditorialEvidence(execution,{workerId,jobId,requestHash,c
   const requests=nodeItems(data,'Expand Claims for Link Check').filter(r=>r.url);const responses=nodeItems(data,'Check Source Links');
   const capturedAt=execution.stoppedAt||execution.startedAt;
   const sources=requests.slice(0,10).map((req,index)=>{const response=responses[index]||{};const body=response.body??response.data??'';const text=typeof body==='string'?readableSourceText(body):'';
-    const title=typeof body==='string'?readableSourceText((body.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)||[])[1]||''):'';
-    const status=Number(response.statusCode)||null;const maintenance=/maintenance|access denied|just a moment|attention required/i.test(title)||/temporairement en maintenance|temporarily unavailable|verify you are human/i.test(text.slice(0,1500));
-    return {url:safePhotoReference(req.url),claimIndex:req.claim_index,httpStatus:status,title:title.slice(0,400),access:status>=200&&status<300&&!maintenance&&text?'source_text_captured':status===404||status===410?'dead_reference':'access_unconfirmed',maintenancePage:maintenance,textExcerpt:text.slice(0,10000),contentHash:digest(text),capturedAt,basis:'recorded_n8n_execution',humanFactVerification:false};});
+    const packet=recordedSourceEvidence(response,tools.decode,candidate.claims[req.claim_index]?.claim||'',10000);
+    return {...packet,url:safePhotoReference(req.url),claimIndex:req.claim_index,contentHash:digest(text),capturedAt,basis:'recorded_n8n_execution'};});
   const scan=nodeItems(data,'Prepare First-Party Page Scan')[0];const page=nodeItems(data,'Fetch First-Party Page Metadata')[0];
   const rawHtml=page?.body??page?.data??'';const context={id:'DEV-'+jobId,subject:candidate.subject,title:candidate.title};const images=scan?inspectPhotoSource(rawHtml,scan.source_page_url,context):[];
   for(let index=0;index<requests.length;index++){if(sources[index]?.access!=='source_text_captured')continue;const response=responses[index]||{};for(const image of inspectPhotoSource(response.body??response.data??'',requests[index].url,context)){if(!images.some(existing=>existing.url===image.url))images.push(image);}}

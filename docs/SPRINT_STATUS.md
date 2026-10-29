@@ -1,3 +1,11 @@
+# Captured source passages before drafting — 2026-10-29
+
+Development drafting now receives bounded relevant source passages from already-fetched claim responses. HTTP200 maintenance pages, binary PDFs and unavailable/oversized text cannot count as usable evidence; all-unusable sources stop before drafting spend. Claim-index/URL-bound packets retain no headers and reach Studio Research directly. Capture/replay and native producer share the same extractor. Excerpts remain source text, not factual verification.
+
+Offline2254 replay recovers a530-character museum passage with1967 costume/2018 exhibition chronology, marks both503 references unavailable, passes the input-budget guard, preserves the original caption/photo IDs.17 focused client/evidence checks,8 worker checks, syntax and30 browser flows pass. Existing40-node worker saved INACTIVE c6464f37-4126-49ef-b492-d9a0ef6ed2dc, backed up/read back, no execution. First real story/decisions/local version3 preserved. Next safe increment: figure-caption and lazy photography extraction. No additional paid call.
+
+---
+
 # Recovered discovery routing + evidence ordering — 2026-10-29
 
 Resumed exact ea1ebf0 work; preserved tracked patch/untracked sources privately before repairs. Proactive requests no longer masquerade as founder submissions. Existing n8n preset/territory preparation runs; one branch is selected within the same budget, recent development subjects/territories reduce repetition, tested saved seed leads are skipped. On-demand founder direction/link remain exact. Selected route/preset provenance is retained with future candidates.
