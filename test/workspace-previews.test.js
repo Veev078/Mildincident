@@ -105,4 +105,27 @@ test('HTTP preview upload requires existing scoped asset, intent and declaration
   assert.equal(image.headers.get('cross-origin-resource-policy'), 'same-origin');
   assert.equal((await fetch(url + '?hash=../../private')).status, 400);
   assert.equal((await fetch(`${origin}/.local/previews.sqlite`)).status, 404);
+  const reviewUrl=url.replace(/preview$/,'review');
+  const reviewHeaders={'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'};
+  const reviewBody=JSON.stringify({decision:'reject',reason:'Does not serve the planned opening narrative',expectedVersion:0});
+  assert.equal((await fetch(reviewUrl.replace('/asset-1/','/foreign/'),{method:'POST',headers:reviewHeaders,body:reviewBody})).status,404);
+  assert.equal((await fetch(reviewUrl,{method:'POST',headers:reviewHeaders,body:reviewBody})).status,200);
+  assert.equal((await fetch(reviewUrl,{method:'POST',headers:reviewHeaders,body:reviewBody})).status,409);
+  const reviewed=await(await fetch(`${origin}/api/workspace`)).json();
+  assert.equal(reviewed.stories[0].media[0].localReview.decision,'reject');
+  assert.equal(reviewed.stories[0].revision,before.stories[0].revision);
+
+});
+
+test('editorial image reviews persist with append-only history, conflict checks and no source rights mutation',async t=>{
+ const {root,store,input}=await fixture(t);const source=buildWorkspace(workspaceSnapshot());const before=source.stories[0].revision;
+ let review=store.saveReview(input.storyId,input.assetId,{decision:'reject',reason:'Weak opening photograph for this particular narrative',expectedVersion:0});
+ assert.equal(review.localOnly,true);assert.equal(review.rightsGranted,false);assert.equal(review.version,1);
+ assert.throws(()=>store.saveReview(input.storyId,input.assetId,{decision:'shortlist',reason:'A conflicting simultaneous review',expectedVersion:0}),{code:'EDIT_CONFLICT'});
+ review=store.saveReview(input.storyId,input.assetId,{decision:'shortlist',reason:'Reconsidered after reviewing the complete source sequence',expectedVersion:1});
+ assert.equal(review.history.length,2);assert.equal(review.history[1].decision,'reject');
+ const other=new LocalPreviewStore(root);try{assert.equal(other.review(input.storyId,input.assetId).decision,'shortlist');}finally{other.close();}
+ attachLocalPreviews(source,store);assert.equal(source.stories[0].revision,before);assert.equal(source.stories[0].media[0].rightsStatus,'preview_unreviewed');assert.equal(source.stories[0].media[0].localReview.decision,'shortlist');
+ assert.equal(source.stories[0].selectedAssetIds.includes(input.assetId),true);
+ for(const bad of [{decision:'cleared',reason:'Attempting to grant rights',expectedVersion:2},{decision:'reject',reason:'short',expectedVersion:2},{decision:'reject',reason:'A valid reason with an unsupported field',expectedVersion:2,rightsGranted:true}])assert.throws(()=>store.saveReview(input.storyId,input.assetId,bad),{code:'INVALID_IMAGE_REVIEW'});
 });

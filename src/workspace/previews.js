@@ -25,7 +25,10 @@ export class LocalPreviewStore {
       asset_id TEXT NOT NULL, original_sha256 TEXT NOT NULL, preview_sha256 TEXT NOT NULL,
       original_name TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, original_width INTEGER NOT NULL,
       original_height INTEGER NOT NULL, original_format TEXT NOT NULL, uploaded_at TEXT NOT NULL,
-      UNIQUE(story_id,asset_id,original_sha256));`);
+      UNIQUE(story_id,asset_id,original_sha256));
+      CREATE TABLE IF NOT EXISTS local_image_review_events(story_id TEXT NOT NULL, asset_id TEXT NOT NULL,
+      version INTEGER NOT NULL, decision TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL,
+      PRIMARY KEY(story_id,asset_id,version));`);
   }
 
   #public(row) {
@@ -115,17 +118,44 @@ export class LocalPreviewStore {
     return { bytes: await this.#readBlob(preview.sha256, 'jpg'), preview };
   }
 
+  review(storyId, assetId) {
+    const rows = this.db.prepare('SELECT * FROM local_image_review_events WHERE story_id=? AND asset_id=? ORDER BY version DESC').all(storyId, assetId);
+    const latest = rows[0];
+    return latest ? { decision: latest.decision, reason: latest.reason, version: latest.version, updatedAt: latest.created_at,
+      localOnly: true, rightsGranted: false, history: rows.slice(0, 50).map(r => ({version:r.version, decision:r.decision, reason:r.reason, updatedAt:r.created_at})) } : null;
+  }
+
+  allReviews() {
+    const scopes = this.db.prepare('SELECT DISTINCT story_id,asset_id FROM local_image_review_events').all();
+    return new Map(scopes.map(r => [JSON.stringify([r.story_id,r.asset_id]), this.review(r.story_id,r.asset_id)]));
+  }
+
+  saveReview(storyId, assetId, input) {
+    requireThat(input && typeof input === 'object' && !Array.isArray(input) && Object.keys(input).every(k => ['expectedVersion','decision','reason'].includes(k)), 'INVALID_IMAGE_REVIEW', 'Use an editorial decision and reason only.');
+    requireThat(['shortlist','reject','hold'].includes(input.decision) && typeof input.reason === 'string' && input.reason.trim().length >= 8 && input.reason.length <= 1500, 'INVALID_IMAGE_REVIEW', 'Choose a decision and give a reason between 8 and 1500 characters.');
+    requireThat(Number.isSafeInteger(input.expectedVersion) && input.expectedVersion >= 0, 'INVALID_IMAGE_REVIEW', 'A review version is required.');
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const previous = this.review(storyId,assetId);
+      requireThat((previous?.version || 0) === input.expectedVersion, 'EDIT_CONFLICT', 'Another tab changed this image review. Reopen it before saving.');
+      this.db.prepare('INSERT INTO local_image_review_events VALUES(?,?,?,?,?,?)').run(storyId,assetId,input.expectedVersion+1,input.decision,input.reason.trim(),new Date().toISOString());
+      this.db.exec('COMMIT'); return this.review(storyId,assetId);
+    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+  }
+
   close() { this.db.close(); }
 }
 
 export function attachLocalPreviews(workspace, previews) {
   if (!previews) return workspace;
   const attachments = previews.all();
+  const reviews = previews.allReviews();
   for (const story of workspace.stories) for (const asset of story.media) {
     const preview = attachments.get(JSON.stringify([story.id, asset.id])) || null;
     if (!Object.hasOwn(asset, 'sourcePreviewUrl')) asset.sourcePreviewUrl = asset.previewUrl;
     asset.previewOrigin = preview ? 'local_upload' : 'source';
     asset.localPreview = preview;
+    asset.localReview = reviews.get(JSON.stringify([story.id, asset.id])) || null;
     if (preview) asset.previewUrl = `/api/stories/${encodeURIComponent(story.id)}/assets/${encodeURIComponent(asset.id)}/preview?hash=${preview.sha256}`;
   }
   return workspace;

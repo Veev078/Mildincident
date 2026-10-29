@@ -1,3 +1,7 @@
+# Carousel and image-taste checkpoint — 2026-10-29
+
+Third production increment: large carousel rehearsal (keyboard, framing, roles/caption/music) and per-image human shortlist/reject/hold feedback with reasons, append-only history and optimistic conflicts. No automatic slide removal or rights changes.113 automated tests and22 Chromium workflows pass; actual18-story source smoke passes with only temporary local stores. Discovery shows0 new candidates and5 developing stories, rather than invented research. See CAROUSEL_AND_TASTE_REVIEW.md. Next improve feedback filtering and harden research handoff validation; n8n create remains blocked by auto-review pending direct confirmation.
+
 # Discovery desk checkpoint — 2026-10-29
 
 Second increment: persisted local discovery/creative briefs, versioned append-only handoff/link events, n8n-native authenticated form links and source-derived small review slates.111 automated tests and20 browser workflows passed before final documentation changes. Existing form GETs return401 without session; no research submission/new stories created. Both modes reuse the actual existing engine, with explicit user submission and refresh/link steps. See DISCOVERY_DESK.md. Continue next with carousel rehearsal.

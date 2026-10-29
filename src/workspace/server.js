@@ -2,6 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildDiscoveryDesk } from '../editorial-discovery.js';
 import { WorkspaceSource } from './data-source.js';
 import { LocalResearchStore } from './research-store.js';
 import { LocalDraftStore } from './store.js';
@@ -45,6 +46,7 @@ async function imageBody(request) {
 export function createWorkspaceServer({ source, drafts, previews, research, webRoot = WEB_ROOT }) {
   const view = () => {
     const workspace = attachLocalPreviews(source.view(drafts.all()), previews);
+    workspace.discovery = buildDiscoveryDesk(workspace.stories);
     workspace.researchRequests = research?.all() || [];
     workspace.researchHandoffAvailable = Boolean(research);
     return workspace;
@@ -84,7 +86,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, webR
         source.refresh().catch(() => {}); // Failure is exposed by next workspace read, never logged with secrets.
         json(response, 202, { refreshing: true, productionChanges: 0 }); return;
       }
-      const previewMatch = url.pathname.match(/^\/api\/stories\/(CON-[A-Za-z0-9_-]{1,120})\/assets\/([^/]{1,1200})\/preview$/);
+      const previewMatch = url.pathname.match(/^\/api\/stories\/(CON-[A-Za-z0-9_-]{1,120})\/assets\/([^/]{1,1200})\/(preview|review)$/);
       if (previewMatch) {
         requireThat(previews, 'PREVIEW_UNAVAILABLE', 'The private preview store is unavailable.');
         const storyId = previewMatch[1];
@@ -95,6 +97,11 @@ export function createWorkspaceServer({ source, drafts, previews, research, webR
           requireThat(story && story.media.filter(m => m.id === assetId).length === 1, 'STORY_NOT_FOUND', 'An exact existing story/image record is required.');
         };
         findAsset();
+        if (previewMatch[3] === 'review') {
+          requireThat(request.method === 'POST', 'METHOD_NOT_ALLOWED', 'Use the local review action.');
+          const input = await body(request); findAsset();
+          json(response, 200, { review: previews.saveReview(storyId, assetId, input), scope: 'local_only', rightsGranted: false, productionApplied: false }); return;
+        }
         if (request.method === 'GET') {
           const result = await previews.readPreview(storyId, assetId, url.searchParams.get('hash') ?? undefined);
           response.writeHead(200, { 'Content-Type': 'image/jpeg', 'Content-Length': result.bytes.length,

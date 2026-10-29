@@ -101,6 +101,21 @@ try {
   await page.waitForFunction(() => document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));
   assert.deepEqual(drafts.get(id).selectedAssetIds, ['asset-2', 'asset-1']);
   checks.push('accessible carousel move controls persist ordered local sequence');
+  const beforeRehearsal=JSON.stringify(drafts.get(id));
+  await page.getByRole('button',{name:'Rehearse carousel',exact:true}).click();
+  await page.getByText('Slide 1 of 2',{exact:true}).waitFor();
+  assert.ok(await page.getByRole('button',{name:'Previous carousel image'}).isDisabled());
+  await page.keyboard.press('ArrowRight');
+  await page.getByText('Slide 2 of 2',{exact:true}).waitFor();
+  assert.ok(await page.getByRole('button',{name:'Next carousel image'}).isDisabled());
+  await page.getByLabel('Framing',{exact:true}).selectOption('original');
+  await page.locator('[data-rehearsal][data-fit="original"]').waitFor();
+  await page.getByRole('button',{name:'Previous carousel image'}).click();
+  await page.getByText('Slide 1 of 2',{exact:true}).waitFor();
+  await page.keyboard.press('Escape');
+  assert.equal(JSON.stringify(drafts.get(id)),beforeRehearsal);
+  checks.push('large carousel rehearsal supports keyboard navigation and full-image framing without editing saved sequence');
+
   await page.goto(`${origin}/#/story/${id}/images`);
   await page.locator('[data-action="compare-asset"]').nth(0).click();
   await page.locator('[data-action="compare-asset"]').nth(1).click();
@@ -123,6 +138,19 @@ try {
   await page.waitForFunction(() => { const img = document.querySelector('#asset-dialog img'); return img?.complete && img.naturalWidth === 900; });
   await page.getByRole('button', { name: 'Close image details' }).click();
   checks.push('private preview upload renders actual decoded bytes, persists on reload and preserves source rights');
+  await page.locator('[data-action="inspect"]').first().click();
+  const reviewForm=page.locator('[data-image-review]');
+  await reviewForm.getByLabel('Editorial decision').selectOption('reject');
+  await reviewForm.getByLabel('Why this image?').fill('This image has less narrative presence than the other opening choice.');
+  await reviewForm.getByRole('button',{name:'Save editorial review'}).click();
+  await page.getByText('This rejected image is still in the carousel.',{exact:false}).waitFor();
+  assert.deepEqual(drafts.get(id).selectedAssetIds,['asset-2','asset-1']);
+  await page.reload();await page.locator('[data-action="inspect"]').first().click();
+  await page.getByText('Editorial review history (1 versions)',{exact:true}).waitFor();
+  assert.equal(await page.getByLabel('Editorial decision').inputValue(),'reject');
+  await page.getByRole('button',{name:'Close image details'}).click();
+  checks.push('image taste feedback persists with explicit rejection warning while source rights and selected slides remain unchanged');
+
   await page.route('https://example.org/thumb/**', route => route.abort());
   await page.reload();
   await page.locator('.preview-retry:visible').first().waitFor();
@@ -219,13 +247,13 @@ try {
 
   for (const width of [1440, 768, 390, 375]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const route of ['home', 'pipeline', 'library', `story/${id}/carousel`, `story/${id}/caption`, `story/${id}/direction`, 'publishing', 'archive', 'analytics']) {
+    for (const route of ['discovery', 'home', 'pipeline', 'library', `story/${id}/carousel`, `story/${id}/caption`, `story/${id}/direction`, 'publishing', 'archive', 'analytics']) {
       await page.goto(`${origin}/#/${route}`);
       await page.locator('h1').waitFor();
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `Unexpected horizontal overflow at ${width}px on ${route}`);
     }
   }
-  checks.push('nine views fit desktop, tablet, 390px and 375px without page overflow');
+  checks.push('ten views fit desktop, tablet, 390px and 375px without page overflow');
   await page.goto(`${origin}/#/home`);
   await page.screenshot({ path: path.join(artifactRoot, 'fixture-mobile.png'), fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });

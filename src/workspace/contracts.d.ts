@@ -23,7 +23,13 @@ export interface SourceObservation {
   warnings: string[]; productionMutationsEnabled: false;
   refreshError?: {code: string; message: string} | null;
 }
+export interface ImageEditorialReview {
+  decision: 'shortlist' | 'reject' | 'hold'; reason: string; version: number; updatedAt: string;
+  localOnly: true; rightsGranted: false;
+  history: {version: number; decision: string; reason: string; updatedAt: string}[];
+}
 export interface MediaCandidate {
+  localReview?: ImageEditorialReview | null;
   id: string; title: string; creator: string; sourceUrl: string; previewUrl: string;
   license: string; rightsStatus: string; provider: string; width: number | null; height: number | null; selected: boolean;
   sourcePreviewUrl: string; previewOrigin: 'source' | 'local_upload'; localPreview: LocalPreview | null;

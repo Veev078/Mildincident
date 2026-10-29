@@ -16,6 +16,7 @@ let searchTimer;
 let toastTimer;
 let keyboardPrefix = false;
 let drag = null;
+let rehearsal = null;
 
 function route() {
   const [view = 'home', encodedId, tab = 'overview'] = location.hash.replace(/^#\/?/, '').split('/');
@@ -222,6 +223,18 @@ function openDialog(html) {
   dialog.querySelector('button')?.focus();
 }
 
+function showRehearsal(story, index = 0, fit = 'frame') {
+  if (!story) return;
+  const count = effective(story).selectedAssetIds.length;
+  if (!count) return;
+  const focusAction = document.activeElement?.dataset.action;
+  rehearsal = { storyId: story.id, index: Math.max(0, Math.min(count - 1, index)), fit };
+  openDialog(views.carouselRehearsal(story, rehearsal.index, fit));
+  const nextFocus = ['rehearse-step'].includes(focusAction) ? document.querySelector(`#asset-dialog [data-action="${focusAction}"]:not(:disabled)`) : null;
+  nextFocus?.focus();
+  announce(`Carousel rehearsal: slide ${rehearsal.index + 1} of ${count}.`);
+}
+
 async function openHistory(story) {
   if (!story) return;
   try {
@@ -319,6 +332,8 @@ document.addEventListener('click', event => {
       photo.querySelector('.preview-status').textContent = 'Retrying preview…';
       const src = img.getAttribute('src'); img.removeAttribute('src'); img.setAttribute('src', src); break;
     }
+    case 'rehearse-story': showRehearsal(story); break;
+    case 'rehearse-step': if (rehearsal) showRehearsal(storyById(rehearsal.storyId), rehearsal.index + Number(button.dataset.step), rehearsal.fit); break;
     case 'prepare-discovery':
       button.disabled = true;
       createResearchRequest({kind:'discovery',prompt:'Discover a small culture-led slate using the current n8n editorial preset.',sourceUrl:''}).catch(error=>toast(error.message,{error:true})).finally(()=>{button.disabled=false;}); break;
@@ -425,6 +440,10 @@ document.addEventListener('input', event => {
 });
 
 document.addEventListener('change', event => {
+  if (event.target.matches('[data-rehearsal-fit]') && rehearsal) {
+    showRehearsal(storyById(rehearsal.storyId), rehearsal.index, event.target.value);
+    document.querySelector('[data-rehearsal-fit]')?.focus(); return;
+  }
   const input = event.target;
   if (input.id === 'library-rights') { state.libraryRights = input.value; render(); }
   if (input.dataset.briefField && !input.matches('textarea,input[type="text"]')) {
@@ -529,6 +548,18 @@ document.addEventListener('submit', async event => {
 });
 
 document.addEventListener('submit', async event => {
+  const form = event.target.closest('[data-image-review]'); if (!form) return;
+  event.preventDefault(); const button = form.querySelector('button[type="submit"]'); const status = form.querySelector('[data-review-status]');
+  button.disabled=true; status.textContent='Saving your editorial judgment…';
+  try {
+    await api(`/api/stories/${encodeURIComponent(form.dataset.story)}/assets/${encodeURIComponent(form.dataset.asset)}/review`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({expectedVersion:Number(form.dataset.version),decision:form.elements.decision.value,reason:form.elements.reason.value})});
+    await loadWorkspace({quiet:true});const story=storyById(form.dataset.story);const asset=story?.media.find(a=>a.id===form.dataset.asset);
+    if(form.isConnected&&asset)openDialog(views.assetDialog(story,asset));
+    toast('Editorial review saved locally. Image rights and carousel selection are unchanged.');
+  }catch(error){status.textContent=error.message;}finally{button.disabled=false;}
+});
+
+document.addEventListener('submit', async event => {
   const form = event.target.closest('[data-preview-upload]'); if (!form) return;
   event.preventDefault();
   const status = form.querySelector('[data-upload-status]'); const button = form.querySelector('button[type="submit"]');
@@ -552,6 +583,12 @@ document.addEventListener('submit', async event => {
 
 document.addEventListener('keydown', event => {
   const input = event.target.closest('input,textarea,select,[contenteditable="true"]');
+  if (!input && document.querySelector('#asset-dialog[open] [data-rehearsal]') && rehearsal && !event.metaKey && !event.ctrlKey && !event.altKey && ['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) {
+    event.preventDefault();
+    const story = storyById(rehearsal.storyId);
+    const index = event.key==='Home'?0:event.key==='End'?effective(story).selectedAssetIds.length-1:rehearsal.index+(event.key==='ArrowRight'?1:-1);
+    showRehearsal(story,index,rehearsal.fit); return;
+  }
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's' && route().view === 'story') {
     event.preventDefault(); flushDraft(route().id); return;
   }
