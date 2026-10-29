@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import sharp from 'sharp';
+import { safePhotoReference } from '../n8n/photo-url-guard.js';
 import { HandoffError, requireThat } from '../errors.js';
 
 export const MAX_PREVIEW_BYTES = 25 * 1024 * 1024;
@@ -28,13 +29,17 @@ export class LocalPreviewStore {
       UNIQUE(story_id,asset_id,original_sha256));
       CREATE TABLE IF NOT EXISTS local_image_review_events(story_id TEXT NOT NULL, asset_id TEXT NOT NULL,
       version INTEGER NOT NULL, decision TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL,
-      PRIMARY KEY(story_id,asset_id,version));`);
+      PRIMARY KEY(story_id,asset_id,version));
+      CREATE TABLE IF NOT EXISTS local_source_preview_evidence(story_id TEXT NOT NULL, asset_id TEXT NOT NULL,
+      preview_sha256 TEXT NOT NULL, source_url TEXT NOT NULL, image_url TEXT NOT NULL, execution_id TEXT NOT NULL,
+      inspected_at TEXT NOT NULL, PRIMARY KEY(story_id,asset_id,preview_sha256));`);
   }
 
   #public(row) {
     return row ? { originalSha256: row.original_sha256, sha256: row.preview_sha256, originalName: row.original_name,
       width: row.width, height: row.height, originalWidth: row.original_width, originalHeight: row.original_height,
       originalFormat: row.original_format, uploadedAt: row.uploaded_at,
+      sourceInspection: this.sourceInspection(row.story_id,row.asset_id,row.preview_sha256),
       localOnly: true, rightsGranted: false, identityVerified: false } : null;
   }
 
@@ -118,6 +123,14 @@ export class LocalPreviewStore {
     return { bytes: await this.#readBlob(preview.sha256, 'jpg'), preview };
   }
 
+  sourceInspection(storyId,assetId,hash){const row=this.db.prepare('SELECT * FROM local_source_preview_evidence WHERE story_id=? AND asset_id=? AND preview_sha256=?').get(storyId,assetId,hash);return row?{sourceUrl:row.source_url,imageUrl:row.image_url,executionId:row.execution_id,inspectedAt:row.inspected_at,basis:'recorded_source_copy',identityVerified:false,rightsGranted:false}:null;}
+  recordSourceInspection(storyId,assetId,hash,{sourceUrl,imageUrl,executionId}){
+    requireThat(this.get(storyId,assetId,hash),'PREVIEW_NOT_FOUND','A decoded existing private preview is required.');
+    requireThat(safePhotoReference(sourceUrl)&&safePhotoReference(imageUrl)&&/^[0-9]{1,30}$/.test(executionId),'INVALID_PREVIEW_SOURCE','Recorded public URLs and a native inspection execution are required.');
+    this.db.prepare('INSERT OR IGNORE INTO local_source_preview_evidence VALUES(?,?,?,?,?,?,?)').run(storyId,assetId,hash,sourceUrl,imageUrl,executionId,new Date().toISOString());
+    return this.get(storyId,assetId,hash);
+  }
+
   review(storyId, assetId) {
     const rows = this.db.prepare('SELECT * FROM local_image_review_events WHERE story_id=? AND asset_id=? ORDER BY version DESC').all(storyId, assetId);
     const latest = rows[0];
@@ -153,7 +166,7 @@ export function attachLocalPreviews(workspace, previews) {
   for (const story of workspace.stories) for (const asset of story.media) {
     const preview = attachments.get(JSON.stringify([story.id, asset.id])) || null;
     if (!Object.hasOwn(asset, 'sourcePreviewUrl')) asset.sourcePreviewUrl = asset.previewUrl;
-    asset.previewOrigin = preview ? 'local_upload' : 'source';
+    asset.previewOrigin = preview ? (preview.sourceInspection ? 'source_cache' : 'local_upload') : 'source';
     asset.localPreview = preview;
     asset.localReview = reviews.get(JSON.stringify([story.id, asset.id])) || null;
     if (preview) asset.previewUrl = `/api/stories/${encodeURIComponent(story.id)}/assets/${encodeURIComponent(asset.id)}/preview?hash=${preview.sha256}`;

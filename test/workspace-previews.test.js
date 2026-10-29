@@ -129,3 +129,11 @@ test('editorial image reviews persist with append-only history, conflict checks 
  assert.equal(source.stories[0].selectedAssetIds.includes(input.assetId),true);
  for(const bad of [{decision:'cleared',reason:'Attempting to grant rights',expectedVersion:2},{decision:'reject',reason:'short',expectedVersion:2},{decision:'reject',reason:'A valid reason with an unsupported field',expectedVersion:2,rightsGranted:true}])assert.throws(()=>store.saveReview(input.storyId,input.assetId,bad),{code:'INVALID_IMAGE_REVIEW'});
 });
+
+test('private source copies retain recorded inspection provenance without granting identity or rights',async t=>{
+ const {store,input}=await fixture(t);const preview=await store.save(input);assert.equal(preview.sourceInspection,null);
+ const record=store.recordSourceInspection(input.storyId,input.assetId,preview.sha256,{sourceUrl:'https://archive.example.org/page',imageUrl:'https://archive.example.org/image.jpg',executionId:'2500'});
+ assert.equal(record.sourceInspection.basis,'recorded_source_copy');assert.equal(record.identityVerified,false);assert.equal(record.rightsGranted,false);
+ const workspace=buildWorkspace(workspaceSnapshot());attachLocalPreviews(workspace,store);assert.equal(workspace.stories[0].media[0].previewOrigin,'source_cache');
+ assert.throws(()=>store.recordSourceInspection(input.storyId,input.assetId,preview.sha256,{sourceUrl:'http://archive.example.org/page',imageUrl:'https://archive.example.org/a.jpg',executionId:'2500'}),{code:'INVALID_PREVIEW_SOURCE'});
+});

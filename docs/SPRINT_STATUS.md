@@ -1,3 +1,13 @@
+# Evidence/photography recovery checkpoint — 2026-10-29
+
+Second increment: captured-source/usage inspection, full caption/credit/date metadata, source-variant grouping, supplemental museum image references, single-image preservation and no automatic gallery padding. Original AI result remains in n8n. Working local caption now uses the1974 mirror photograph with correct chronology and no audience-pitch copy. Decision remains needs_research (two503 sources/rights gap), not publication approval.
+
+Actual source image was retrieved once via a temporary recorded-ID-only n8n inspector, directly viewed, decoded1920×1286 and privately cached1600×1072 with execution2257 provenance. Source helper is deactivated. No generic URL downloader/proxy was added; no rights granted. Readiness handshake fixes n8n activation registration lag without re-dispatching the paid generation.
+
+141 tests/26 browser flows passed; actual Studio smoke confirms target1/selected1, seven source artifacts, decoded private image, usage disclosure and no JS errors. See LIVE_GENERATION_REVIEW.md. First paid allowance is CONSUMED (2254); do not run another. Next continue zero-paid improvements to inactive producer prompts, extraction/readiness gates, creative format controls and soundtrack reasoning.
+
+---
+
 # Single paid test consumed — 2026-10-29
 
 The user's ONE approved live generation completed as n8n2254, job99de2099-d762-40d5-85d9-222ba3c241db. Exactlyone Research Candidates node andone Draft Editorial Concept node ran. Candidate: Deneuve/Yves Saint Laurent/Belle de Jour; original generated record is preserved in development storage. Worker deactivated in finally and verified inactive. DO NOT run another paid generation under this approval. Durable one-shot marker/private response/execution: `.local/engine-build/approved-single-run*` and approved-generation-execution.json.

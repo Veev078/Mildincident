@@ -541,7 +541,7 @@ document.addEventListener('click', async event=>{
   try{
     const action=button.dataset.engineAction;
     await api(action==='refresh'?'/api/research/engine/refresh':`/api/research/requests/${button.dataset.request}/engine/${action}`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(action==='start'?{expectedVersion:Number(button.dataset.version)}:{})});
-    await loadWorkspace({quiet:true});toast(action==='queue'?'Queued in isolated n8n development storage. No AI run was started.':action==='start'?'Bounded generation dispatched once. Refresh results to reconcile its status.':'Development engine results refreshed.');
+    await loadWorkspace({quiet:true});toast(action==='queue'?'Queued in isolated n8n development storage. No AI run was started.':action==='evidence'?'Captured execution evidence inspected without a new provider call.':action==='start'?'Bounded generation dispatched once. Refresh results to reconcile its status.':'Development engine results refreshed.');
   }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
 });
 document.addEventListener('submit',async event=>{

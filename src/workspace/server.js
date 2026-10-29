@@ -52,7 +52,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     workspace.researchRequests = research?.all() || [];
     workspace.engine = engine?.status() || {configured:false,generationAvailable:false,generationApproved:false,workerActive:false};
     for (const request of workspace.researchRequests) for (const candidate of request.engineJob?.candidates || []) {
-      const story = developmentCandidateStory(candidate,{soundtrack:source.snapshot?.records?.soundtrack || [],drafts:drafts.all(),decision:request.engineJob.reviewDecisions?.[candidate.id]||null});
+      const story = developmentCandidateStory(candidate,{soundtrack:source.snapshot?.records?.soundtrack || [],drafts:drafts.all(),decision:request.engineJob.reviewDecisions?.[candidate.id]||null,evidence:request.engineJob.evidence?.[candidate.id]||null});
       requireThat(!workspace.stories.some(s=>s.id===story.id),'AMBIGUOUS_ENGINE_RESULT','Development story identity collides with an existing record.');
       workspace.stories.push(story);
     }
@@ -90,12 +90,13 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
         requireThat(engine,'ENGINE_NOT_CONFIGURED','Private development engine connection is unavailable.');
         json(response,200,{engine:await engine.refresh(),productionApplied:false});return;
       }
-      const engineMatch=url.pathname.match(/^\/api\/research\/requests\/([a-f0-9-]{36})\/engine\/(queue|start|review)$/);
+      const engineMatch=url.pathname.match(/^\/api\/research\/requests\/([a-f0-9-]{36})\/engine\/(queue|start|review|evidence)$/);
       if(engineMatch && request.method==='POST'){
         requireThat(engine,'ENGINE_NOT_CONFIGURED','Private development engine connection is unavailable.');
         const input=await body(request);let job;
         if(engineMatch[2]==='queue'){requireThat(input&&Object.keys(input).length===0,'INVALID_RESEARCH_REQUEST','Queue requires only a saved request identity.');job=await engine.queue(engineMatch[1]);}
         else if(engineMatch[2]==='start'){requireThat(input&&Object.keys(input).every(k=>k==='expectedVersion'),'INVALID_RESEARCH_REQUEST','Unsupported start fields.');job=await engine.start(engineMatch[1],input.expectedVersion);}
+        else if(engineMatch[2]==='evidence'){requireThat(Object.keys(input).length===0,'INVALID_RESEARCH_REQUEST','Evidence inspection takes no caller URLs or execution IDs.');job=await engine.captureEvidence(engineMatch[1]);}
         else job=engine.review(engineMatch[1],input);
         json(response,engineMatch[2]==='start'?202:200,{job,scope:'development_only',productionApplied:false});return;
       }

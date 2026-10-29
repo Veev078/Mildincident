@@ -32,9 +32,9 @@ export interface MediaCandidate {
   localReview?: ImageEditorialReview | null;
   id: string; title: string; creator: string; sourceUrl: string; previewUrl: string;
   license: string; rightsStatus: string; provider: string; width: number | null; height: number | null; selected: boolean;
-  sourcePreviewUrl: string; previewOrigin: 'source' | 'local_upload'; localPreview: LocalPreview | null;
+  sourcePreviewUrl: string; previewOrigin: 'source' | 'local_upload' | 'source_cache'; localPreview: LocalPreview | null;
 }
-export interface LocalPreview { originalSha256:string; sha256:string; originalName:string; uploadedAt:string;
+export interface LocalPreview { sourceInspection?: {sourceUrl:string; imageUrl:string; executionId:string; inspectedAt:string; basis:'recorded_source_copy'; identityVerified:false; rightsGranted:false} | null; originalSha256:string; sha256:string; originalName:string; uploadedAt:string;
   width:number;height:number;originalWidth:number;originalHeight:number;originalFormat:string;
   localOnly:true;rightsGranted:false;identityVerified:false }
 export interface EditorialStory {
@@ -60,6 +60,7 @@ export interface ResearchRequest {
 export interface DevelopmentCandidate {
   id: string; jobId: string; status: 'ready_to_review' | 'needs_research' | 'approved' | 'rejected';
   title: string; subject: string; hook: string; captionDraft: string; carouselOutline: string;
+  format?: 'single_image' | 'carousel' | 'visual_essay' | 'reel'; targetSlideCount?: number; outlineSlides?: string[];
   claims: {claim: string; claimType: string; sourceName: string; url: string; linkStatus: string}[];
   media: MediaCandidate[]; gaps: string[];
   provenance: {executionId: string; researchWorkflowId: string; researchActiveVersion: string; kind: string; generatedAt: string};

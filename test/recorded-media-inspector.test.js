@@ -1,0 +1,11 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {safePhotoReference} from '../src/n8n/photo-url-guard.js';import {resolveRecordedMedia,validateImageHead,buildRecordedMediaInspector,MAX_SOURCE_IMAGE_BYTES} from '../src/n8n/recorded-media-inspector.js';
+const scope={job_id:'job',asset_id:'photo'};const row={job_id:'job',candidate_json:JSON.stringify({jobId:'job',media:[{asset_id:'photo',source_page_url:'https://archive.example.org/page',thumb_url:'https://archive.example.org/photo.jpg'}]})};
+test('media inspection resolves only a recorded asset on its recorded source host, never caller URLs',()=>{
+ assert.equal(resolveRecordedMedia([row],scope,safePhotoReference).url,'https://archive.example.org/photo.jpg');assert.throws(()=>resolveRecordedMedia([row],{...scope,asset_id:'other'},safePhotoReference));assert.throws(()=>resolveRecordedMedia([row,row],scope,safePhotoReference));
+ for(const url of ['https://127.0.0.1/a.jpg','https://other.example.org/a.jpg','http://archive.example.org/a.jpg']){const r={...row,candidate_json:JSON.stringify({jobId:'job',media:[{asset_id:'photo',source_page_url:'https://archive.example.org/page',thumb_url:url}]})};assert.throws(()=>resolveRecordedMedia([r],scope,safePhotoReference));}
+});
+test('HEAD bounds still-image MIME and size before the image read',()=>{
+ const head={statusCode:200,headers:{'Content-Type':'image/jpeg','Content-Length':'1200'}};assert.equal(validateImageHead(head,MAX_SOURCE_IMAGE_BYTES).expectedBytes,1200);
+ for(const bad of [{...head,statusCode:302},{...head,headers:{'content-type':'image/svg+xml','content-length':'100'}},{...head,headers:{'content-type':'image/jpeg'}},{...head,headers:{'content-type':'image/jpeg','content-length':String(MAX_SOURCE_IMAGE_BYTES+1)}}])assert.throws(()=>validateImageHead(bad,MAX_SOURCE_IMAGE_BYTES));
+ const workflow=buildRecordedMediaInspector({candidatesTableId:'dev-table',credentialId:'dev-auth',credentialName:'Development'});assert.ok(!workflow.nodes.some(n=>/openAi|scheduleTrigger|executeWorkflow/.test(n.type)));assert.ok(workflow.nodes.filter(n=>n.type.endsWith('dataTable')).every(n=>n.parameters.operation==='get'));assert.equal(workflow.nodes[0].parameters.authentication,'headerAuth');
+});

@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {requireThat} from '../errors.js';
+import {captureEditorialEvidence} from '../editorial-evidence.js';
 import {requestFingerprint} from './editorial-engine-client.js';
 const REMOTE_STATES=new Set(['queued','generating','ready_to_review','needs_research','failed','rejected','approved']);
 export class EditorialEngineService {
@@ -24,8 +25,12 @@ export class EditorialEngineService {
         if(local.state!==observedState||local.nativeStatus!==row.status||local.lastError!==data.lastError||JSON.stringify(local.candidates||[])!==JSON.stringify(result)||local.executionId!==data.executionId)this.research.recordEngineState(request.id,observedState,data);
       }return this.status();})();try{return await this.refreshing;}finally{this.refreshing=null;}
   }
+  async captureEvidence(id){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The development connection is unavailable.');const request=this.research.get(id);const job=request?.engineJob;requireThat(job?.executionId&&job.candidates?.length===1,'INVALID_ENGINE_RESULT','Reconcile one completed candidate before inspecting its execution.');
+    const execution=await this.client.executionDetails(job.executionId);const candidate=job.candidates[0];const evidence=captureEditorialEvidence(execution,{workerId:this.client.connection.editorialWorkerId,jobId:id,requestHash:requestFingerprint(request),candidate});
+    return this.research.recordEngineState(id,job.state,{evidence:{...(job.evidence||{}),[candidate.id]:evidence}},job.version);
+  }
   review(id,input){
-    requireThat(input&&Object.keys(input).every(k=>['candidateId','decision','reason','expectedVersion'].includes(k))&&['approved','rejected'].includes(input.decision)&&typeof input.reason==='string'&&input.reason.trim().length>=10&&input.reason.length<=2000&&Number.isSafeInteger(input.expectedVersion),'INVALID_ENGINE_REVIEW','Choose an editorial decision, reason and current job version.');
+    requireThat(input&&Object.keys(input).every(k=>['candidateId','decision','reason','expectedVersion'].includes(k))&&['approved','rejected','needs_research'].includes(input.decision)&&typeof input.reason==='string'&&input.reason.trim().length>=10&&input.reason.length<=2000&&Number.isSafeInteger(input.expectedVersion),'INVALID_ENGINE_REVIEW','Choose an editorial decision, reason and current job version.');
     const job=this.research.engineJob(id);requireThat(job?.candidates?.some(c=>c.id===input.candidateId),'INVALID_ENGINE_REVIEW','Review an existing correlated development result.');
     return this.research.recordEngineState(id,job.state,{reviewDecisions:{...(job.reviewDecisions||{}),[input.candidateId]:{decision:input.decision,reason:input.reason.trim(),createdAt:new Date().toISOString()}}},input.expectedVersion);
   }
