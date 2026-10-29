@@ -23,14 +23,29 @@ export function photoEvidenceTools(publicReference) {
   const hash=value=>{let h=2166136261;for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h.toString(36);};
   function inspect(html,page,story={}) {
     if(typeof html!=='string'||html.length>2500000||!publicReference(page))return [];
-    const candidates=new Map();const body=html.slice(0,300000);
-    const add=(url,caption,isCover,width,height)=>{url=resolve(url,page);if(!url||/\/(?:logo|favicon|avatar|icon|sprite|pixel|spinner)[._/-]/i.test(url)||/\.svg(?:[?#]|$)/i.test(url))return;
+    const candidates=new Map();const body=html.slice(0,300000).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi,' ').replace(/<!--[\s\S]*?-->/g,' ');
+    const captionText=value=>decode(String(value||'').replace(/<[^>]+>/g,' ')).replace(/\s+/g,' ').trim().slice(0,2000);
+    const figures=[...body.matchAll(/<figure\b[^>]*>[\s\S]*?<\/figure>/gi)].slice(0,260).map(m=>({start:m.index,end:m.index+m[0].length,html:m[0],images:[...m[0].matchAll(/<img\b/gi)].length,caption:captionText((m[0].match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/i)||[])[1]||'')}));
+    const referencedCaptions=new Map();for(const m of [...body.matchAll(/<(figcaption|p|span)\b([^>]*)>([\s\S]*?)<\/\1>/gi)].slice(0,500)){const a=attrs(m[2]);if(a.id)referencedCaptions.set(a.id,captionText(m[3]));}
+    const add=(url,caption,isCover,width,height,captionBasis='image_alt')=>{url=resolve(url,page);if(!url||/\/(?:logo|favicon|avatar|icon|sprite|pixel|spinner)[._/-]/i.test(url)||/\.svg(?:[?#]|$)/i.test(url))return;
       const key=fileKey(url);const previous=candidates.get(key);const referenceVariants=[...new Set([...(previous?.referenceVariants||[]),url])];if(previous&&!previous.isCover){previous.referenceVariants=referenceVariants;previous.duplicateBasis=referenceVariants.length>1?'source_file_reference_variant':'none';return;}
-      candidates.set(key,{url,referenceVariants,duplicateBasis:referenceVariants.length>1?'source_file_reference_variant':'none',sameImageVerified:false,caption:String(caption||'').trim().slice(0,2000),isCover,reportedWidth:width||null,reportedHeight:height||null});};
+      candidates.set(key,{url,referenceVariants,duplicateBasis:referenceVariants.length>1?'source_file_reference_variant':'none',sameImageVerified:false,caption:String(caption||'').trim().slice(0,2000),captionBasis,isCover,reportedWidth:width||null,reportedHeight:height||null});};
     for(const tag of [...body.matchAll(/<meta\b[^>]*>/gi)].slice(0,250)){const a=attrs(tag[0]);if(['og:image','og:image:secure_url','twitter:image','twitter:image:src'].includes((a.property||a.name||'').toLowerCase()))add(a.content,'Page cover / social preview',true);}
-    for(const tag of [...body.matchAll(/<img\b[^>]*>/gi)].slice(0,260)){const a=attrs(tag[0]);const responsive=String(a.srcset||a['data-srcset']||'').split(',').map(part=>{const [url,size]=part.trim().split(/\s+/);return {url,width:/^\d+w$/.test(size||'')?parseInt(size,10):0};}).filter(x=>resolve(x.url,page)).sort((a,b)=>b.width-a.width);
-      const url=responsive[0]?.url||a['data-src']||a.src;const width=parseInt(a.width||'0',10)||0,height=parseInt(a.height||'0',10)||0;
-      if((width&&width<100)||(height&&height<100))continue;add(url,a.alt||a.title||'',false,width,height);}
+    const bestResponsive=value=>String(value||'').split(',').map(part=>{const [url,size]=part.trim().split(/\s+/);return {url,width:/^\d+w$/.test(size||'')?parseInt(size,10):/^\d+(?:\.\d+)?x$/.test(size||'')?Number.parseFloat(size)*100:0};}).filter(x=>resolve(x.url,page)).sort((a,b)=>b.width-a.width)[0]?.url;
+    for(const tag of [...body.matchAll(/<img\b[^>]*>/gi)].slice(0,260)){
+      const a=attrs(tag[0]);const figure=figures.find(f=>tag.index>=f.start&&tag.index<f.end);let picture='';
+      if(figure?.images===1){const source=[...figure.html.matchAll(/<source\b[^>]*>/gi)].map(m=>attrs(m[0])).find(s=>!s.type||/^image\/(jpeg|png|webp)$/i.test(s.type));if(source)picture=bestResponsive(source.srcset||source['data-srcset']);}
+      const width=parseInt(a.width||'0',10)||0,height=parseInt(a.height||'0',10)||0;
+      const direct=bestResponsive(a.srcset||a['data-srcset'])||a['data-src']||a['data-lazy-src']||a['data-original']||(resolve(a.src,page)?a.src:'');
+      const url=((width&&width<100)||(height&&height<100))&&picture?picture:direct||picture;
+      if(((width&&width<100)||(height&&height<100))&&!a['data-src']&&!a['data-lazy-src']&&!a['data-original']&&!a.srcset&&!a['data-srcset']&&!picture)continue;
+      const referenced=String(a['aria-describedby']||'').split(/\s+/).map(id=>referencedCaptions.get(id)).filter(Boolean).join(' ');
+      const nearby=referenced||(figure?.images===1?figure.caption:'');const alt=a.alt||a.title||'';
+      let caption=alt,basis=a.alt?'image_alt':a.title?'image_title':'missing';
+      if(nearby){caption=/^(?:©|copyright|photo(?:graph)?(?: by|:))/i.test(nearby)?[alt,nearby].filter(Boolean).join(' '):nearby;basis=referenced?'linked_caption':'figure_caption';}
+      add(url,caption,false,width,height,basis);
+      if(picture&&resolve(url,page)&&fileKey(resolve(picture,page))===fileKey(resolve(url,page)))add(picture,caption,false,width,height,basis);
+    }
     const images=[...candidates.values()];const subject=tokens(`${story.subject||''} ${story.title||''}`).filter(t=>!stop.has(t));
     const captionTokens=images.map(m=>tokens(m.caption.replace(/©[\s\S]*$/,'')));
     const frequency=new Map(subject.map(t=>[t,captionTokens.filter(ts=>ts.includes(t)).length]));

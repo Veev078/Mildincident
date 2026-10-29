@@ -1,3 +1,11 @@
+# Archive photography extraction — 2026-10-29
+
+Added lazy data-lazy-src/data-original files, picture fallbacks, single-image figure/explicitly linked captions, caption-basis provenance and script/comment decoy exclusion. Shared captions are not assigned to multiple unidentified images. Legitimate noscript references remain first to preserve existing image IDs; responsive variants stay grouped without claiming identical pixels.
+
+26 focused checks pass. Offline replay confirms the real1974 photograph and both1967 museum document IDs remain exact, target1/selection unchanged. Existing40-node development worker saved INACTIVE065f440c-50e7-47db-a3d3-ee07b6ed7b47 after version check/backup/readback; no execution. Actual2254/local decisions remain untouched. Next: strengthen correlated on-demand dispatch receipts/reconciliation without permitting a retry or paid run.
+
+---
+
 # Captured source passages before drafting — 2026-10-29
 
 Development drafting now receives bounded relevant source passages from already-fetched claim responses. HTTP200 maintenance pages, binary PDFs and unavailable/oversized text cannot count as usable evidence; all-unusable sources stop before drafting spend. Claim-index/URL-bound packets retain no headers and reach Studio Research directly. Capture/replay and native producer share the same extractor. Excerpts remain source text, not factual verification.

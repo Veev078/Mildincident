@@ -41,3 +41,17 @@ test('responsive CMS variants are grouped as references while different asset qu
  const variants='<img src="/images/_gallery_1/Sketch.jpg" alt="Mira Sol costume, 1967"><img src="/images/_gallery_4/Sketch.jpg" alt="Mira Sol costume, 1967"><img src="/photo?id=one&amp;width=400" alt="One"><img src="/photo?id=two&amp;width=400" alt="Two">';
  const images=inspectPhotoSource(variants,'https://archive.example.org/gallery',{subject:'Mira Sol'});assert.equal(images.length,3);assert.equal(images[0].referenceVariants.length,2);assert.equal(images[0].sameImageVerified,false);assert.equal(images[0].duplicateBasis,'source_file_reference_variant');assert.ok(images.some(m=>m.url.includes('id=one')));assert.ok(images.some(m=>m.url.includes('id=two')));
 });
+
+test('lazy archive images recover single-figure captions/credits while script decoys and shared captions cannot invent identity',()=>{
+ const page='https://archive.example.org/gallery';const context={id:'DEV-fixture',subject:'Mira Sol (1967)'};
+ const html='<script>const fake="<img src=\"/fake.jpg\" alt=\"Mira Sol 1967\">";</script><figure><img src="data:image/gif;base64,AA" data-lazy-src="/portrait.jpg" width="1" height="1" alt="Image"><figcaption>Mira Sol in Paris, 1974. © Alex Vale.</figcaption></figure><figure><img src="/group-a.jpg" alt="Image 1"><img src="/group-b.jpg" alt="Image 2"><figcaption>Mira Sol at an event, 1967. © Alex Vale.</figcaption></figure>';
+ const images=inspectPhotoSource(html,page,context);assert.equal(images.length,3);assert.ok(!images.some(m=>m.url.endsWith('fake.jpg')));const portrait=images.find(m=>m.url.endsWith('portrait.jpg'));assert.equal(portrait.captionBasis,'figure_caption');assert.deepEqual(portrait.years,[1974]);assert.equal(portrait.creator,'Alex Vale');assert.equal(portrait.relation,'subject_caption_match');assert.ok(images.filter(m=>m.url.includes('group-')).every(m=>m.relation==='context_only'));
+});
+test('linked captions and picture fallbacks are supported without replacing established image-reference identities',()=>{
+ const page='https://archive.example.org/gallery';const images=inspectPhotoSource('<figure><picture><source type="image/webp" srcset="/images/_gallery_4/Sketch.jpg 1600w"><img src="/images/_gallery_1/Sketch.jpg" aria-describedby="caption"></picture></figure><p id="caption">Mira Sol costume sketch, 1967. © Design Museum.</p><figure><picture><source type="image/webp" data-srcset="/second.webp 2x"><img src="data:image/gif;base64,AA" alt="Mira Sol portrait, 1974"></picture></figure>',page,{subject:'Mira Sol'});
+ assert.equal(images.length,2);assert.equal(images[0].url,'https://archive.example.org/images/_gallery_1/Sketch.jpg');assert.equal(images[0].referenceVariants.length,2);assert.equal(images[0].captionBasis,'linked_caption');assert.equal(images[0].creator,'');assert.equal(images[1].url,'https://archive.example.org/second.webp');assert.equal(images[1].rightsGranted,false);
+});
+
+test('noscript photograph fallbacks preserve the original reference when a lazy responsive duplicate follows',()=>{
+ const page='https://archive.example.org/gallery';const images=inspectPhotoSource('<noscript><img src="/images/_gallery_1/Photo.jpg" alt="Mira Sol, 1974"></noscript><img data-srcset="/images/_gallery_4/Photo.jpg 1600w, /images/_gallery_1/Photo.jpg 250w" alt="Mira Sol, 1974">',page,{subject:'Mira Sol'});assert.equal(images.length,1);assert.equal(images[0].url,page.replace('/gallery','')+'/images/_gallery_1/Photo.jpg');assert.equal(images[0].referenceVariants.length,2);
+});
