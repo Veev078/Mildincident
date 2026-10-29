@@ -1,3 +1,7 @@
+# Local inspection handoff — 2026-10-29
+
+Added `npm run workspace:local`, ignored `.env.local` loading, credential-free `.env.example` and `docs/LOCAL_START.md`. Smoke verified on an isolated empty directory: root HTTP 200, source API 503 without credentials, production writes disabled. GitHub source excludes private snapshots; fresh downloads need both existing API credentials for actual editorial content. No deployment or feature sprint.
+
 # Recovery and release readiness — 2026-10-29 UTC
 
 Major development paused. See [the audited release baseline](release/READINESS_2026-10-29.md) for the feature/status table and hosting blockers.

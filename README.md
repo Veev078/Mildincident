@@ -110,3 +110,7 @@ Replace RUN paths with actual audit outputs. Generated patches stay private beca
 ## Next product actions
 
 Review the local frontend across existing stories and stage it only after authentication/origin/deployment approval. Use proposal downloads to review caption/sequence work against current n8n records. Existing source permissions, atomic claim validation and provider/Instagram reconciliation remain separate prerequisites for production publishing changes; see [atomic claim review](docs/ATOMIC_CLAIM_REVIEW.md). No dates or UI actions grant scheduling/publication approval.
+
+## Run on your computer
+
+See [the beginner local startup guide](docs/LOCAL_START.md). Use Node 24.19.0, `npm ci --omit=dev`, then `npm run workspace:local`. Credentials belong only in ignored `.env.local`, never Git.
