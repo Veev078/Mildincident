@@ -367,6 +367,21 @@ try {
   await candidateReview.getByRole('button',{name:'Save development decision'}).click();
   await page.getByText('Your development decision: approved',{exact:true}).waitFor();
   assert.equal(research.engineJob(queued.job_id).reviewDecisions[fixtureCandidate.id].decision,'approved');
+  const savedVersion=drafts.get(devStoryId).version;
+  await page.goto(`${origin}/#/story/${devStoryId}/overview`);
+  const inlineReview=page.locator('[data-engine-review]');
+  await inlineReview.getByLabel('Development editorial decision').selectOption('needs_research');
+  await inlineReview.getByLabel('Decision reason').fill('Keep the original research, refine the documented angle.');
+  await inlineReview.getByRole('button',{name:'Save development decision'}).click();
+  await page.getByText('Keep the original research, refine the documented angle.',{exact:false}).first().waitFor();
+  await page.goto(`${origin}/#/story/${devStoryId}/caption`);
+  assert.ok(!await page.getByLabel('Local caption draft').isDisabled());
+  await page.getByLabel('Local caption draft').fill('Caption remains editable after the local editorial decision.');
+  await page.waitForFunction(()=>document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));
+  assert.ok(drafts.get(devStoryId).version>savedVersion);
+  assert.equal(JSON.parse(engineFixture.candidates[0].candidate_json).captionDraft,fixtureCandidate.captionDraft);
+  checks.push('inline editorial feedback retains native research and local revisions without a false stale-source conflict');
+
   checks.push('correlated development results open and save in existing Studio tools with clear provenance and local approval, without inserting production records');
   assert.deepEqual(errors, []);
   const result = { passed: true, checks, fixtureOnly: true, productionWrites: 0, browserErrors: errors };

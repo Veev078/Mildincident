@@ -1,3 +1,11 @@
+# Completion sprint: decisions inside the editorial vertical slice — 2026-10-29
+
+The existing development decision form now appears in the story Overview, using the same versioned job/event ledger as Discovery. Local decision/stage presentation is excluded from native source-revision hashing, fixing false stale-draft conflicts after approving/rejecting an already-edited candidate. Original native candidates, local history and reasoned feedback remain preserved. Existing actual needs_research/version3 hash is unchanged.
+
+31 browser flows pass, including inline decision → caption edit without rebase; actual first-story smoke passes with decoded source photo and readiness desk. No new AI execution or native workflow activation. Private backup/recovery tooling is the next small operational increment.
+
+---
+
 # Completion sprint: unified evidence readiness — 2026-10-29
 
 Added Studio editorial review desk covering angle, captured/blocked claims, image relevance/decoding, working format, caption, optional sound, rights and recorded decisions. No objective taste score or automatic approval. Asset inspection distinguishes decoded source copies/private uploads, uninspected references, unavailable previews, unrelated covers and context documents. Local saves refresh readiness immediately.

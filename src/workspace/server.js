@@ -56,6 +56,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     for (const request of workspace.researchRequests) for (const candidate of request.engineJob?.candidates || []) {
       const story = developmentCandidateStory(candidate,{soundtrack:source.snapshot?.records?.soundtrack || [],drafts:drafts.all(),decision:request.engineJob.reviewDecisions?.[candidate.id]||null,evidence:request.engineJob.evidence?.[candidate.id]||null});
       requireThat(!workspace.stories.some(s=>s.id===story.id),'AMBIGUOUS_ENGINE_RESULT','Development story identity collides with an existing record.');
+      story.engineReviewVersion=request.engineJob.version;
       workspace.stories.push(story);
     }
     attachLocalPreviews(workspace,previews);
