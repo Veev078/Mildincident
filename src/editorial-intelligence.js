@@ -83,22 +83,29 @@ export function findDuplicateStories(stories = [], { threshold = 0.64 } = {}) {
   return candidates.sort((a, b) => b.score - a.score || a.storyIds.join('|').localeCompare(b.storyIds.join('|')));
 }
 
-const CONTEXT_GROUPS = [
-  ['goth', 'gothic', 'batcave', 'postpunk', 'post-punk'], ['nightlife', 'nightclub', 'nightclubs', 'club', 'clubs'],
-  ['film', 'cinema', 'cinematic', 'movie', 'movies', 'filmmaking', 'filmcraft'],
-  ['fashion', 'style', 'harajuku', 'streetstyle', 'street-style'], ['photography', 'photograph', 'photographs', 'photographer', 'photo'],
-  ['horror', 'monster', 'monsters', 'werewolf', 'fright'], ['home', 'domestic', 'house', 'family'],
-  ['seaside', 'ocean', 'beach', 'boardwalk'], ['industrial', 'machinery', 'mechanical', 'machines'],
+// Directional broadening only: a named venue/scene/creature can suggest a theme,
+// but a broad theme must never invent that named subject in the story.
+const CONTEXT_EXPANSIONS = [
+  [['batcave', 'goth', 'postpunk', 'post-punk'], ['goth', 'nightlife']],
+  [['nightlife', 'nightclub', 'nightclubs', 'club', 'clubs'], ['nightlife']],
+  [['film', 'cinema', 'cinematic', 'movie', 'movies', 'filmmaking', 'filmcraft'], ['film', 'cinema']],
+  [['fashion', 'harajuku', 'streetstyle', 'street-style'], ['fashion']],
+  [['photography', 'photograph', 'photographs', 'photographer', 'photo'], ['photography']],
+  [['horror', 'monster', 'monsters', 'werewolf', 'fright'], ['horror']],
+  [['home', 'domestic', 'house', 'family'], ['domestic']],
+  [['seaside', 'ocean', 'beach', 'boardwalk'], ['seaside']],
+  [['industrial', 'machinery', 'mechanical', 'machines'], ['industrial']],
 ];
 
 function contextTokens(story) {
   const selected = new Set(Array.isArray(story.selectedAssetIds) ? story.selectedAssetIds : []);
   const photos = (Array.isArray(story.media) ? story.media : []).filter(m => m && selected.has(m.id));
   const text = `${story.title || ''} ${story.subject || ''} ${story.hook || ''} ${story.caption || ''} ${photos.map(p => `${p.title || ''} ${p.creator || ''}`).join(' ')}`;
-  const result = new Set(tokens(text));
-  for (const group of CONTEXT_GROUPS) if (group.some(t => result.has(t))) for (const t of group) result.add(t);
+  const literal = new Set(tokens(text));
+  const result = new Set(literal);
+  for (const [triggers, themes] of CONTEXT_EXPANSIONS) if (triggers.some(t => literal.has(t))) for (const t of themes) result.add(t);
   for (const match of text.matchAll(/\b(1[6-9]\d{2}|20\d{2})(?:s)?\b/g)) result.add(`${Math.floor(Number(match[1]) / 10) * 10}s`);
-  return result;
+  return { literal, themes: result };
 }
 
 export function rankSoundtracks(story = {}, catalog = [], { limit = 3 } = {}) {
@@ -116,20 +123,25 @@ export function rankSoundtracks(story = {}, catalog = [], { limit = 3 } = {}) {
     if (seen.has(key)) continue;
     seen.add(key);
     const matches = [];
+    const literalMatches = [];
+    const inferredMatches = [];
     let score = 0;
     for (const [field, weight] of [['themes', 3], ['moods', 2], ['eras', 1]]) {
       for (const tag of tags(track[field])) {
         const words = tokens(tag);
-        if (!words.length || !words.every(w => context.has(w))) continue;
+        if (!words.length || !words.every(w => context.themes.has(w))) continue;
         score += weight;
         if (!matches.includes(tag)) matches.push(tag);
+        const target = words.every(w => context.literal.has(w)) ? literalMatches : inferredMatches;
+        if (!target.includes(tag)) target.push(tag);
       }
     }
     const retained = selectionKey === key;
     if (!score && !retained) continue;
     ranked.push({ track: string(track.track), artist: string(track.artist), score, selected: retained,
-      reason: retained ? 'Your saved music direction is retained. Availability and permissions still need review.' : `Matches ${matches.slice(0, 4).join(', ')} cues in the story text and selected-photo metadata.`,
-      matchedTags: matches, basis: 'editorial_metadata', availability: 'not_verified', licenseVerified: false });
+      reason: retained ? 'Your saved music direction is retained. Availability and permissions still need review.' :
+        [literalMatches.length ? `Literal metadata cues: ${literalMatches.slice(0, 4).join(', ')}.` : '', inferredMatches.length ? `Broader themes inferred from those cues: ${inferredMatches.slice(0, 4).join(', ')}; review the fit.` : ''].filter(Boolean).join(' '),
+      matchedTags: matches, literalMatchedTags: literalMatches, inferredMatchedTags: inferredMatches, basis: 'editorial_metadata', availability: 'not_verified', licenseVerified: false });
   }
   if (selectionKey && !ranked.some(r => r.selected)) ranked.push({ track: string(selected.track), artist: string(selected.artist), score: 0, selected: true,
     reason: 'Your saved music direction is retained even though it is outside the current catalog.', matchedTags: [], basis: 'saved_preference', availability: 'not_verified', licenseVerified: false });

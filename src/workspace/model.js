@@ -3,6 +3,7 @@ import { canonical } from '../package.js';
 import { editorialReadiness } from '../reconciliation.js';
 import { analyzeStory, findDuplicateStories } from '../editorial-intelligence.js';
 import { calculateAnalytics } from '../analytics.js';
+import { buildEditorialDirection } from '../editorial-direction.js';
 
 export const WORKSPACE_TABLES = Object.freeze({
   stories: '5AxSMHqi15TNwBZl', packages: 'cCFwaHyKVVTZvr5s', media: 'ARiuqg92GgVSpZMr',
@@ -85,6 +86,7 @@ export function buildWorkspace(snapshot, drafts = new Map()) {
     const effective = draft && !story.localDraft.stale ? { ...story, ...draft } : story;
     story.intelligence = analyzeStory(effective, { catalog: records.soundtrack });
     story.musicRecommendations = story.intelligence.musicRecommendations;
+    story.editorialDirection = buildEditorialDirection(effective, { creativeBrief: draft?.creativeBrief });
     return story;
   });
   const activityLabels = { draft_created: 'Draft creation recorded at transfer', reserved: 'Draft handoff reserved', review_needed: 'Handoff needs reconciliation', abandoned: 'Transfer stopped before Buffer' };

@@ -7,9 +7,17 @@ export interface LocalDraft {
   notes?: string;
   selectedAssetIds?: string[];
   musicSelection?: { track: string; artist: string } | null;
+  creativeBrief?: CreativeBrief;
+}
+export interface CreativeBrief {
+  hookType?: '' | 'hidden_connection' | 'true_form' | 'secret_backstory' | 'character_wardrobe' | 'bizarre_fact' | 'curated_list' | 'timely_timeless';
+  angle?: string; visualIntent?: string; captionApproach?: 'sentence_case' | 'lowercase' | 'retain_source';
+  sequenceRoles?: {assetId: string; role: 'question' | 'context' | 'evidence' | 'payoff'; note?: string}[];
+  ratings?: {hook?: number | null; visual?: number | null; shareability?: number | null; timelessness?: number | null};
+  notes?: string; sourceLaneIds?: string[];
 }
 export interface DraftPatch extends Omit<LocalDraft, 'version' | 'updatedAt' | 'stale'> { expectedVersion: number }
-export interface RebaseRequest { expectedVersion: number; previousRevision: string; currentRevision: string; confirm: 'keep_local_after_review'; selectedAssetIds?: string[] }
+export interface RebaseRequest { expectedVersion: number; previousRevision: string; currentRevision: string; confirm: 'keep_local_after_review'; selectedAssetIds?: string[]; creativeBrief?: CreativeBrief }
 export interface SourceObservation {
   kind: 'live_snapshot'; observedAt: string; stale: boolean; refreshing?: boolean;
   warnings: string[]; productionMutationsEnabled: false;

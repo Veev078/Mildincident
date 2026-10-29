@@ -86,6 +86,34 @@ try {
   await page.waitForFunction(() => document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));
   assert.equal(drafts.get(id).musicSelection.track, 'Fixture track');
   checks.push('manual soundtrack direction saves locally without availability claims');
+
+  await page.goto(`${origin}/#/story/${id}/direction`);
+  await page.locator('#direction-angle').waitFor();
+  assert.equal(await page.locator('#direction-angle').getAttribute('maxlength'), '700');
+  await page.locator('#direction-hook-hidden_connection').check();
+  await page.locator('#direction-angle').fill('Investigate the documented connection rather than inventing a surprising claim.');
+  await page.locator('#direction-visual').fill('Compare the opening image and the evidence in their original context.');
+  await page.locator('#direction-caption-approach').selectOption('lowercase');
+  await page.locator('#direction-role-0').selectOption('question');
+  await page.locator('#direction-role-note-0').fill('Check the first image with the original source.');
+  await page.locator('[data-brief-lane="photographer_portfolios"]').check();
+  await page.locator('[data-brief-lane="independent_magazines"]').check();
+  await page.locator('#direction-rating-hook').selectOption('4');
+  await page.locator('#direction-rating-visual').selectOption('4');
+  await page.locator('#direction-rating-shareability').selectOption('5');
+  assert.ok((await page.locator('[data-direction-review]').textContent()).includes('3'));
+  await page.locator('#direction-rating-timelessness').selectOption('4');
+  await page.waitForFunction(() => document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));
+  assert.ok((await page.locator('[data-direction-review]').textContent()).includes('4.25'));
+  assert.equal(drafts.get(id).creativeBrief.hookType, 'hidden_connection');
+  assert.equal(drafts.get(id).creativeBrief.captionApproach, 'lowercase');
+  assert.equal(drafts.get(id).caption, caption);
+  assert.ok(drafts.get(id).creativeBrief.sourceLaneIds.includes('independent_magazines'));
+  assert.equal(drafts.get(id).creativeBrief.sequenceRoles[0].role, 'question');
+  assert.equal(await page.locator('.direction-source-grid a[href^="https://search.brave.com/"]').count(), 7);
+  await page.reload(); await page.locator('#direction-angle').waitFor();
+  assert.ok((await page.locator('#direction-angle').inputValue()).includes('documented connection'));
+  checks.push('editorial direction autosaves hook/visual/roles/source lanes and manual ratings without rewriting source captions');
   const downloadEvent = page.waitForEvent('download');
   await page.locator('.story-header-actions a').click();
   const download = await downloadEvent;
@@ -94,6 +122,7 @@ try {
   const proposal = JSON.parse(await fs.readFile(downloaded, 'utf8'));
   assert.equal(proposal.productionApplied, false);
   assert.equal(proposal.changes.caption, caption);
+  assert.equal(proposal.changes.creativeBrief.hookType, 'hidden_connection');
   checks.push('downloadable review proposal contains actual edits and no production approval');
 
   snapshot.records.packages[0].caption_draft = 'A source edit made separately during the regression test';
@@ -137,18 +166,20 @@ try {
 
   for (const width of [1440, 768, 390, 375]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const route of ['home', 'pipeline', 'library', `story/${id}/carousel`, `story/${id}/caption`, 'publishing', 'archive', 'analytics']) {
+    for (const route of ['home', 'pipeline', 'library', `story/${id}/carousel`, `story/${id}/caption`, `story/${id}/direction`, 'publishing', 'archive', 'analytics']) {
       await page.goto(`${origin}/#/${route}`);
       await page.locator('h1').waitFor();
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `Unexpected horizontal overflow at ${width}px on ${route}`);
     }
   }
-  checks.push('eight views fit desktop, tablet, 390px and 375px without page overflow');
+  checks.push('nine views fit desktop, tablet, 390px and 375px without page overflow');
   await page.goto(`${origin}/#/home`);
   await page.screenshot({ path: path.join(artifactRoot, 'fixture-mobile.png'), fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`${origin}/#/story/${id}/carousel`);
   await page.screenshot({ path: path.join(artifactRoot, 'fixture-carousel-desktop.png'), fullPage: true });
+  await page.goto(`${origin}/#/story/${id}/direction`);
+  await page.screenshot({ path: path.join(artifactRoot, 'fixture-direction-desktop.png'), fullPage: true });
   assert.deepEqual(errors, []);
   const result = { passed: true, checks, fixtureOnly: true, productionWrites: 0, browserErrors: errors };
   await fs.writeFile(path.join(artifactRoot, 'report.json'), JSON.stringify(result, null, 2), { mode: 0o600 });

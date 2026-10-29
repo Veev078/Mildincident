@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { chmodSync, closeSync, mkdirSync, openSync } from 'node:fs';
 import path from 'node:path';
 import { HandoffError, requireThat } from '../errors.js';
+import { validateCreativeBrief } from '../editorial-direction.js';
 
 export class LocalDraftStore {
   constructor(filename) {
@@ -29,7 +30,7 @@ export class LocalDraftStore {
   }
 
   save(story, input) {
-    const keys = ['baseRevision', 'expectedVersion', 'caption', 'selectedAssetIds', 'notes', 'musicSelection'];
+    const keys = ['baseRevision', 'expectedVersion', 'caption', 'selectedAssetIds', 'notes', 'musicSelection', 'creativeBrief'];
     requireThat(input && typeof input === 'object' && !Array.isArray(input) && Object.keys(input).every(k => keys.includes(k)), 'INVALID_LOCAL_EDIT', 'Unsupported local draft fields.');
     requireThat(input.baseRevision === story.revision, 'STALE_SOURCE', 'The n8n story has changed. Reload and compare the local draft before saving.');
     requireThat(Number.isSafeInteger(input.expectedVersion) && input.expectedVersion >= 0, 'INVALID_LOCAL_EDIT', 'expectedVersion is required.');
@@ -54,6 +55,7 @@ export class LocalDraftStore {
       const { baseRevision, expectedVersion, ...changes } = input;
       const { version, updatedAt, baseRevision: oldRevision, ...oldData } = previous || {};
       const data = { ...oldData, ...changes };
+      if (data.creativeBrief !== undefined) data.creativeBrief = validateCreativeBrief(data.creativeBrief, { ...story, selectedAssetIds: data.selectedAssetIds || story.selectedAssetIds });
       const now = new Date().toISOString();
       this.db.prepare(`INSERT INTO local_editorial_drafts VALUES(?,?,?,?,?) ON CONFLICT(story_id) DO UPDATE SET
         base_revision=excluded.base_revision,version=excluded.version,data_json=excluded.data_json,updated_at=excluded.updated_at`)
@@ -71,7 +73,7 @@ export class LocalDraftStore {
 
   rebase(story, input) {
     requireThat(input && typeof input === 'object' && !Array.isArray(input) &&
-      Object.keys(input).every(k => ['expectedVersion', 'previousRevision', 'currentRevision', 'confirm', 'selectedAssetIds'].includes(k)) &&
+      Object.keys(input).every(k => ['expectedVersion', 'previousRevision', 'currentRevision', 'confirm', 'selectedAssetIds', 'creativeBrief'].includes(k)) &&
       Number.isSafeInteger(input.expectedVersion) && input.expectedVersion > 0 && input.currentRevision === story.revision &&
       input.confirm === 'keep_local_after_review', 'INVALID_REBASE', 'Compare current n8n content with the local draft and explicitly confirm keeping local edits.');
     this.db.exec('BEGIN IMMEDIATE');
@@ -85,6 +87,8 @@ export class LocalDraftStore {
         'FOREIGN_ASSET', 'A selected image no longer exists in this story. Explicitly review a replacement sequence or export the preserved proposal.');
       const { baseRevision, version, updatedAt, ...data } = previous;
       if (input.selectedAssetIds !== undefined) data.selectedAssetIds = input.selectedAssetIds;
+      if (input.creativeBrief !== undefined) data.creativeBrief = input.creativeBrief;
+      if (data.creativeBrief !== undefined) data.creativeBrief = validateCreativeBrief(data.creativeBrief, { ...story, selectedAssetIds: data.selectedAssetIds || story.selectedAssetIds });
       const now = new Date().toISOString();
       const serialized = JSON.stringify(data);
       this.db.prepare('UPDATE local_editorial_drafts SET base_revision=?,version=?,data_json=?,updated_at=? WHERE story_id=?').run(story.revision, version + 1, serialized, now, story.id);
@@ -100,7 +104,7 @@ export class LocalDraftStore {
     return { schemaVersion: 1, kind: 'mildincident_local_change_proposal', conceptId: story.id,
       packageVersion: story.packageVersion, baseRevision: draft.baseRevision, currentRevision: story.revision,
       stale: draft.baseRevision !== story.revision, localVersion: draft.version, updatedAt: draft.updatedAt,
-      changes: Object.fromEntries(['caption', 'selectedAssetIds', 'notes', 'musicSelection'].filter(k => Object.hasOwn(draft, k)).map(k => [k, draft[k]])),
+      changes: Object.fromEntries(['caption', 'selectedAssetIds', 'notes', 'musicSelection', 'creativeBrief'].filter(k => Object.hasOwn(draft, k)).map(k => [k, draft[k]])),
       productionApplied: false, publicationApproved: false, rightsGranted: false,
       instructions: 'Review against current n8n records. This proposal is not an import command, rights clearance, scheduling or publication approval.' };
   }

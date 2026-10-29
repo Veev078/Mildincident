@@ -1,5 +1,6 @@
 import { esc, date, human, storyUrl, effective, proposalContent } from './components.js';
 import * as views from './views.js';
+import { creativeBriefFor, emptyCreativeBrief, directionReviewSummary, directionSequenceObservations } from './direction.js';
 
 const state = { workspace: null, search: '', pipelineGroup: 'all', librarySearch: '', libraryRights: 'all', compared: [], loading: true, error: null };
 const pending = new Map();
@@ -121,6 +122,16 @@ function editDraft(id, changes, { rerender = false, immediate = false } = {}) {
   else timers.set(id, setTimeout(() => flushDraft(id), 650));
 }
 
+function editCreativeBrief(id, transform, options = {}) {
+  const story = storyById(id);
+  if (!story) return;
+  const brief = creativeBriefFor(story);
+  transform(brief);
+  editDraft(id, { creativeBrief: brief }, options);
+  const summary = document.querySelector('[data-direction-review]');
+  if (summary && route().id === id) summary.innerHTML = directionReviewSummary(story);
+}
+
 async function flushDraft(id) {
   clearTimeout(timers.get(id));
   if (saving.has(id)) return savePromises.get(id);
@@ -146,6 +157,9 @@ async function flushDraft(id) {
       current.localDraft = { ...draft, ...(pending.get(id) || {}) };
       if (result.intelligence) current.intelligence = result.intelligence;
       if (result.musicRecommendations) current.musicRecommendations = result.musicRecommendations;
+      if (result.editorialDirection) current.editorialDirection = result.editorialDirection;
+      const sequenceIssues = document.querySelector('[data-direction-sequence-issues]');
+      if (sequenceIssues && route().id === id) sequenceIssues.innerHTML = directionSequenceObservations(current);
       const checks = document.querySelector('[data-caption-checks]');
       if (checks && route().id === id) checks.innerHTML = views.captionChecks(current);
     }
@@ -220,17 +234,21 @@ async function openHistory(story) {
 
 async function rebaseDraft(story) {
   if (!story?.localDraft?.stale) return;
+  const saved = effective(story);
   const known = new Set((story.media || []).map(asset => asset.id));
-  const selected = effective(story).selectedAssetIds;
+  const selected = saved.selectedAssetIds;
   const retained = selected.filter(id => known.has(id));
   const removed = selected.length - retained.length;
-  const message = removed ? `Keep the local edits as a new revision and remove ${removed} unavailable image reference${removed === 1 ? '' : 's'}? The earlier version stays in local history. n8n will not change.` : 'Keep these local edits after comparing them with the current source? This creates a new local revision and does not change n8n.';
+  const reviewedBrief = saved.creativeBrief ? structuredClone(saved.creativeBrief) : null;
+  const removedRoles = (reviewedBrief?.sequenceRoles || []).filter(item => !known.has(item.assetId)).length;
+  const message = removed || removedRoles ? `Keep the local edits as a new revision and remove ${removed} unavailable image reference${removed === 1 ? '' : 's'} and ${removedRoles} unavailable narrative-role annotation${removedRoles === 1 ? '' : 's'}? The earlier version stays in local history. n8n will not change.` : 'Keep these local edits after comparing them with the current source? This creates a new local revision and does not change n8n.';
   if (!window.confirm(message)) return;
+  if (reviewedBrief && removedRoles) reviewedBrief.sequenceRoles = reviewedBrief.sequenceRoles.filter(item => known.has(item.assetId));
   try {
     if (!(versions.get(story.id) || 0)) {
-      const saved = effective(story);
       story.localDraft = { ...story.localDraft, baseRevision: story.revision, stale: false };
-      pending.set(story.id, { caption: saved.caption, notes: saved.notes, selectedAssetIds: retained, musicSelection: saved.musicSelection ?? null });
+      pending.set(story.id, { caption: saved.caption, notes: saved.notes, selectedAssetIds: retained, musicSelection: saved.musicSelection ?? null,
+        ...(reviewedBrief ? { creativeBrief: reviewedBrief } : {}) });
       if (!await flushDraft(story.id)) return;
       document.querySelector('#asset-dialog').close(); render();
       toast('Previously unsaved local edits were saved against the explicitly reviewed source revision.');
@@ -238,7 +256,7 @@ async function rebaseDraft(story) {
     }
     const result = await api(`/api/stories/${encodeURIComponent(story.id)}/draft/rebase`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Mildincident-Intent': 'local-edit' },
-      body: JSON.stringify({ expectedVersion: versions.get(story.id) || story.localDraft.version, previousRevision: story.localDraft.baseRevision, currentRevision: story.revision, confirm: 'keep_local_after_review', ...(removed ? { selectedAssetIds: retained } : {}) }),
+      body: JSON.stringify({ expectedVersion: versions.get(story.id) || story.localDraft.version, previousRevision: story.localDraft.baseRevision, currentRevision: story.revision, confirm: 'keep_local_after_review', ...(removed ? { selectedAssetIds: retained } : {}), ...(removedRoles ? { creativeBrief: reviewedBrief } : {}) }),
     });
     const draft = result.draft || result;
     if (!Number.isInteger(draft.version)) throw new Error('The source review did not return a new local version.');
@@ -246,9 +264,14 @@ async function rebaseDraft(story) {
     story.localDraft = { ...draft, ...(pending.get(story.id) || {}) };
     if (result.intelligence) story.intelligence = result.intelligence;
     if (result.musicRecommendations) story.musicRecommendations = result.musicRecommendations;
+    if (result.editorialDirection) story.editorialDirection = result.editorialDirection;
     if (removed) {
       story.localDraft.selectedAssetIds = retained;
       if (pending.get(story.id)?.selectedAssetIds) pending.get(story.id).selectedAssetIds = retained;
+    }
+    if (removedRoles) {
+      story.localDraft.creativeBrief = reviewedBrief;
+      if (pending.get(story.id)?.creativeBrief) pending.get(story.id).creativeBrief = reviewedBrief;
     }
     document.querySelector('#asset-dialog').close();
     render();
@@ -304,9 +327,13 @@ document.addEventListener('click', event => {
       const known = new Set((story.media || []).map(asset => asset.id));
       const retained = (draft.selectedAssetIds || []).filter(id => known.has(id));
       const removed = (draft.selectedAssetIds || []).length - retained.length;
-      if (!window.confirm(`Use local version ${draft.version} as a new local draft?${removed ? ` ${removed} unavailable image reference${removed === 1 ? '' : 's'} will be removed from the new version.` : ''} Existing versions and n8n data are preserved.`)) break;
+      const brief = structuredClone(draft.creativeBrief || emptyCreativeBrief());
+      const removedRoles = (brief.sequenceRoles || []).filter(item => !known.has(item.assetId)).length;
+      if (!window.confirm(`Use local version ${draft.version} as a new local draft?${removed ? ` ${removed} unavailable image reference${removed === 1 ? '' : 's'} will be removed from the new version.` : ''}${removedRoles ? ` ${removedRoles} unavailable narrative-role annotation${removedRoles === 1 ? '' : 's'} will also be removed.` : ''} Existing versions and n8n data are preserved.`)) break;
+      if (removedRoles) brief.sequenceRoles = brief.sequenceRoles.filter(item => known.has(item.assetId));
       document.querySelector('#asset-dialog').close();
-      editDraft(story.id, { caption: draft.caption ?? story.caption ?? '', selectedAssetIds: draft.selectedAssetIds === undefined ? [...(story.selectedAssetIds || [])] : retained, notes: draft.notes || '', musicSelection: Object.hasOwn(draft, 'musicSelection') ? draft.musicSelection : story.musicSelection ?? null }, { rerender: true, immediate: true });
+      editDraft(story.id, { caption: draft.caption ?? story.caption ?? '', selectedAssetIds: draft.selectedAssetIds === undefined ? [...(story.selectedAssetIds || [])] : retained, notes: draft.notes || '', musicSelection: Object.hasOwn(draft, 'musicSelection') ? draft.musicSelection : story.musicSelection ?? null,
+        creativeBrief: brief }, { rerender: true, immediate: true });
       break;
     }
     case 'close-dialog': document.querySelector('#asset-dialog').close(); break;
@@ -360,6 +387,15 @@ document.addEventListener('click', event => {
 
 document.addEventListener('input', event => {
   const input = event.target;
+  if (input.dataset.briefField && input.matches('textarea,input[type="text"]')) {
+    editCreativeBrief(input.dataset.story, brief => { brief[input.dataset.briefField] = input.value; });
+  }
+  if (input.dataset.briefRoleNote) {
+    editCreativeBrief(input.dataset.story, brief => {
+      const annotation = brief.sequenceRoles.find(item => item.assetId === input.dataset.briefRoleNote);
+      if (annotation) annotation.note = input.value;
+    });
+  }
   if (input.id === 'global-search') {
     state.search = input.value;
     clearTimeout(searchTimer);
@@ -379,7 +415,34 @@ document.addEventListener('input', event => {
 });
 
 document.addEventListener('change', event => {
-  if (event.target.id === 'library-rights') { state.libraryRights = event.target.value; render(); }
+  const input = event.target;
+  if (input.id === 'library-rights') { state.libraryRights = input.value; render(); }
+  if (input.dataset.briefField && !input.matches('textarea,input[type="text"]')) {
+    editCreativeBrief(input.dataset.story, brief => { brief[input.dataset.briefField] = input.value; }, { immediate: true });
+    if (input.type === 'radio') for (const option of document.querySelectorAll('.direction-hook')) option.classList.toggle('chosen', Boolean(option.querySelector('input:checked')));
+  }
+  if (input.dataset.briefRating) {
+    editCreativeBrief(input.dataset.story, brief => { brief.ratings[input.dataset.briefRating] = input.value === '' ? null : Number(input.value); }, { immediate: true });
+  }
+  if (input.dataset.briefLane) {
+    editCreativeBrief(input.dataset.story, brief => {
+      const lanes = new Set(brief.sourceLaneIds || []);
+      if (input.checked) lanes.add(input.dataset.briefLane); else lanes.delete(input.dataset.briefLane);
+      brief.sourceLaneIds = [...lanes];
+    }, { immediate: true });
+  }
+  if (input.dataset.briefRole) {
+    const story = storyById(input.dataset.story);
+    const previous = creativeBriefFor(story).sequenceRoles.find(item => item.assetId === input.dataset.briefRole);
+    if (!input.value && previous?.note && !window.confirm('Clear this local narrative role and its note? The prior saved version remains in local history.')) {
+      input.value = previous.role; return;
+    }
+    editCreativeBrief(input.dataset.story, brief => {
+      const earlier = brief.sequenceRoles.find(item => item.assetId === input.dataset.briefRole);
+      brief.sequenceRoles = brief.sequenceRoles.filter(item => item.assetId !== input.dataset.briefRole);
+      if (input.value) brief.sequenceRoles.push({ assetId: input.dataset.briefRole, role: input.value, ...(earlier?.note ? { note: earlier.note } : {}) });
+    }, { rerender: true, immediate: true });
+  }
 });
 
 document.addEventListener('submit', event => {

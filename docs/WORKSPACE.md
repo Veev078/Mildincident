@@ -2,6 +2,8 @@
 
 This sprint adds a functioning local frontend over the **existing n8n and Buffer system**. It is not a new publishing backend and has not replaced the production Founder Studio. Production writes, deployment, scheduling and publication remain disabled.
 
+The resumed sprint adds a **Direction** tab: optional narrative hooks, a visual brief, selected-image roles, seven broader visual-source search lanes and manual taste ratings. See [editorial direction](EDITORIAL_DIRECTION.md). The user-supplied inspiration-account PDF is a dated unverified reference, not a source of live metrics, format bans or posting instructions.
+
 ## Run and verify
 
 ```sh
@@ -28,6 +30,7 @@ Browser tests use pinned Playwright with the environment's installed `/usr/bin/c
 | Unified story desk | Research claims, original-source links, existing founder/production/source-review notes, local working notes, caption and music under one ID | Actual n8n records; notes/caption proposals stay local | Sanitization/revision tests; actual source-note render |
 | Image review and carousel | 264 actual candidate records, rights filters, provenance dialogs, side-by-side comparison, add/remove/reorder with drag and keyboard-accessible controls | Source metadata and direct browser previews; local sequence overlay | Browser comparison/reordering; foreign/duplicate asset rejection |
 | Private editorial editing | Debounced versioned autosave, restart persistence, save/retry errors, reviewed stale-source rebase, version history/restore and proposal download | Ignored SQLite; no n8n write adapter | Conflict/restart/rebase/removed-image and streaming-body race tests; browser reload/recovery |
+| Creative direction | Evidence-led hook choices, angle/visual intent, caption approach intention, sequence roles, broader source searches and four explicit human ratings | Local creative brief only; no caption rewrite, source fetch or performance prediction | Direction-module and frontend render-safety tests; storage/rebase/proposal checks and browser save/reload flow |
 | Publishing and archive | Manual lifecycle vs Buffer observation vs independently verified Instagram state, mapped IDs, reported links, duplicate/reconciliation flags and all unmapped provider rows | Read-only provider scan, no automatic identity inference | Projection tests; four actual unmapped records visible |
 | Editorial intelligence | Source deduplication, caption lint, duplicate-story candidates, selected-photo-metadata soundtrack ranking with saved preferences retained | Actual text/catalog metadata; no external verification, pixels or audio | Dedicated sparse/negative/Unicode/identity tests |
 | Performance | Measured metric totals/rates with sample sizes, missing measurements, New York publishing buckets, production bottlenecks and coverage | Actual Buffer observations where available; empty performance log is not fabricated | Metric/unit/null/zero/duplicate/internal-test tests; actual four measured editorial sends |
@@ -61,7 +64,7 @@ Every saved local draft has its existing story ID, source revision, local versio
 - Source refresh flushes pending browser saves first. Pending/in-flight work retains its original base revision; it is never silently retagged to newer content.
 - A source mismatch pauses editing and shows source/local comparison. Keeping local edits requires explicit confirmation and creates another local version. Removed source images require an explicitly reviewed replacement sequence; the prior selection remains in history.
 - Local history is retained. Restoring an earlier version makes a new save rather than deleting later versions.
-- Captions, notes, selected images and music can be proposed. Rights, live stage, scheduling and publication fields cannot be changed through this API.
+- Captions, notes, selected images, music and `creativeBrief` can be proposed. Rights, live stage, scheduling and publication fields cannot be changed through this API. Missing-source narrative annotations require an explicitly reviewed brief replacement during rebase; older annotations remain in history.
 - Proposal JSON marks `productionApplied`, `publicationApproved` and `rightsGranted` false. An unsaved browser rescue is separately labeled and is not a saved server version.
 
 ## Local API surface
@@ -85,7 +88,11 @@ At the extended sprint's refresh, the workspace contained **18 stories, 264 medi
 
 Media previews could not be loaded in this cloud browser; source/provenance links and unavailable-preview states were checked. No archival imagery was synthesized to fill the gap. Preview availability should be tested from the intended authenticated staging browser/network before deployment.
 
+A focused preview diagnosis through the existing HTTPS proxy observed tunnel failures for the sampled Seaside and Instagram CDN image hosts. Those requests did not disable TLS verification or bypass policy. No environment allowlist was changed. Browser preview networking and potentially expired source URLs need staged verification; source-page access alone does not imply publication permission.
+
 Stored citations do not prove factual correctness. Catalog/public-domain labels do not grant per-image rights. Music suggestions do not prove Instagram availability or licensing. Buffer `sent` and reported links remain distinct from independently verified Instagram outcomes. There are no invented stage durations, causal performance claims or recommended posting times from this small sample.
+
+Metric-fetch time is separate from provider-reported measurement/update timestamps (`metricsUpdatedAt`, or explicit imported measurement time). Unknown timestamps remain unknown. Reference-account likes/follower ratios never enter these calculations. Music matching uses directional theme broadening: general fashion/horror/architecture cues do not manufacture named scenes such as Harajuku/Batcave or a specific creature. Literal versus inferred metadata matches are labeled separately.
 
 ## Production integration and rollback
 

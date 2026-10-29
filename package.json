@@ -8,7 +8,7 @@
     "node": ">=24.17.0 <25"
   },
   "scripts": {
-    "test": "node --test --test-isolation=none test/*.test.js",
+    "test": "node --test --test-isolation=none test/*.test.js web/tests/*.test.js",
     "test:browser": "node test/browser-workspace.mjs",
     "check": "node scripts/check.mjs",
     "preflight": "node src/cli.js prepare",

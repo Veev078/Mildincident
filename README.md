@@ -6,6 +6,8 @@ The product-wide development workspace includes editorial home, story pipeline, 
 
 Start with [workspace usage and deployment boundaries](docs/WORKSPACE.md), [product friction addressed](docs/PRODUCT_FRICTION.md), [editorial intelligence](docs/EDITORIAL_INTELLIGENCE.md), and the [current checkpoint](docs/SPRINT_STATUS.md).
 
+The new [Direction workspace](docs/EDITORIAL_DIRECTION.md) turns the supplied inspiration research into local hook/visual/sequence briefs and broader source-search prompts. Manual ratings are not performance predictions; approved captions and production packages are preserved. Analytics distinguishes fetch time from provider metric-update time.
+
 The autonomous sprint connected both APIs and inspected the actual production system. Start with [current live findings](docs/LIVE_AUDIT.md), [sprint checkpoint](docs/SPRINT_STATUS.md), [Halloween review](docs/HALLOWEEN_REVIEW.md), and [proposed production changes](docs/PRODUCTION_REVIEW.md). The connection failures described in the initial assessment are resolved.
 
 The starting checkout contained only a blank `01-Central` file. The supplied [handoff](docs/reference/handoff-2026-10-28.md) is a dated historical source, not verified live data. See the [engineering assessment](docs/engineering-assessment.md), [architecture](docs/architecture.md), and [backlog](docs/backlog.md).

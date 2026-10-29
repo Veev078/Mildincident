@@ -64,7 +64,7 @@ export function createWorkspaceServer({ source, drafts, webRoot = WEB_ROOT }) {
           requireThat(current, 'STORY_NOT_FOUND', 'Story was removed from the source snapshot.');
           const draft = drafts.save(current, input);
           const updated = source.view(drafts.all()).stories.find(s => s.id === id);
-          json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, scope: 'local_only', productionApplied: false }); return;
+          json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, editorialDirection: updated.editorialDirection, scope: 'local_only', productionApplied: false }); return;
         }
         if (operation === 'draft/history' && request.method === 'GET') { json(response, 200, { versions: drafts.history(id), scope: 'local_only' }); return; }
         if (operation === 'draft/rebase' && request.method === 'POST') {
@@ -73,7 +73,7 @@ export function createWorkspaceServer({ source, drafts, webRoot = WEB_ROOT }) {
           requireThat(current, 'STORY_NOT_FOUND', 'Story was removed from the source snapshot.');
           const draft = drafts.rebase(current, input);
           const updated = source.view(drafts.all()).stories.find(s => s.id === id);
-          json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, scope: 'local_only', productionApplied: false }); return;
+          json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, editorialDirection: updated.editorialDirection, scope: 'local_only', productionApplied: false }); return;
         }
         if (operation === 'proposal' && request.method === 'GET') {
           response.setHeader('Content-Disposition', `attachment; filename="${id}-local-proposal.json"`);

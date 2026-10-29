@@ -1,5 +1,21 @@
 # Autonomous sprint checkpoint — October 28, 2026
 
+## Resume checkpoint — editorial direction completed
+
+Recovered the exact interrupted state without resetting files or re-running the inventory. `2496a52` contains the connected workspace; `cca5d5f` commits its final recovery UX, browser failure checks, friendly analytics labels and operating guides. Last validated baseline: 80 tests and 15 Chromium workflows, with actual-data mobile/source-note smoke successful.
+
+New user-supplied reference: `deep-dive-inspo-accounts-2026-10-28.pdf`, extracted privately to `.local/workspace/inspiration-reference.txt`. It is historical account research, not verified current metrics, source verification, publication permission or instructions to adopt mandatory bans/times. Do not mix its likes/follower ratios with actual Buffer measurements.
+
+Completed: local creative-brief/Direction tools with seven optional hook frames, visual intent, seven broader source-search lanes, per-image narrative roles and explicitly manual taste ratings. Modules in `src/editorial-direction.js`, frontend in `web/direction.js`, integration in `src/workspace/`. `creativeBrief` is retained by proposal/history/rebase APIs; no production records or approved captions change. Role notes for removed images require explicit reviewed repair and remain in earlier history.
+
+Validated: **97 unit/integration/render tests pass, zero failures/skips; 16 Chromium workflows pass, including nine views at four viewport widths.** Actual-source Direction/Performance smoke loaded all18 existing stories, seven hooks/lanes, an unrated null average, reported metric timestamps and no mobile overflow or JavaScript errors. The refreshed API cache was fetched at2026-10-29T02:07Z (Oct28,10:07PM ET); its measured metric updates remain around2026-10-28T23:13Z (Oct28,7:13PM ET), now shown separately. No reference-account performance figures were imported.
+
+Also fixed: soundtrack-theme expansion no longer manufactures named Batcave/Harajuku/werewolf context from broad gothic/fashion/horror terms; literal and inferred cues are distinguished. Analytics exposes measurement ranges/unknown timestamps separately from retrieval time. Completed in the resume feature commit after `cca5d5f`; use `git log -2 --oneline` for exact IDs.
+
+Next safe continuation: review the new Direction UX and proposal integration, then authenticated staging/preview delivery planning. Production frontend deployment, earlier n8n patches, live schema changes and Buffer mutations remain unapproved. The actual n8n atomic-update engine/credential integration gate is still unresolved; see ATOMIC_CLAIM_REVIEW.md. Local servers were smoke-tested and can be restarted with `npm run workspace`; do not assume running processes survive the task.
+
+---
+
 ## Extended sprint — current feature milestone
 
 The published environment restored this branch cleanly. A product-wide local editorial workspace now exists in `web/` and `src/workspace/`, with real read-only source caching and versioned local editing. Start with `npm run workspace` (loopback port 4174). No production mutations or environment edits have occurred.

@@ -81,3 +81,31 @@ test('removed images require explicit sequence replacement during rebase and rem
   assert.deepEqual(rebased.selectedAssetIds, ['asset-2']);
   assert.deepEqual(store.history(story.id)[1].selectedAssetIds, ['asset-1', 'asset-2']);
 });
+
+test('editorial direction saves with history/proposals but cannot grant rights or alter source captions', async t => {
+  const { store, story } = await fixture(t);
+  const creativeBrief = {
+    hookType: 'hidden_connection', angle: 'A proposed connection to investigate, not an established fact.',
+    visualIntent: 'Use the original photograph as evidence; review its visual strength manually.', captionApproach: 'sentence_case',
+    sequenceRoles: [{ assetId: 'asset-1', role: 'question', note: 'Review opening photograph' }, { assetId: 'asset-2', role: 'payoff' }],
+    ratings: { hook: 4, visual: 4, shareability: 5, timelessness: 4 }, notes: 'Manual editorial judgment',
+    sourceLaneIds: ['photographer_portfolios', 'independent_magazines'],
+  };
+  const saved = store.save(story, { baseRevision: story.revision, expectedVersion: 0, creativeBrief });
+  assert.equal(saved.creativeBrief.hookType, 'hidden_connection');
+  assert.equal(store.history(story.id)[0].creativeBrief.ratings.visual, 4);
+  const proposal = store.proposal(story);
+  assert.equal(proposal.changes.creativeBrief.angle, creativeBrief.angle);
+  assert.equal(proposal.rightsGranted, false);
+  assert.equal(proposal.productionApplied, false);
+  assert.equal(store.get(story.id).caption, undefined); // Choosing case/direction did not rewrite the caption.
+  assert.throws(() => store.save(story, { baseRevision: story.revision, expectedVersion: 1, creativeBrief: { ...creativeBrief, ratings: { visual: 100 } } }), { code: 'INVALID_CREATIVE_BRIEF' });
+  assert.throws(() => store.save(story, { baseRevision: story.revision, expectedVersion: 1, creativeBrief: { ...creativeBrief, publicationApproved: true } }), { code: 'INVALID_CREATIVE_BRIEF' });
+  const changed = { ...story, revision: 'new-source-after-role-asset-removed', media: story.media.filter(m => m.id !== 'asset-1') };
+  const rebase = { expectedVersion: 1, previousRevision: story.revision, currentRevision: changed.revision, confirm: 'keep_local_after_review' };
+  assert.throws(() => store.rebase(changed, rebase), { code: 'INVALID_CREATIVE_BRIEF' });
+  const corrected = { ...creativeBrief, sequenceRoles: creativeBrief.sequenceRoles.filter(role => role.assetId !== 'asset-1') };
+  store.rebase(changed, { ...rebase, creativeBrief: corrected });
+  assert.equal(store.history(story.id)[1].creativeBrief.sequenceRoles.length, 2);
+  assert.equal(store.get(story.id).creativeBrief.sequenceRoles.length, 1);
+});

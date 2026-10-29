@@ -102,3 +102,18 @@ test('empty datasets expose unavailable values and no invented production timing
   assert.equal(result.observedAt, null);
   assert.equal(result.stageDurationsAvailable, false);
 });
+
+test('measurement recency remains separate from cache fetch time and missing timestamps are not invented', () => {
+  const result = calculateAnalytics({ observedAt: '2026-10-29T01:34:00Z', posts: [
+    { ...sent('measured', [metric('likes', 4)]), metricsUpdatedAt: '2026-10-28T23:13:00Z' },
+    sent('unknown-time', [metric('likes', 0), metric('reach', 5)]),
+  ] });
+  assert.equal(result.observedAt, '2026-10-29T01:34:00.000Z');
+  assert.equal(result.measurementRange.newestAt, '2026-10-28T23:13:00.000Z');
+  assert.equal(result.measurementRange.unknownObservationCount, 2);
+  const likes = result.metrics.find(m => m.name === 'likes');
+  assert.equal(likes.value, 4);
+  assert.equal(likes.measurement.knownCount, 1);
+  assert.equal(likes.measurement.unknownCount, 1);
+  assert.equal(result.metrics.find(m => m.name === 'reach').measurement.newestAt, null);
+});

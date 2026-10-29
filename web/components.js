@@ -13,6 +13,7 @@ export const effective = story => ({
   selectedAssetIds: story.localDraft?.selectedAssetIds ?? story.selectedAssetIds ?? [],
   notes: story.localDraft?.notes ?? '',
   musicSelection: story.localDraft && Object.hasOwn(story.localDraft, 'musicSelection') ? story.localDraft.musicSelection : story.musicSelection ?? null,
+  creativeBrief: story.localDraft?.creativeBrief ?? null,
 });
 export const mediaFor = story => {
   const ids = effective(story).selectedAssetIds;

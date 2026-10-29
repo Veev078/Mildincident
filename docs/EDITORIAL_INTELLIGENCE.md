@@ -1,5 +1,7 @@
 # Editorial intelligence and performance calculations
 
+Resumed-sprint hardening: inferred theme matches are labeled separately and can only broaden a specific context; broad fashion/gothic/horror cues no longer invent named Harajuku/Batcave/werewolf context. Performance output retains provider measurement/update time separately from snapshot fetch time, including unknown-timestamp counts. See EDITORIAL_DIRECTION.md for the optional local creative brief; its manual scores and historical reference statistics do not enter performance calculations.
+
 These modules provide local decision support for the new workspace. They read supplied data and return results; they do not fetch sources, download images, change n8n records, merge concepts, grant rights, schedule posts or publish content. Existing stories and saved preferences remain authoritative.
 
 ## Source and caption tools

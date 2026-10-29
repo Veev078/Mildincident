@@ -42,3 +42,19 @@ test('carousel and provenance changes invalidate draft revisions even without a 
     assert.notEqual(buildWorkspace(snapshot).stories[0].revision, old);
   }
 });
+
+test('editorial reference guidance stays separate from provider metrics and survives stale role references', () => {
+  const snapshot = workspaceSnapshot();
+  const original = buildWorkspace(snapshot).stories[0];
+  const drafts = new Map([[original.id, { baseRevision: original.revision, version: 1, creativeBrief: {
+    hookType: 'secret_backstory', angle: 'A hypothesis needing evidence', sequenceRoles: [{ assetId: 'asset-1', role: 'question' }], ratings: { hook: 5, visual: 5, shareability: 5, timelessness: 5 },
+  } }]]);
+  snapshot.records.media = snapshot.records.media.filter(m => m.asset_id !== 'asset-1');
+  const model = buildWorkspace(snapshot, drafts);
+  assert.equal(model.stories[0].localDraft.stale, true);
+  assert.equal(model.stories[0].editorialDirection.reference.metricsComparable, false);
+  assert.equal(model.stories[0].editorialDirection.review.publicationApproved, false);
+  assert.equal(model.stories[0].editorialDirection.sequence.visualAnalysisPerformed, false);
+  assert.ok(model.stories[0].editorialDirection.sequence.issues.length > 0);
+  assert.equal(model.analytics.coverage.postsWithMetrics, 0);
+});

@@ -27,7 +27,7 @@ function unit(value) {
 
 function observations(post, performanceRows) {
   const result = new Map();
-  const add = (metrics, source) => {
+  const add = (metrics, source, fallbackMeasuredAt) => {
     if (!Array.isArray(metrics)) return;
     for (const metric of metrics) {
       if (!metric || !finite(metric.value)) continue;
@@ -36,25 +36,33 @@ function observations(post, performanceRows) {
       const measureUnit = unit(metric.unit);
       const key = `${name}|${measureUnit}`;
       // Direct provider values take precedence over duplicated imported observations.
-      if (!result.has(key)) result.set(key, { name, unit: measureUnit, value: metric.value, source, type: slug(metric.type) });
+      const measured = timestamp(metric.measuredAt || fallbackMeasuredAt);
+      if (!result.has(key)) result.set(key, { name, unit: measureUnit, value: metric.value, source, type: slug(metric.type), measuredAt: measured === null ? null : new Date(measured).toISOString() });
     }
   };
-  add(post.metrics, 'buffer');
+  add(post.metrics, 'buffer', post.metricsUpdatedAt);
   for (const row of performanceRows) {
     if ((row.postId || row.buffer_post_id || row.post_id) !== post.id) continue;
-    add(row.metrics, 'performance_log');
+    add(row.metrics, 'performance_log', row.measuredAt || row.observedAt || row.measured_at);
   }
   return [...result.values()];
+}
+
+function measurementRange(observations) {
+  const times = observations.map(metric => metric.measuredAt).filter(Boolean).sort();
+  return { oldestAt: times[0] || null, newestAt: times.at(-1) || null,
+    knownCount: times.length, unknownCount: observations.length - times.length };
 }
 
 function summarizeMetrics(entries, includeDefaults = true) {
   const groups = new Map();
   for (const entry of entries) for (const metric of entry.metrics) {
     const key = `${metric.name}|${metric.unit}`;
-    const group = groups.get(key) || { name: metric.name, unit: metric.unit, values: [], postIds: [], sources: new Set(), ratio: false };
+    const group = groups.get(key) || { name: metric.name, unit: metric.unit, values: [], postIds: [], sources: new Set(), observations: [], ratio: false };
     group.values.push(metric.value);
     group.postIds.push(entry.post.id);
     group.sources.add(metric.source);
+    group.observations.push(metric);
     group.ratio ||= ['percent', 'ratio', 'rate'].includes(metric.unit) || ['percentage', 'percent', 'ratio', 'rate'].includes(metric.type);
     groups.set(key, group);
   }
@@ -64,9 +72,9 @@ function summarizeMetrics(entries, includeDefaults = true) {
     return { name: group.name, label: group.name.replace(/_/g, ' '), unit: group.unit,
       value: group.ratio ? average : total, total: group.ratio ? null : total, average,
       sampleSize: group.values.length, available: true, aggregation: group.ratio ? 'mean_of_observed_post_rates' : 'sum_of_observed_post_values',
-      postIds: group.postIds, sources: [...group.sources] };
+      postIds: group.postIds, sources: [...group.sources], measurement: measurementRange(group.observations) };
   });
-  if (includeDefaults) for (const name of DEFAULT_METRICS) if (!metrics.some(metric => metric.name === name)) metrics.push({ name, label: name, unit: 'count', value: null, total: null, average: null, sampleSize: 0, available: false, aggregation: null, postIds: [], sources: [] });
+  if (includeDefaults) for (const name of DEFAULT_METRICS) if (!metrics.some(metric => metric.name === name)) metrics.push({ name, label: name, unit: 'count', value: null, total: null, average: null, sampleSize: 0, available: false, aggregation: null, postIds: [], sources: [], measurement: measurementRange([]) });
   return metrics.sort((a, b) => a.name.localeCompare(b.name) || a.unit.localeCompare(b.unit));
 }
 
@@ -157,6 +165,7 @@ export function calculateAnalytics({ posts = [], stories = [], performanceRows =
     'Reach totals sum post-level measurements and are not a deduplicated audience count.',
     'No engagement rate, causal performance recommendation, optimal posting time or stage duration is inferred from missing data.',
     'Production bottlenecks are current snapshot counts; elapsed time per stage requires transition history.',
+    'Snapshot fetch time is separate from provider measurement time. Measurements without reported timestamps have unknown recency.',
   ];
   if (conflicting.size) limitations.push('Conflicting repeated post IDs were excluded from calculations until reconciled.');
   const unmapped = eligible.filter(post => !storyRows.some(story => story.publishing?.postIds?.includes(post.id))).length;
@@ -165,7 +174,9 @@ export function calculateAnalytics({ posts = [], stories = [], performanceRows =
       sentPosts: unique.filter(post => post.status === 'sent').length, eligibleSentPosts: eligible.length,
       postsWithMetrics: withMetrics.length, metricCoverage: eligible.length ? withMetrics.length / eligible.length : null,
       unmappedEditorialSentPosts: unmapped, ambiguousPostMappings, performanceRows: performance.length, metricSource: 'buffer_or_explicit_performance_observations' },
-    metrics, publishing: publishingSummary(unique, timezone),
+    metrics, measurementRange: (() => { const range = measurementRange(entries.flatMap(entry => entry.metrics)); return {
+      oldestAt: range.oldestAt, newestAt: range.newestAt, knownObservationCount: range.knownCount, unknownObservationCount: range.unknownCount,
+    }; })(), publishing: publishingSummary(unique, timezone),
     bottlenecks: [...blockerMap.values()].sort((a, b) => b.count - a.count || a.code.localeCompare(b.code)),
     stages: [...stageMap].map(([name, count]) => ({ name, count })), stageDurationsAvailable: false,
     categories: [...categories.values()].map(category => {

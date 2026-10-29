@@ -86,3 +86,19 @@ test('story analysis preserves missing/unreviewed image rights and labels the ex
   assert.equal(result.visualAnalysisPerformed, false);
   assert.equal(result.audioAnalysisPerformed, false);
 });
+
+test('broad themes never manufacture a named scene, venue or creature in soundtrack reasons', () => {
+  const catalog = [
+    { track: 'Venue-specific fixture', artist: 'One', themes: 'Batcave', active: true },
+    { track: 'Scene-specific fixture', artist: 'Two', themes: 'Harajuku', active: true },
+    { track: 'Creature-specific fixture', artist: 'Three', themes: 'werewolf', active: true },
+    { track: 'Generic scene fixture', artist: 'Four', themes: 'nightlife', active: true },
+  ];
+  assert.deepEqual(rankSoundtracks({ title: 'A Gothic cathedral' }, catalog), []);
+  assert.deepEqual(rankSoundtracks({ title: 'Fashion photography' }, catalog), []);
+  assert.deepEqual(rankSoundtracks({ title: 'A horror film' }, catalog), []);
+  const inferred = rankSoundtracks({ title: 'The Batcave photographs' }, catalog).find(t => t.track === 'Generic scene fixture');
+  assert.ok(inferred);
+  assert.ok(inferred.inferredMatchedTags.includes('nightlife'));
+  assert.match(inferred.reason, /inferred/);
+});
