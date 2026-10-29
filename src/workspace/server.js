@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { WorkspaceSource } from './data-source.js';
 import { LocalDraftStore } from './store.js';
 import { HandoffError, requireThat } from '../errors.js';
+import { LocalPreviewStore, attachLocalPreviews, MAX_PREVIEW_BYTES } from './previews.js';
+import { analyzeImageCuration } from '../image-curation.js';
 
 const WEB_ROOT = fileURLToPath(new URL('../../web/', import.meta.url));
 const CONTENT_TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
@@ -27,7 +29,25 @@ async function body(request) {
   catch { throw new HandoffError('INVALID_JSON', 'Request body is not valid JSON.'); }
 }
 
-export function createWorkspaceServer({ source, drafts, webRoot = WEB_ROOT }) {
+async function imageBody(request) {
+  const length = Number(request.headers['content-length']);
+  requireThat(!Number.isFinite(length) || length <= MAX_PREVIEW_BYTES, 'INVALID_PREVIEW_FILE', 'Image exceeds 25 MiB.');
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of request) {
+    size += chunk.length;
+    requireThat(size <= MAX_PREVIEW_BYTES, 'INVALID_PREVIEW_FILE', 'Image exceeds 25 MiB.');
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
+export function createWorkspaceServer({ source, drafts, previews, webRoot = WEB_ROOT }) {
+  const view = () => {
+    const workspace = attachLocalPreviews(source.view(drafts.all()), previews);
+    for (const story of workspace.stories) story.imageCuration = analyzeImageCuration({ ...story, creativeBrief: story.localDraft?.creativeBrief }, { selectedAssetIds: story.localDraft?.selectedAssetIds || story.selectedAssetIds });
+    return workspace;
+  };
   return http.createServer(async (request, response) => {
     response.setHeader('Cache-Control', 'no-store');
     response.setHeader('X-Content-Type-Options', 'nosniff');
@@ -47,32 +67,66 @@ export function createWorkspaceServer({ source, drafts, webRoot = WEB_ROOT }) {
       if (url.pathname === '/api/health' && request.method === 'GET') {
         json(response, 200, { status: 'ok', mode: 'local_editorial_workspace', productionMutationsEnabled: false, sourceAvailable: Boolean(source.snapshot), refreshing: Boolean(source.inflight) }); return;
       }
-      if (url.pathname === '/api/workspace' && request.method === 'GET') { json(response, 200, source.view(drafts.all())); return; }
+      if (url.pathname === '/shared/image-curation.js' && ['GET', 'HEAD'].includes(request.method)) {
+        const bytes = await fs.readFile(new URL('../image-curation.js', import.meta.url));
+        response.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8' }); response.end(request.method === 'HEAD' ? undefined : bytes); return;
+      }
+      if (url.pathname === '/api/workspace' && request.method === 'GET') { json(response, 200, view()); return; }
       if (url.pathname === '/api/refresh' && request.method === 'POST') {
         source.refresh().catch(() => {}); // Failure is exposed by next workspace read, never logged with secrets.
         json(response, 202, { refreshing: true, productionChanges: 0 }); return;
       }
+      const previewMatch = url.pathname.match(/^\/api\/stories\/(CON-[A-Za-z0-9_-]{1,120})\/assets\/([^/]{1,1200})\/preview$/);
+      if (previewMatch) {
+        requireThat(previews, 'PREVIEW_UNAVAILABLE', 'The private preview store is unavailable.');
+        const storyId = previewMatch[1];
+        let assetId;
+        try { assetId = decodeURIComponent(previewMatch[2]); } catch { throw new HandoffError('INVALID_PREVIEW_SCOPE', 'Invalid image reference.'); }
+        const findAsset = () => {
+          const story = view().stories.find(s => s.id === storyId);
+          requireThat(story && story.media.filter(m => m.id === assetId).length === 1, 'STORY_NOT_FOUND', 'An exact existing story/image record is required.');
+        };
+        findAsset();
+        if (request.method === 'GET') {
+          const result = await previews.readPreview(storyId, assetId, url.searchParams.get('hash') ?? undefined);
+          response.writeHead(200, { 'Content-Type': 'image/jpeg', 'Content-Length': result.bytes.length,
+            'Cache-Control': url.searchParams.has('hash') ? 'private, max-age=300, immutable' : 'no-store',
+            'Content-Disposition': 'inline; filename="private-review-preview.jpg"' });
+          response.end(result.bytes); return;
+        }
+        if (request.method === 'POST') {
+          requireThat(request.headers['x-mildincident-preview-declaration'] === 'private_review_only', 'PREVIEW_DECLARATION_REQUIRED', 'Confirm private review only; an upload does not prove provenance or rights.');
+          const bytes = await imageBody(request);
+          findAsset(); // Source may have refreshed while the file was uploaded.
+          let originalName;
+          try { originalName = decodeURIComponent(String(request.headers['x-mildincident-filename'] || 'private-review-image')); }
+          catch { throw new HandoffError('INVALID_PREVIEW_NAME', 'The file name is not valid.'); }
+          const preview = await previews.save({ storyId, assetId, bytes, originalName,
+            contentType: String(request.headers['content-type'] || '').split(';')[0], declaration: request.headers['x-mildincident-preview-declaration'] });
+          json(response, 200, { assetId, preview, scope: 'local_only', rightsGranted: false, productionApplied: false }); return;
+        }
+      }
       const match = url.pathname.match(/^\/api\/stories\/(CON-[A-Za-z0-9_-]{1,120})(?:\/(draft|proposal|draft\/history|draft\/rebase))?$/);
       if (match) {
         const [, id, operation] = match;
-        const story = source.view(drafts.all()).stories.find(s => s.id === id);
+        const story = view().stories.find(s => s.id === id);
         requireThat(story, 'STORY_NOT_FOUND', 'Existing story was not found in the source snapshot.');
         if (!operation && request.method === 'GET') { json(response, 200, story); return; }
         if (operation === 'draft' && request.method === 'PATCH') {
           const input = await body(request);
-          const current = source.view(drafts.all()).stories.find(s => s.id === id);
+          const current = view().stories.find(s => s.id === id);
           requireThat(current, 'STORY_NOT_FOUND', 'Story was removed from the source snapshot.');
           const draft = drafts.save(current, input);
-          const updated = source.view(drafts.all()).stories.find(s => s.id === id);
+          const updated = view().stories.find(s => s.id === id);
           json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, editorialDirection: updated.editorialDirection, scope: 'local_only', productionApplied: false }); return;
         }
         if (operation === 'draft/history' && request.method === 'GET') { json(response, 200, { versions: drafts.history(id), scope: 'local_only' }); return; }
         if (operation === 'draft/rebase' && request.method === 'POST') {
           const input = await body(request);
-          const current = source.view(drafts.all()).stories.find(s => s.id === id);
+          const current = view().stories.find(s => s.id === id);
           requireThat(current, 'STORY_NOT_FOUND', 'Story was removed from the source snapshot.');
           const draft = drafts.rebase(current, input);
-          const updated = source.view(drafts.all()).stories.find(s => s.id === id);
+          const updated = view().stories.find(s => s.id === id);
           json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, editorialDirection: updated.editorialDirection, scope: 'local_only', productionApplied: false }); return;
         }
         if (operation === 'proposal' && request.method === 'GET') {
@@ -102,7 +156,7 @@ export function createWorkspaceServer({ source, drafts, webRoot = WEB_ROOT }) {
       const message = error instanceof HandoffError ? error.message : 'The local operation did not complete. No production changes were made.';
       const status = ['INVALID_HOST', 'INVALID_ORIGIN', 'INTENT_REQUIRED'].includes(code) ? 403 :
         ['STALE_SOURCE', 'STALE_LOCAL_DRAFT', 'EDIT_CONFLICT'].includes(code) ? 409 :
-          ['STORY_NOT_FOUND', 'DRAFT_NOT_FOUND', 'FILE_NOT_FOUND'].includes(code) ? 404 : code === 'SOURCE_UNAVAILABLE' ? 503 : 400;
+          ['STORY_NOT_FOUND', 'DRAFT_NOT_FOUND', 'FILE_NOT_FOUND', 'PREVIEW_NOT_FOUND'].includes(code) ? 404 : code === 'SOURCE_UNAVAILABLE' ? 503 : 400;
       if (!response.headersSent) json(response, status, { error: { code, message } });
       else response.end();
     }
@@ -113,7 +167,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const source = new WorkspaceSource();
   await source.initialize();
   const drafts = new LocalDraftStore('.local/workspace/drafts.sqlite');
-  const server = createWorkspaceServer({ source, drafts });
+  const previews = new LocalPreviewStore('.local/workspace/previews');
+  const server = createWorkspaceServer({ source, drafts, previews });
   const port = Number(process.env.PORT || 4174);
   requireThat(Number.isSafeInteger(port) && port > 0 && port <= 65535, 'INVALID_PORT', 'PORT must be from 1 to 65535.');
   server.on('error', error => { console.error(`Workspace startup failed: ${error.code || 'LOCAL_ERROR'}`); process.exitCode = 1; drafts.close(); });

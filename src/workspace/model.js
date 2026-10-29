@@ -4,6 +4,7 @@ import { editorialReadiness } from '../reconciliation.js';
 import { analyzeStory, findDuplicateStories } from '../editorial-intelligence.js';
 import { calculateAnalytics } from '../analytics.js';
 import { buildEditorialDirection } from '../editorial-direction.js';
+import { analyzeImageCuration } from '../image-curation.js';
 
 export const WORKSPACE_TABLES = Object.freeze({
   stories: '5AxSMHqi15TNwBZl', packages: 'cCFwaHyKVVTZvr5s', media: 'ARiuqg92GgVSpZMr',
@@ -81,12 +82,14 @@ export function buildWorkspace(snapshot, drafts = new Map()) {
       selectedAssetIds, rightsStatus: story.rightsStatus, research: story.research, musicSelection: story.musicSelection,
       availableMedia: [...media].sort((a, b) => a.id.localeCompare(b.id)),
     })).digest('hex');
+    for (const asset of media) { asset.sourcePreviewUrl = asset.previewUrl; asset.previewOrigin = 'source'; asset.localPreview = null; }
     const draft = drafts.get(story.id);
     story.localDraft = draft ? { ...draft, stale: draft.baseRevision !== story.revision } : null;
     const effective = draft && !story.localDraft.stale ? { ...story, ...draft } : story;
     story.intelligence = analyzeStory(effective, { catalog: records.soundtrack });
     story.musicRecommendations = story.intelligence.musicRecommendations;
     story.editorialDirection = buildEditorialDirection(effective, { creativeBrief: draft?.creativeBrief });
+    story.imageCuration = analyzeImageCuration({ ...story, creativeBrief: draft?.creativeBrief }, { selectedAssetIds: draft?.selectedAssetIds || story.selectedAssetIds });
     return story;
   });
   const activityLabels = { draft_created: 'Draft creation recorded at transfer', reserved: 'Draft handoff reserved', review_needed: 'Handoff needs reconciliation', abandoned: 'Transfer stopped before Buffer' };

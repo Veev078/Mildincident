@@ -26,7 +26,11 @@ export interface SourceObservation {
 export interface MediaCandidate {
   id: string; title: string; creator: string; sourceUrl: string; previewUrl: string;
   license: string; rightsStatus: string; provider: string; width: number | null; height: number | null; selected: boolean;
+  sourcePreviewUrl: string; previewOrigin: 'source' | 'local_upload'; localPreview: LocalPreview | null;
 }
+export interface LocalPreview { originalSha256:string; sha256:string; originalName:string; uploadedAt:string;
+  width:number;height:number;originalWidth:number;originalHeight:number;originalFormat:string;
+  localOnly:true;rightsGranted:false;identityVerified:false }
 export interface EditorialStory {
   id: string; title: string; subject: string; hook: string; format: string; stage: string;
   approvalStatus: string; caption: string; packageVersion: number | null; revision: string;

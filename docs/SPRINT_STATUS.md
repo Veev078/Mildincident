@@ -1,5 +1,15 @@
 # Autonomous sprint checkpoint — October 28, 2026
 
+## Active photography sprint — in progress
+
+Restored clean branch at `eb082a4`; reran the preserved baseline: **97 tests and 16 Chromium workflows pass**. No environment configuration was reapplied or published; no production mutation occurred. No repeat full audit.
+
+Current work: private local-file previews attached only to existing story/image IDs (safe image decode, metadata-stripped derivative, preserved original, no rights/identity assertion), better metadata filters and carousel rehearsal, image-curation diagnostics and a read-only proposal-to-n8n change review. Local implementation is in progress and not yet the final validated release. See pending Git changes. Existing proposals/source records must be preserved.
+
+Environment handoff note: reused subagents reported completed files that were not visible in the primary workspace despite matching environment metadata. Recover their completed work by verified patch/message transfer, not by recreating it. Main workspace files and commits are authoritative; confirm file presence before assuming a child edit propagated.
+
+---
+
 ## Resume checkpoint — editorial direction completed
 
 Recovered the exact interrupted state without resetting files or re-running the inventory. `2496a52` contains the connected workspace; `cca5d5f` commits its final recovery UX, browser failure checks, friendly analytics labels and operating guides. Last validated baseline: 80 tests and 15 Chromium workflows, with actual-data mobile/source-note smoke successful.
