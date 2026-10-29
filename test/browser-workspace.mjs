@@ -227,6 +227,20 @@ try {
   await page.reload(); await page.locator('#direction-angle').waitFor();
   assert.ok((await page.locator('#direction-angle').inputValue()).includes('documented connection'));
   checks.push('editorial direction autosaves hook/visual/roles/source lanes and manual ratings without rewriting source captions');
+  const sourceIdentity=JSON.stringify({title:snapshot.records.stories[0].title,format:snapshot.records.stories[0].format,target:snapshot.records.packages[0].target_slide_count});
+  const priorSelection=[...drafts.get(id).selectedAssetIds];
+  await page.getByLabel('Working title',{exact:true}).fill('The working frame — synthetic fixture');
+  await page.getByLabel('Working hook',{exact:true}).fill('A more specific fixture angle');
+  await page.getByLabel('Working format',{exact:true}).selectOption('single_image');
+  assert.equal(await page.getByLabel('Planned frames',{exact:true}).inputValue(),'1');
+  await page.getByRole('button',{name:'Save working story',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));
+  assert.equal(drafts.get(id).format,'single_image');assert.deepEqual(drafts.get(id).selectedAssetIds,priorSelection);
+  await page.reload();await page.getByRole('heading',{name:'The working frame — synthetic fixture',exact:true}).waitFor();
+  assert.equal(await page.getByLabel('Working title',{exact:true}).inputValue(),'The working frame — synthetic fixture');
+  assert.equal(JSON.stringify({title:snapshot.records.stories[0].title,format:snapshot.records.stories[0].format,target:snapshot.records.packages[0].target_slide_count}),sourceIdentity);
+  checks.push('working title/hook/format survive reload and export while source identity and selected assets remain intact');
+
   const downloadEvent = page.waitForEvent('download');
   await page.locator('.story-header-actions a').click();
   const download = await downloadEvent;
@@ -303,6 +317,9 @@ try {
   checks.push('Studio queues a correlated development job while disabled generation cannot start or spend credits');
   const queued=engineFixture.jobs[0];queued.status='ready_to_review';queued.execution_id='2500';
   const fixtureCandidate={id:'DEV-'+queued.job_id+'-1',jobId:queued.job_id,status:'ready_to_review',story:{title:'Synthetic generated development candidate — fixture only',subject:'Fixture photography',hook:'A fixture-only cultural connection'},captionDraft:'Synthetic candidate caption, not researched content.',carouselOutline:'Opening / context / payoff',claims:[{claim:'A labeled fixture claim',claim_type:'hypothesis',source_name:'Fixture source',source_url:'https://example.org/source'}],media:[{asset_id:'dev-photo-1',title:'Synthetic fixture photograph',source_page_url:'https://example.org/source',thumb_url:'https://example.org/thumb/fixture.jpg',provider:'synthetic_fixture'}],gaps:['Synthetic fixture only; no live generation'],musicGap:'Not verified',provenance:{kind:research.get(queued.job_id).kind,executionId:'2500',generatedAt:new Date().toISOString()}};
+  fixtureCandidate.story.format='single_image';fixtureCandidate.proposedAssetIds=['dev-photo-1'];
+  Object.assign(fixtureCandidate.media[0],{source_caption:'Synthetic fixture photograph, 1974.',credit_at_source:'Fixture generator',source_years:[1974],source_relation:'subject_caption_match',material_kind:'photograph_reference'});
+  for(const name of ['drawing','trench'])fixtureCandidate.media.push({asset_id:'dev-'+name,thumb_url:'https://example.org/'+name+'.jpg',source_page_url:'https://example.org/source',source_caption:'Synthetic fixture costume document, 1967.',credit_at_source:'Fixture museum',source_years:[1967],source_relation:'subject_caption_match',material_kind:'design_documentation'});
   engineFixture.candidates.push({job_id:queued.job_id,candidate_id:fixtureCandidate.id,status:'ready_to_review',candidate_json:JSON.stringify(fixtureCandidate)});
   await page.getByRole('button',{name:'Refresh engine results',exact:true}).first().click();
   await page.getByRole('link',{name:'Open candidate in Studio →',exact:true}).click();
@@ -313,6 +330,17 @@ try {
   await page.waitForFunction(()=>document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));
   await page.reload();assert.equal(await page.getByLabel('Local caption draft').inputValue(),'Edited fixture development caption using the normal Studio editor.');
   assert.equal(snapshot.records.stories.length,1);
+  await page.goto(`${origin}/#/story/${devStoryId}/carousel`);
+  await page.getByText('The photograph and its supporting documents · 3 frames',{exact:true}).click();
+  await page.getByRole('button',{name:'Use 3-frame source plan locally',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));
+  assert.equal(drafts.get(devStoryId).format,'carousel');assert.equal(drafts.get(devStoryId).targetSlideCount,3);
+  assert.deepEqual(drafts.get(devStoryId).selectedAssetIds,['dev-photo-1','dev-drawing','dev-trench']);
+  assert.equal(drafts.get(devStoryId).creativeBrief.sequenceRoles.length,3);
+  await page.reload();await page.locator('.carousel-slide').first().waitFor();assert.equal(await page.locator('.carousel-slide').count(),3);
+  assert.equal(JSON.parse(engineFixture.candidates[0].candidate_json).story.format,'single_image');
+  checks.push('source-caption sequence proposal applies dated real-reference metadata locally with roles/history and no native candidate overwrite');
+
   await page.goto(`${origin}/#/discovery`);
   const candidateReview=page.locator('[data-engine-review]');
   await candidateReview.getByLabel('Development editorial decision').selectOption('approved');

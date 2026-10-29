@@ -109,3 +109,15 @@ test('editorial direction saves with history/proposals but cannot grant rights o
   assert.equal(store.history(story.id)[1].creativeBrief.sequenceRoles.length, 2);
   assert.equal(store.get(story.id).creativeBrief.sequenceRoles.length, 1);
 });
+
+test('working titles, hooks and format persist, export and rebase without changing the source revision or dropping assets',async t=>{
+ const {filename,store,story}=await fixture(t);const original=structuredClone(story);
+ const first=store.save(story,{baseRevision:story.revision,expectedVersion:0,title:'The detail inside the frame',hook:'A specific documented observation',format:'single_image',targetSlideCount:1,selectedAssetIds:['asset-1','asset-2']});
+ assert.deepEqual(story,original);assert.equal(first.title,'The detail inside the frame');assert.equal(first.selectedAssetIds.length,2);assert.equal(first.targetSlideCount,1);
+ const reopened=new LocalDraftStore(filename);try{assert.equal(reopened.get(story.id).format,'single_image');assert.equal(reopened.proposal(story).changes.title,first.title);}finally{reopened.close();}
+ const changed={...story,revision:'source-changed',title:'Separately revised in n8n'};
+ const rebased=store.rebase(changed,{expectedVersion:1,previousRevision:story.revision,currentRevision:changed.revision,confirm:'keep_local_after_review'});assert.equal(rebased.title,first.title);assert.equal(rebased.targetSlideCount,1);assert.equal(store.history(story.id)[1].baseRevision,story.revision);
+ assert.throws(()=>store.save(changed,{baseRevision:changed.revision,expectedVersion:2,format:'single_image',targetSlideCount:3}),{code:'INVALID_LOCAL_EDIT'});
+ assert.throws(()=>store.save(changed,{baseRevision:changed.revision,expectedVersion:2,title:' '}),{code:'INVALID_LOCAL_EDIT'});
+ assert.equal(store.get(story.id).version,2);
+});

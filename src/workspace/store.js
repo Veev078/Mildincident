@@ -4,6 +4,19 @@ import path from 'node:path';
 import { HandoffError, requireThat } from '../errors.js';
 import { validateCreativeBrief } from '../editorial-direction.js';
 
+const EDITORIAL_FIELDS = ['title', 'hook', 'format', 'targetSlideCount'];
+function validateEditorialFields(data, story) {
+  if (data.title !== undefined) requireThat(typeof data.title === 'string' && data.title.trim().length > 0 && data.title.length <= 300, 'INVALID_LOCAL_EDIT', 'Working title must contain 1–300 characters.');
+  if (data.hook !== undefined) requireThat(typeof data.hook === 'string' && data.hook.length <= 1000, 'INVALID_LOCAL_EDIT', 'Working hook must contain at most 1,000 characters.');
+  if (data.format !== undefined) requireThat(['single_image', 'carousel', 'visual_essay', 'reel'].includes(data.format), 'INVALID_LOCAL_EDIT', 'Choose a supported editorial format.');
+  if (data.targetSlideCount !== undefined || data.format !== undefined) {
+    const format = data.format ?? story.format;
+    const target = data.targetSlideCount ?? (format === 'single_image' ? 1 : story.targetSlideCount);
+    requireThat(Number.isInteger(target) && target >= 1 && target <= 10 && (format !== 'single_image' || target === 1) && (format !== 'carousel' || target >= 2), 'INVALID_LOCAL_EDIT', 'Use one frame for a single image, or 2–10 slides for a carousel.');
+    data.targetSlideCount = target;
+  }
+}
+
 export class LocalDraftStore {
   constructor(filename) {
     requireThat(filename !== ':memory:', 'DURABLE_STORE_REQUIRED', 'Local editing requires an on-disk private store.');
@@ -30,7 +43,7 @@ export class LocalDraftStore {
   }
 
   save(story, input) {
-    const keys = ['baseRevision', 'expectedVersion', 'caption', 'selectedAssetIds', 'notes', 'musicSelection', 'creativeBrief'];
+    const keys = ['baseRevision', 'expectedVersion', 'caption', 'selectedAssetIds', 'notes', 'musicSelection', 'creativeBrief', ...EDITORIAL_FIELDS];
     requireThat(input && typeof input === 'object' && !Array.isArray(input) && Object.keys(input).every(k => keys.includes(k)), 'INVALID_LOCAL_EDIT', 'Unsupported local draft fields.');
     requireThat(input.baseRevision === story.revision, 'STALE_SOURCE', 'The n8n story has changed. Reload and compare the local draft before saving.');
     requireThat(Number.isSafeInteger(input.expectedVersion) && input.expectedVersion >= 0, 'INVALID_LOCAL_EDIT', 'expectedVersion is required.');
@@ -55,6 +68,7 @@ export class LocalDraftStore {
       const { baseRevision, expectedVersion, ...changes } = input;
       const { version, updatedAt, baseRevision: oldRevision, ...oldData } = previous || {};
       const data = { ...oldData, ...changes };
+      validateEditorialFields(data, story);
       if (data.creativeBrief !== undefined) data.creativeBrief = validateCreativeBrief(data.creativeBrief, { ...story, selectedAssetIds: data.selectedAssetIds || story.selectedAssetIds });
       const now = new Date().toISOString();
       this.db.prepare(`INSERT INTO local_editorial_drafts VALUES(?,?,?,?,?) ON CONFLICT(story_id) DO UPDATE SET
@@ -88,6 +102,7 @@ export class LocalDraftStore {
       const { baseRevision, version, updatedAt, ...data } = previous;
       if (input.selectedAssetIds !== undefined) data.selectedAssetIds = input.selectedAssetIds;
       if (input.creativeBrief !== undefined) data.creativeBrief = input.creativeBrief;
+      validateEditorialFields(data, story);
       if (data.creativeBrief !== undefined) data.creativeBrief = validateCreativeBrief(data.creativeBrief, { ...story, selectedAssetIds: data.selectedAssetIds || story.selectedAssetIds });
       const now = new Date().toISOString();
       const serialized = JSON.stringify(data);
@@ -104,7 +119,7 @@ export class LocalDraftStore {
     return { schemaVersion: 1, kind: 'mildincident_local_change_proposal', conceptId: story.id,
       packageVersion: story.packageVersion, baseRevision: draft.baseRevision, currentRevision: story.revision,
       stale: draft.baseRevision !== story.revision, localVersion: draft.version, updatedAt: draft.updatedAt,
-      changes: Object.fromEntries(['caption', 'selectedAssetIds', 'notes', 'musicSelection', 'creativeBrief'].filter(k => Object.hasOwn(draft, k)).map(k => [k, draft[k]])),
+      changes: Object.fromEntries(['caption', 'selectedAssetIds', 'notes', 'musicSelection', 'creativeBrief', ...EDITORIAL_FIELDS].filter(k => Object.hasOwn(draft, k)).map(k => [k, draft[k]])),
       productionApplied: false, publicationApproved: false, rightsGranted: false,
       instructions: 'Review against current n8n records. This proposal is not an import command, rights clearance, scheduling or publication approval.' };
   }

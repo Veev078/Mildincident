@@ -260,7 +260,7 @@ async function rebaseDraft(story) {
   try {
     if (!(versions.get(story.id) || 0)) {
       story.localDraft = { ...story.localDraft, baseRevision: story.revision, stale: false };
-      pending.set(story.id, { caption: saved.caption, notes: saved.notes, selectedAssetIds: retained, musicSelection: saved.musicSelection ?? null,
+      pending.set(story.id, { title:saved.title, hook:saved.hook, format:saved.format, targetSlideCount:saved.targetSlideCount, caption: saved.caption, notes: saved.notes, selectedAssetIds: retained, musicSelection: saved.musicSelection ?? null,
         ...(reviewedBrief ? { creativeBrief: reviewedBrief } : {}) });
       if (!await flushDraft(story.id)) return;
       document.querySelector('#asset-dialog').close(); render();
@@ -332,6 +332,16 @@ document.addEventListener('click', event => {
       photo.querySelector('.preview-status').textContent = 'Retrying preview…';
       const src = img.getAttribute('src'); img.removeAttribute('src'); img.setAttribute('src', src); break;
     }
+    case 'apply-source-sequence': {
+      const option=story?.sourceSequencePlan?.options[Number(button.dataset.index)];
+      if(!option||story.localDraft?.stale)break;
+      const brief=creativeBriefFor(story);
+      const roles=new Map(brief.sequenceRoles.map(role=>[role.assetId,role]));
+      for(const slide of option.slides)if(!roles.has(slide.assetId))roles.set(slide.assetId,{assetId:slide.assetId,role:slide.role,note:slide.note});
+      brief.sequenceRoles=[...roles.values()];
+      editDraft(story.id,{format:option.format,targetSlideCount:option.targetSlideCount,selectedAssetIds:option.slides.map(slide=>slide.assetId),creativeBrief:brief},{rerender:true,immediate:true});
+      break;
+    }
     case 'rehearse-story': showRehearsal(story); break;
     case 'rehearse-step': if (rehearsal) showRehearsal(storyById(rehearsal.storyId), rehearsal.index + Number(button.dataset.step), rehearsal.fit); break;
     case 'prepare-discovery':
@@ -356,7 +366,7 @@ document.addEventListener('click', event => {
       if (!window.confirm(`Use local version ${draft.version} as a new local draft?${removed ? ` ${removed} unavailable image reference${removed === 1 ? '' : 's'} will be removed from the new version.` : ''}${removedRoles ? ` ${removedRoles} unavailable narrative-role annotation${removedRoles === 1 ? '' : 's'} will also be removed.` : ''} Existing versions and n8n data are preserved.`)) break;
       if (removedRoles) brief.sequenceRoles = brief.sequenceRoles.filter(item => known.has(item.assetId));
       document.querySelector('#asset-dialog').close();
-      editDraft(story.id, { caption: draft.caption ?? story.caption ?? '', selectedAssetIds: draft.selectedAssetIds === undefined ? [...(story.selectedAssetIds || [])] : retained, notes: draft.notes || '', musicSelection: Object.hasOwn(draft, 'musicSelection') ? draft.musicSelection : story.musicSelection ?? null,
+      editDraft(story.id, { title:draft.title ?? story.title, hook:draft.hook ?? story.hook, format:draft.format ?? story.format, targetSlideCount:draft.targetSlideCount ?? story.targetSlideCount, caption: draft.caption ?? story.caption ?? '', selectedAssetIds: draft.selectedAssetIds === undefined ? [...(story.selectedAssetIds || [])] : retained, notes: draft.notes || '', musicSelection: Object.hasOwn(draft, 'musicSelection') ? draft.musicSelection : story.musicSelection ?? null,
         creativeBrief: brief }, { rerender: true, immediate: true });
       break;
     }
@@ -427,6 +437,8 @@ document.addEventListener('input', event => {
     searchTimer = setTimeout(() => { if (!['pipeline', 'publishing', 'archive'].includes(route().view)) location.hash = '#/pipeline'; else render(); }, 150);
   }
   if (input.id === 'library-search') { state.librarySearch = input.value; clearTimeout(searchTimer); searchTimer = setTimeout(render, 150); }
+  const setup=input.closest('[data-form="editorial-setup"]');
+  if(setup){state.editorialSetupDrafts??={};state.editorialSetupDrafts[setup.dataset.story]={title:setup.elements.title.value,hook:setup.elements.hook.value,format:setup.elements.format.value,targetSlideCount:Number(setup.elements.targetSlideCount.value)};}
   if (input.dataset.draftField) {
     editDraft(input.dataset.story, { [input.dataset.draftField]: input.value });
     if (input.dataset.draftField === 'caption') {
@@ -445,6 +457,14 @@ document.addEventListener('change', event => {
     document.querySelector('[data-rehearsal-fit]')?.focus(); return;
   }
   const input = event.target;
+  if (input.matches('[data-format-control]')) {
+    const target = input.form.elements.targetSlideCount;
+    target.readOnly = input.value === 'single_image';
+    target.min = input.value === 'carousel' ? '2' : '1';
+    if (input.value === 'single_image') target.value = '1';
+    else if (Number(target.value) < Number(target.min)) target.value = target.min;
+    state.editorialSetupDrafts??={};state.editorialSetupDrafts[input.form.dataset.story]={title:input.form.elements.title.value,hook:input.form.elements.hook.value,format:input.value,targetSlideCount:Number(target.value)};
+  }
   if (input.id === 'image-editorial-filter') { state.imageEditorialFilter = input.value; render(); }
   if (input.id === 'library-rights') { state.libraryRights = input.value; render(); }
   if (input.dataset.briefField && !input.matches('textarea,input[type="text"]')) {
@@ -475,6 +495,14 @@ document.addEventListener('change', event => {
   }
 });
 
+document.addEventListener('submit', event => {
+  const form = event.target.closest('[data-form="editorial-setup"]');
+  if (!form) return;
+  event.preventDefault();
+  const changes={title:form.elements.title.value.trim(),hook:form.elements.hook.value,format:form.elements.format.value,targetSlideCount:Number(form.elements.targetSlideCount.value)};
+  if(state.editorialSetupDrafts)delete state.editorialSetupDrafts[form.dataset.story];
+  editDraft(form.dataset.story, changes, {rerender:true,immediate:true});
+});
 document.addEventListener('submit', event => {
   const form = event.target.closest('[data-form="music"]');
   if (!form) return;
@@ -625,7 +653,7 @@ document.querySelector('#asset-dialog').addEventListener('click', event => {
   if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) event.currentTarget.close(); }
 });
 window.addEventListener('hashchange', () => { document.querySelector('#asset-dialog').close(); render({ focusMain: true }); window.scrollTo({ top: 0, behavior: 'instant' }); });
-window.addEventListener('beforeunload', event => { if (pending.size || saving.size || state.researchDraft?.prompt?.trim()) { event.preventDefault(); event.returnValue = ''; } });
+window.addEventListener('beforeunload', event => { if (pending.size || saving.size || Object.keys(state.editorialSetupDrafts||{}).length || state.researchDraft?.prompt?.trim()) { event.preventDefault(); event.returnValue = ''; } });
 
 render();
 loadWorkspace().catch(() => {});

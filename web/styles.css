@@ -3683,3 +3683,10 @@ dialog::backdrop {
 .engine-candidate { margin-top:18px; padding:18px; border:1px solid var(--line); background:var(--surface); }
 .engine-candidate textarea { min-height:90px; }
 .engine-job,.engine-candidate { overflow-wrap:anywhere; }
+
+.source-sequence-options details { border-top: 1px solid var(--line, #dbe5f5); padding: 1rem 0; }
+.source-sequence-options summary { cursor: pointer; font-weight: 600; }
+.source-sequence-slides { list-style: none; padding: 0; }
+.source-sequence-slides li { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 1rem; margin: 1rem 0; }
+.source-sequence-slides .photo { aspect-ratio: 1; }
+.source-sequence-slides p { overflow-wrap: anywhere; }

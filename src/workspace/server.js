@@ -1,3 +1,4 @@
+import {buildSourceSequencePlan} from '../editorial-sequence.js';
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -57,6 +58,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       workspace.stories.push(story);
     }
     attachLocalPreviews(workspace,previews);
+    for (const story of workspace.stories) story.sourceSequencePlan = buildSourceSequencePlan(story);
     workspace.discovery = buildDiscoveryDesk(workspace.stories);
     workspace.researchHandoffAvailable = Boolean(research);
     return workspace;

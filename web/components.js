@@ -9,12 +9,21 @@ export const date = value => {
 };
 export const storyUrl = (id, tab = 'overview') => `#/story/${encodeURIComponent(id)}/${tab}`;
 export const effective = story => ({
+  title: story.localDraft?.title ?? story.title ?? '',
+  hook: story.localDraft?.hook ?? story.hook ?? '',
+  format: story.localDraft?.format ?? story.format ?? 'carousel',
+  targetSlideCount: story.localDraft?.targetSlideCount ?? story.targetSlideCount ?? 5,
   caption: story.localDraft?.caption ?? story.caption ?? '',
   selectedAssetIds: story.localDraft?.selectedAssetIds ?? story.selectedAssetIds ?? [],
   notes: story.localDraft?.notes ?? '',
   musicSelection: story.localDraft && Object.hasOwn(story.localDraft, 'musicSelection') ? story.localDraft.musicSelection : story.musicSelection ?? null,
   creativeBrief: story.localDraft?.creativeBrief ?? null,
 });
+// Display local editorial choices without changing the source object or its revision.
+export const workingStory = story => {
+  const { title, hook, format, targetSlideCount } = effective(story);
+  return { ...story, title, hook, format, targetSlideCount, sourceEditorial: story.sourceEditorial || {title:story.title,hook:story.hook,format:story.format,targetSlideCount:story.targetSlideCount} };
+};
 export const mediaFor = story => {
   const ids = effective(story).selectedAssetIds;
   return ids.map(id => (story.media || []).find(asset => asset.id === id)).filter(Boolean);

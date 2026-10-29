@@ -1,0 +1,8 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {buildSourceSequencePlan} from '../src/editorial-sequence.js';
+const asset=(id,year,materialType='photograph_reference')=>({id,previewUrl:`https://archive.example.org/${id}.jpg`,sourceRelation:'subject_caption_match',sourceCaption:`A source-caption reference from ${year}.`,sourceCredit:'Recorded source credit',sourceYears:[year],materialType});
+test('source plans distinguish photographs and dated supporting documents without padding or granting clearance',()=>{
+ const story={selectedAssetIds:['photo'],media:[asset('cover',1974),asset('dress',1967,'design_documentation'),asset('photo',1974),asset('trench',1967,'design_documentation'),asset('rejected',1967)]};story.media[0].sourceRelation='page_cover';story.media[4].localReview={decision:'reject'};
+ const before=JSON.stringify(story);const plan=buildSourceSequencePlan(story);assert.equal(plan.options.length,2);assert.deepEqual(plan.options[1].slides.map(s=>s.assetId),['photo','dress','trench']);assert.deepEqual(plan.options[1].slides.map(s=>s.years[0]),[1974,1967,1967]);assert.equal(plan.options[1].slides[1].material,'design_documentation');assert.equal(plan.pixelReviewPerformed,false);assert.equal(plan.rightsGranted,false);assert.equal(JSON.stringify(story),before);
+ const one=buildSourceSequencePlan({media:[asset('photo',1974),{...asset('duplicate',1974),previewUrl:'https://archive.example.org/photo.jpg'}]});assert.equal(one.options.length,1);assert.equal(one.options[0].targetSlideCount,1);
+ const none=buildSourceSequencePlan({media:[{id:'no-metadata'}]});assert.deepEqual(none.options,[]);
+});

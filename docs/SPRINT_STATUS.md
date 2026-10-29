@@ -1,3 +1,11 @@
+# Working editorial identity + source sequences — 2026-10-29
+
+Studio Direction now saves versioned local title/hook/format/frame target; all views use working identity without changing source revisions. History/export/rebase/restore preserve the fields. Unsaved setup form text survives quiet refresh/save completion. Carousel offers optional source-caption plans, excludes covers/rejected references, preserves dates/material types and never grants rights or trims assets implicitly.
+
+Actual2254 local version2: “The photographer in the mirror,” single_image/target1/selected1, corrected1974 caption retained. Native original untouched; SQLite backup in ignored engine-build. Actual browser smoke verifies private1600px photo, working title and one/three-frame options (1974photo;1967documents),19stories, no JS errors, inactive worker.28 fixture browser flows and focused persistence/sequence/view tests pass. No extra paid call. Next: stronger soundtrack intent/reasoning and discovery brief handling; continue safe work and push increments.
+
+---
+
 # Source-aware producer increment — 2026-10-29
 
 Saved tested 40-node source-aware graph to existing INACTIVE development worker (saved version f9c1f169-4b6e-4640-87d8-dd451424de33). Captured image captions/dates now precede drafting; generic covers cannot unlock a draft. Audience-pitch and chronology gates retain rejected paid copy and photos for revision. Full native response retention preserves future usage/tool evidence. Native metadata reaches Studio without a second evidence fetch.
