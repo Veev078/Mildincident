@@ -535,6 +535,20 @@ async function createResearchRequest(input) {
   toast('Saved locally. Open the n8n form and submit there to start research.');
   document.querySelector(`[data-request-id="${result.request.id}"]`)?.scrollIntoView({block:'center'});
 }
+document.addEventListener('click', async event=>{
+  const button=event.target.closest('[data-engine-action]');if(!button||button.disabled)return;
+  button.disabled=true;
+  try{
+    const action=button.dataset.engineAction;
+    await api(action==='refresh'?'/api/research/engine/refresh':`/api/research/requests/${button.dataset.request}/engine/${action}`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(action==='start'?{expectedVersion:Number(button.dataset.version)}:{})});
+    await loadWorkspace({quiet:true});toast(action==='queue'?'Queued in isolated n8n development storage. No AI run was started.':action==='start'?'Bounded generation dispatched once. Refresh results to reconcile its status.':'Development engine results refreshed.');
+  }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
+});
+document.addEventListener('submit',async event=>{
+  const form=event.target.closest('[data-engine-review]');if(!form)return;event.preventDefault();const button=form.querySelector('button[type="submit"]');button.disabled=true;
+  try{await api(`/api/research/requests/${form.dataset.request}/engine/review`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({candidateId:form.dataset.candidate,expectedVersion:Number(form.dataset.version),decision:form.elements.decision.value,reason:form.elements.reason.value})});await loadWorkspace({quiet:true});toast('Development editorial decision saved. Production and rights remain unchanged.');}catch(error){form.querySelector('[data-engine-status]').textContent=error.message;}finally{button.disabled=false;}
+});
+
 document.addEventListener('click', event => {
   const link=event.target.closest('[data-research-handoff]'); if(!link)return;
   api(`/api/research/requests/${link.dataset.researchHandoff}/events`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({event:'handoff_requested',expectedVersion:Number(link.dataset.version)})})

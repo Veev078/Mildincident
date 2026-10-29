@@ -12,3 +12,17 @@ test('development prompt caps active research branches and incorporates prior de
  const out=vm.runInNewContext(`(function(){${prompt}})()`,{$:name=>({all:()=>[{json:{candidate_json:JSON.stringify({story:{subject:'Previously generated subject'}})}}],first:()=>({json:{kind:'brief'}})})});
  assert.equal(out.length,1);assert.equal(out[0].json.source,'development_brief');assert.ok(out[0].json.avoid.includes('Previously generated subject'));
 });
+
+test('research input budget stops oversized prompts before the model node',()=>{
+ const fixtureInput=fixture();fixtureInput.researchWorkflow.activeVersion.nodes.find(n=>n.name==='Build Research Prompt').parameters.jsCode="return [{json:{userPrompt:'a'.repeat(30001),avoid:[]}}];";
+ const {workflow}=buildEditorialDevelopmentEngine(fixtureInput);const code=workflow.nodes.find(n=>n.name==='Build Research Prompt').parameters.jsCode;
+ assert.throws(()=>vm.runInNewContext(`(function(){${code}})()`,{$:()=>({all:()=>[],first:()=>({json:{kind:'brief'}})})}),/RESEARCH_INPUT_BUDGET_EXCEEDED/);
+ const guard=workflow.nodes.find(n=>n.name==='Guard Draft Input Budget').parameters.jsCode;
+ assert.throws(()=>vm.runInNewContext(`(function(){${guard}})()`,{$input:{first:()=>({json:{claims:'a'.repeat(30001)}})},$:()=>({first:()=>({json:{brandText:''}})})}),/DRAFT_INPUT_BUDGET_EXCEEDED/);
+});
+
+test('worker refuses ambiguous duplicate-row claim before any model work',()=>{
+ const {workflow}=buildEditorialDevelopmentEngine(fixture());const code=workflow.nodes.find(n=>n.name==='Verify Development Claim').parameters.jsCode;
+ const row={job_id:'same',lease_token:'lease',status:'generating',kind:'brief',prompt:'A valid creative research request'};
+ const out=vm.runInNewContext(`(function(){${code}})()`,{$input:{first:()=>({json:row}),all:()=>[{json:row},{json:row}]},$:()=>({first:()=>({json:{job_id:'same',dispatch_id:'lease'}})})});assert.equal(out[0].json.claimed,false);
+});

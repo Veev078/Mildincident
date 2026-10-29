@@ -1,7 +1,7 @@
 /** Review ordering from recorded evidence, never an aesthetic/performance score. */
 export function buildDiscoveryDesk(stories) {
-  const reviewStages = new Set(['awaiting_chief_review','awaiting_founder_approval','research_complete','idea','researching']);
-  const eligible = stories.filter(s => s.stage !== 'rejected' && !['founder_rejected','rejected'].includes(s.approvalStatus) &&
+  const reviewStages = new Set(['awaiting_chief_review','awaiting_founder_approval','research_complete','idea','researching','development_review']);
+  const eligible = stories.filter(s => !['rejected','development_rejected'].includes(s.stage) && !['founder_rejected','rejected'].includes(s.approvalStatus) &&
     !['buffer_sent','instagram_posted_verified','buffer_scheduled','buffer_unscheduled_draft'].includes(s.publishing?.observed));
   const describe = story => {
     const draft = story.localDraft;

@@ -1,3 +1,17 @@
+# Durable development jobs + Studio result integration — 2026-10-29
+
+Approved sandbox work proceeded. Commits32c7c7f (native replay),6671a77 (lease + inactive worker) preserved. Four development workflows exist and are ALL INACTIVE after zero-AI tests. Actual replay2249 returned7 references; concurrent native claim2252 won1/4; existing source/research production versions unchanged. New development job/result tables and isolated header credential only.
+
+Implemented server-only engine client + durable local job/event ledger, same-UUID n8n queueing, read-only reconciliation, provenance/secret validation, strict version/budget arming, no automatic uncertain redispatch, local development decisions and real result adapters into existing Studio editors. Real brief queued at n8n dev row2 under request99de2099-d762-40d5-85d9-222ba3c241db. Actual Studio shows queued + generation disabled,18 source stories, no JS errors/token leak. No fresh candidate generated. Imported-result browser verification uses labeled fixtures.
+
+Worker6CkqfYc4Pyd4k8vi has37 nodes, inactive:1 research+atmost1 draft,3500/1800 output tokens,2 research tools,30000 input characters per call,240s runtime, only isolated development writers. Node retries disabled; SDK behavior/price unverified. Approval review blocked activation/AI run for payload/destination/unknown-spend scope. No AI call, recurring schedule, production change, Buffer action, deployment or environment publication.
+
+Validation:126-test full regression passed; two additional budget/ambiguity tests plus focused builder/client checks passed;26 Chromium flows passed. Native replay/lease tests succeeded; generation remains unexecuted. Private connection/backups/evidence in `.local/engine-build/`; never commit/share publicly. Fresh checkouts lack that development credential and fall back to existing native forms.
+
+Next: obtain exact model-context/spend approval accepted by review, run ONE existing queued development brief, verify provider output/usage and candidate persistence/import, then improve actual editorial/photographic quality. Do not recreate workflows or copy synthetic fixtures into live candidate tables. No manual Windows testing/download request needed now. Details: DEVELOPMENT_ENGINE.md.
+
+---
+
 # Development generation worker checkpoint — 2026-10-29
 
 Created inactive development worker6CkqfYc4Pyd4k8vi (36nodes) from captured ACTIVE research+sourcing graphs. All writes target new development jobs/candidate tables; no production writer, schedule, subworkflow call or automatic model retry. Caps:1 research call (3500 output tokens,2 tool calls), at most1 draft (1800 output tokens),1 candidate and bounded first-party HTML preview inspection. Clone retains source prompts/brand readers/duplicate gates and human-verification gaps. No newly generated discovery exists yet.

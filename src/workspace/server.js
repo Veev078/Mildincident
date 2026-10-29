@@ -4,6 +4,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDiscoveryDesk } from '../editorial-discovery.js';
 import { WorkspaceSource } from './data-source.js';
+import { loadEditorialEngineClient } from './editorial-engine-client.js';
+import { EditorialEngineService } from './editorial-engine-service.js';
+import { developmentCandidateStory } from './development-story.js';
 import { LocalResearchStore } from './research-store.js';
 import { LocalDraftStore } from './store.js';
 import { HandoffError, requireThat } from '../errors.js';
@@ -43,11 +46,18 @@ async function imageBody(request) {
   return Buffer.concat(chunks);
 }
 
-export function createWorkspaceServer({ source, drafts, previews, research, webRoot = WEB_ROOT }) {
+export function createWorkspaceServer({ source, drafts, previews, research, engine, webRoot = WEB_ROOT }) {
   const view = () => {
-    const workspace = attachLocalPreviews(source.view(drafts.all()), previews);
-    workspace.discovery = buildDiscoveryDesk(workspace.stories);
+    const workspace = source.view(drafts.all());
     workspace.researchRequests = research?.all() || [];
+    workspace.engine = engine?.status() || {configured:false,generationAvailable:false,generationApproved:false,workerActive:false};
+    for (const request of workspace.researchRequests) for (const candidate of request.engineJob?.candidates || []) {
+      const story = developmentCandidateStory(candidate,{soundtrack:source.snapshot?.records?.soundtrack || [],drafts:drafts.all(),decision:request.engineJob.reviewDecisions?.[candidate.id]||null});
+      requireThat(!workspace.stories.some(s=>s.id===story.id),'AMBIGUOUS_ENGINE_RESULT','Development story identity collides with an existing record.');
+      workspace.stories.push(story);
+    }
+    attachLocalPreviews(workspace,previews);
+    workspace.discovery = buildDiscoveryDesk(workspace.stories);
     workspace.researchHandoffAvailable = Boolean(research);
     return workspace;
   };
@@ -75,6 +85,19 @@ export function createWorkspaceServer({ source, drafts, previews, research, webR
         requireThat(research, 'RESEARCH_UNAVAILABLE', 'The private research request store is unavailable.');
         const input = await body(request); const workspace = view();
         json(response, 201, { request: research.create(input, workspace.stories), scope: 'local_only', productionApplied: false }); return;
+      }
+      if (url.pathname === '/api/research/engine/refresh' && request.method === 'POST') {
+        requireThat(engine,'ENGINE_NOT_CONFIGURED','Private development engine connection is unavailable.');
+        json(response,200,{engine:await engine.refresh(),productionApplied:false});return;
+      }
+      const engineMatch=url.pathname.match(/^\/api\/research\/requests\/([a-f0-9-]{36})\/engine\/(queue|start|review)$/);
+      if(engineMatch && request.method==='POST'){
+        requireThat(engine,'ENGINE_NOT_CONFIGURED','Private development engine connection is unavailable.');
+        const input=await body(request);let job;
+        if(engineMatch[2]==='queue'){requireThat(input&&Object.keys(input).length===0,'INVALID_RESEARCH_REQUEST','Queue requires only a saved request identity.');job=await engine.queue(engineMatch[1]);}
+        else if(engineMatch[2]==='start'){requireThat(input&&Object.keys(input).every(k=>k==='expectedVersion'),'INVALID_RESEARCH_REQUEST','Unsupported start fields.');job=await engine.start(engineMatch[1],input.expectedVersion);}
+        else job=engine.review(engineMatch[1],input);
+        json(response,engineMatch[2]==='start'?202:200,{job,scope:'development_only',productionApplied:false});return;
       }
       const requestMatch = url.pathname.match(/^\/api\/research\/requests\/([a-f0-9-]{36})\/events$/);
       if (requestMatch && request.method === 'POST') {
@@ -170,8 +193,8 @@ export function createWorkspaceServer({ source, drafts, previews, research, webR
       const code = error instanceof HandoffError ? error.code : 'LOCAL_ERROR';
       const message = error instanceof HandoffError ? error.message : 'The local operation did not complete. No production changes were made.';
       const status = ['INVALID_HOST', 'INVALID_ORIGIN', 'INTENT_REQUIRED'].includes(code) ? 403 :
-        ['STALE_SOURCE', 'STALE_LOCAL_DRAFT', 'EDIT_CONFLICT'].includes(code) ? 409 :
-          ['STORY_NOT_FOUND', 'DRAFT_NOT_FOUND', 'FILE_NOT_FOUND', 'PREVIEW_NOT_FOUND', 'RESEARCH_REQUEST_NOT_FOUND'].includes(code) ? 404 : code === 'SOURCE_UNAVAILABLE' ? 503 : 400;
+        ['STALE_SOURCE', 'STALE_LOCAL_DRAFT', 'EDIT_CONFLICT', 'GENERATION_NOT_APPROVED', 'ENGINE_ALREADY_DISPATCHED'].includes(code) ? 409 :
+          ['STORY_NOT_FOUND', 'DRAFT_NOT_FOUND', 'FILE_NOT_FOUND', 'PREVIEW_NOT_FOUND', 'RESEARCH_REQUEST_NOT_FOUND'].includes(code) ? 404 : ['SOURCE_UNAVAILABLE','ENGINE_NOT_CONFIGURED','ENGINE_NETWORK_UNCERTAIN'].includes(code) ? 503 : 400;
       if (!response.headersSent) json(response, status, { error: { code, message } });
       else response.end();
     }
@@ -184,7 +207,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const drafts = new LocalDraftStore('.local/workspace/drafts.sqlite');
   const previews = new LocalPreviewStore('.local/workspace/previews');
   const research = new LocalResearchStore('.local/workspace/research.sqlite');
-  const server = createWorkspaceServer({ source, drafts, previews, research });
+  let engine=null;
+  try { const client=await loadEditorialEngineClient(); if(client){engine=new EditorialEngineService({research,client});engine.inspect().catch(()=>{});} } catch(error) { console.error(`Development engine unavailable: ${error.code || 'CONFIGURATION_ERROR'}`); }
+  const server = createWorkspaceServer({ source, drafts, previews, research, engine });
   const port = Number(process.env.PORT || 4174);
   requireThat(Number.isSafeInteger(port) && port > 0 && port <= 65535, 'INVALID_PORT', 'PORT must be from 1 to 65535.');
   server.on('error', error => { console.error(`Workspace startup failed: ${error.code || 'LOCAL_ERROR'}`); process.exitCode = 1; drafts.close(); });

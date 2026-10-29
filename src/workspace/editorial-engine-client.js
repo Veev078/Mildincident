@@ -1,0 +1,59 @@
+import fs from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {HandoffError,requireThat} from '../errors.js';
+import {EDITORIAL_JOB_BUDGET} from '../n8n/editorial-development-engine.js';
+import {browserUrl,WORKSPACE_TABLES} from './model.js';
+export const EDITORIAL_ENGINE_ORIGIN='https://rickywelch.app.n8n.cloud';
+export const requestFingerprint=request=>createHash('sha256').update(JSON.stringify({kind:request.kind,prompt:request.prompt,sourceUrl:request.sourceUrl||''})).digest('hex');
+const text=(value,max=10000)=>typeof value==='string'?value.slice(0,max):'';
+const terminal=new Set(['ready_to_review','needs_research','failed','rejected','approved']);
+export function sanitizeDevelopmentCandidate(row) {
+  let raw;try{raw=JSON.parse(row.candidate_json);}catch{throw new HandoffError('INVALID_ENGINE_RESULT','Development candidate JSON is invalid.');}
+  requireThat(raw.id===row.candidate_id&&raw.jobId===row.job_id&&/^DEV-[a-f0-9-]{36}-1$/.test(raw.id)&&['ready_to_review','needs_research','rejected','approved'].includes(row.status)&&raw.provenance?.executionId&&Number.isFinite(Date.parse(raw.provenance?.generatedAt)), 'INVALID_ENGINE_RESULT','Candidate identity or execution provenance is missing.');
+  const claims=(Array.isArray(raw.claims)?raw.claims:[]).slice(0,10).map(c=>({claim:text(c.claim,1500),claimType:['verified_fact','interpretation','hypothesis'].includes(c.claim_type)?c.claim_type:'hypothesis',sourceName:text(c.source_name,200),url:browserUrl(c.source_url),linkStatus:text(c.link_status,100)}));
+  const media=(Array.isArray(raw.media)?raw.media:[]).slice(0,7).map(m=>({id:text(m.asset_id,300),title:text(m.title,300),creator:text(m.creator,200),sourceUrl:browserUrl(m.source_page_url),previewUrl:browserUrl(m.thumb_url),provider:text(m.provider,100),rightsStatus:'preview_unreviewed',license:text(m.license,300),width:null,height:null}));
+  return {id:raw.id,jobId:raw.jobId,status:row.status,title:text(raw.story?.title,300),subject:text(raw.story?.subject,300),hook:text(raw.story?.hook,600),captionDraft:text(raw.captionDraft,10000),carouselOutline:text(raw.carouselOutline,10000),claims,media,gaps:(Array.isArray(raw.gaps)?raw.gaps:[]).slice(0,20).map(g=>text(g,1000)),musicSuggestions:[],musicGap:text(raw.musicGap,600),
+    provenance:{executionId:text(String(raw.provenance.executionId),40),researchWorkflowId:text(raw.provenance.researchWorkflowId,200),researchActiveVersion:text(raw.provenance.researchActiveVersion,200),kind:text(raw.provenance.kind,30),generatedAt:raw.provenance.generatedAt},rightsGranted:false,factsVerifiedByHuman:false,pixelAnalysisPerformed:false};
+}
+export class EditorialEngineClient {
+  constructor({connection,apiKey,fetchImpl=fetch}) {
+    requireThat(connection&&['jobsTableId','candidatesTableId','editorialWorkerId'].every(k=>typeof connection[k]==='string'&&/^[A-Za-z0-9_-]{1,200}$/.test(connection[k])),'ENGINE_NOT_CONFIGURED','Development engine connection is incomplete.');
+    requireThat(!Object.values(WORKSPACE_TABLES).includes(connection.jobsTableId)&&!Object.values(WORKSPACE_TABLES).includes(connection.candidatesTableId)&&connection.jobsTableId!==connection.candidatesTableId,'UNSAFE_ENGINE_TABLE','Development storage must be separate from production tables.');
+    requireThat(connection.headerName==='X-Mildincident-Development-Key'&&typeof connection.token==='string'&&connection.token.length>=32&&!/[\r\n]/.test(connection.token)&&typeof apiKey==='string'&&apiKey.length>0,'ENGINE_NOT_CONFIGURED','Server credentials are required.');
+    this.connection=connection;this.apiKey=apiKey;this.fetchImpl=fetchImpl;this.tablesReady=null;this.lastInspection=null;
+  }
+  async api(path,method='GET',body) {
+    const tablePaths=[`/data-tables/${this.connection.jobsTableId}`,`/data-tables/${this.connection.candidatesTableId}`];
+    const readAllowed=method==='GET'&&(path===`/workflows/${this.connection.editorialWorkerId}`||/^\/executions\/[0-9]{1,30}\?includeData=false$/.test(path)||tablePaths.some(prefix=>path===prefix||new RegExp('^'+prefix+'/rows\\?limit=100(?:&cursor=[A-Za-z0-9%_.~-]+)?$').test(path)));
+    const writeAllowed=method==='POST'&&path===`/data-tables/${this.connection.jobsTableId}/rows`;
+    requireThat(readAllowed||writeAllowed,'INVALID_ENGINE_PATH','Only fixed development reads and job creation are available.');
+    let response;try{response=await this.fetchImpl(EDITORIAL_ENGINE_ORIGIN+'/api/v1'+path,{method,headers:{'X-N8N-API-KEY':this.apiKey,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(20000)});}catch{throw new HandoffError('ENGINE_NETWORK_UNCERTAIN','Development request did not return. Reconcile read-only before retrying any write.');}
+    requireThat(response.ok,'ENGINE_HTTP_'+response.status,'Development service returned HTTP '+response.status+'. No automatic retry was performed.');
+    let bytes=0;const chunks=[];for await(const chunk of response.body){bytes+=chunk.byteLength;requireThat(bytes<=4*1024*1024,'ENGINE_RESPONSE_TOO_LARGE','Development response exceeds the safety limit.');chunks.push(chunk);}
+    try{return JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw new HandoffError('INVALID_ENGINE_RESULT','Development response is not JSON.');}
+  }
+  async verifyTables(){if(!this.tablesReady)this.tablesReady=(async()=>{for(const [key,name] of [['jobsTableId','mildincident_dev_editorial_jobs'],['candidatesTableId','mildincident_dev_editorial_candidates']]){const table=await this.api('/data-tables/'+this.connection[key]);requireThat(table.name===name,'UNSAFE_ENGINE_TABLE','Configured development table name does not match.');}})().catch(e=>{this.tablesReady=null;throw e;});await this.tablesReady;}
+  async inspect(){await this.verifyTables();const workflow=await this.api('/workflows/'+this.connection.editorialWorkerId);requireThat(workflow.name==='MILDINCIDENT DEV — bounded editorial generation','UNSAFE_ENGINE_WORKFLOW','Unexpected development workflow.');const approved=this.connection.generationEnabled===true&&typeof this.connection.approvedWorkerVersion==='string'&&this.connection.approvedWorkerVersion===workflow.activeVersionId;
+    if(approved){const nodes=workflow.activeVersion?.nodes;requireThat(Array.isArray(nodes)&&!nodes.some(n=>/scheduleTrigger|executeWorkflow/.test(n.type))&&nodes.filter(n=>n.type.includes('openAi')).length===2&&nodes.every(n=>n.type!=='n8n-nodes-base.dataTable'||n.parameters.operation==='get'||[this.connection.jobsTableId,this.connection.candidatesTableId].includes(n.parameters.dataTableId.value)),'UNSAFE_ENGINE_WORKFLOW','Approved worker graph no longer matches isolated execution constraints.');
+      const research=nodes.find(n=>n.name==='Research Candidates');const draft=nodes.find(n=>n.name==='Draft Editorial Concept');
+      requireThat(research?.parameters?.options?.maxTokens<=3500&&research.parameters.options.maxTokens>0&&research.parameters.options.maxToolCalls<=2&&research.retryOnFail===false&&draft?.parameters?.options?.maxTokens<=1800&&draft.parameters.options.maxTokens>0&&draft.retryOnFail===false&&nodes.some(n=>n.name==='Guard Draft Input Budget'),'UNSAFE_ENGINE_WORKFLOW','Worker model budgets do not match approval constraints.');}
+
+    this.lastInspection={configured:true,workerActive:workflow.active===true,generationApproved:approved,generationAvailable:workflow.active===true&&approved,budget:EDITORIAL_JOB_BUDGET,maxResearchCalls:1,maxDraftCalls:1,maxCandidates:1};return {...this.lastInspection};}
+  async rows(tableId){await this.verifyTables();let cursor;const rows=[];for(let page=0;page<5;page++){const result=await this.api(`/data-tables/${tableId}/rows?limit=100${cursor?'&cursor='+encodeURIComponent(cursor):''}`);requireThat(Array.isArray(result.data),'INVALID_ENGINE_RESULT','Development row page is malformed.');rows.push(...result.data);cursor=result.nextCursor;if(!cursor)return rows;}throw new HandoffError('ENGINE_SCAN_INCOMPLETE','Development scan is incomplete; no write is safe.');}
+  async findJob(id){const matches=(await this.rows(this.connection.jobsTableId)).filter(row=>row.job_id===id);requireThat(matches.length<=1,'AMBIGUOUS_ENGINE_JOB','Multiple remote jobs share this identity. Reconcile manually.');return matches[0]||null;}
+  async queue(request){const hash=requestFingerprint(request);const existing=await this.findJob(request.id);if(existing){requireThat(existing.request_hash===hash,'EDIT_CONFLICT','Remote job identity belongs to a different request.');return existing;}
+    await this.api(`/data-tables/${this.connection.jobsTableId}/rows`,'POST',{data:[{job_id:request.id,request_hash:hash,kind:request.kind,prompt:request.prompt,source_url:request.sourceUrl||'',status:'queued',result_count:0,error:'',result_json:'',lease_token:'',execution_id:''}]});
+    const saved=await this.findJob(request.id);requireThat(saved&&saved.request_hash===hash,'ENGINE_NETWORK_UNCERTAIN','Queued job was not confirmed. Reconcile instead of reposting.');return saved;
+  }
+  async candidates(jobId){return(await this.rows(this.connection.candidatesTableId)).filter(row=>row.job_id===jobId).map(sanitizeDevelopmentCandidate);}
+  async executionStatus(id){requireThat(/^[0-9]{1,30}$/.test(id),'INVALID_ENGINE_RESULT','Invalid engine execution identity.');const result=await this.api('/executions/'+id+'?includeData=false');requireThat(result.workflowId===this.connection.editorialWorkerId,'INVALID_ENGINE_RESULT','Execution does not belong to the development worker.');return {status:result.status,finished:result.finished===true};}
+  async dispatch(request,dispatchId){const inspection=await this.inspect();requireThat(inspection.generationAvailable,'GENERATION_NOT_APPROVED','Paid generation is not enabled: the development worker must be approved and active.');
+    const response=await this.fetchImpl(EDITORIAL_ENGINE_ORIGIN+'/webhook/mildincident-dev-editorial-job-v1',{method:'POST',headers:{'Content-Type':'application/json',[this.connection.headerName]:this.connection.token},body:JSON.stringify({job_id:request.id,request_hash:requestFingerprint(request),dispatch_id:dispatchId}),redirect:'error',signal:AbortSignal.timeout(270000)});
+    requireThat(response.ok,'ENGINE_DISPATCH_UNCERTAIN','Generation dispatch did not complete cleanly. Reconcile before considering another execution.');return response.json();
+  }
+}
+export async function loadEditorialEngineClient({filename='.local/engine-build/development-connection.json',apiKey=process.env.N8N_API_KEY}={}) {
+  let connection;try{connection=JSON.parse(await fs.readFile(filename,'utf8'));}catch(error){if(error.code==='ENOENT')return null;throw new HandoffError('ENGINE_NOT_CONFIGURED','Private engine configuration is unreadable.');}
+  return new EditorialEngineClient({connection,apiKey});
+}
+export const isTerminalEngineState=status=>terminal.has(status);

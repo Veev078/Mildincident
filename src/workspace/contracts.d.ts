@@ -54,5 +54,24 @@ export interface ResearchRequest {
   id: string; kind: 'discovery' | 'brief'; prompt: string; sourceUrl: string; createdAt: string;
   baselineIds: string[]; version: number; linkedStoryId: string | null; handoffUrl: string;
   events: {version: number; event: 'handoff_requested' | 'story_linked'; storyId: string | null; createdAt: string}[];
-  executionConfirmed: false; productionApplied: false;
+  engineJob?: DevelopmentJob | null; executionConfirmed: false; productionApplied: false;
+}
+
+export interface DevelopmentCandidate {
+  id: string; jobId: string; status: 'ready_to_review' | 'needs_research' | 'approved' | 'rejected';
+  title: string; subject: string; hook: string; captionDraft: string; carouselOutline: string;
+  claims: {claim: string; claimType: string; sourceName: string; url: string; linkStatus: string}[];
+  media: MediaCandidate[]; gaps: string[];
+  provenance: {executionId: string; researchWorkflowId: string; researchActiveVersion: string; kind: string; generatedAt: string};
+  rightsGranted: false; factsVerifiedByHuman: false; pixelAnalysisPerformed: false;
+}
+export interface DevelopmentJob {
+  requestId: string; requestHash: string; state: string; version: number; updatedAt: string;
+  remoteRowId?: string; executionId?: string; nativeStatus?: string; lastError?: string | null;
+  candidates?: DevelopmentCandidate[];
+  reviewDecisions?: Record<string,{decision: 'approved' | 'rejected'; reason: string; createdAt: string}>;
+}
+export interface DevelopmentEngineStatus {
+  configured: boolean; workerActive: boolean; generationApproved: boolean; generationAvailable: boolean;
+  budget?: {maxResearchCalls: number; maxDraftCalls: number; maxResearchToolCalls: number; maxCandidates: number; maxInputCharactersPerCall: number; maxResearchOutputTokens: number; maxDraftOutputTokens: number; priceVerified: false};
 }

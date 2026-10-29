@@ -3678,3 +3678,8 @@ dialog::backdrop {
 .image-editorial-review { margin-top:24px; padding-top:18px; border-top:1px solid var(--line); }
 .image-editorial-review textarea { min-height:100px; }
 .image-editorial-review ul { padding-left:18px; overflow-wrap:anywhere; }
+
+.engine-job { margin:18px 0; padding:18px; border:1px solid var(--line); background:var(--paper); }
+.engine-candidate { margin-top:18px; padding:18px; border:1px solid var(--line); background:var(--surface); }
+.engine-candidate textarea { min-height:90px; }
+.engine-job,.engine-candidate { overflow-wrap:anywhere; }
