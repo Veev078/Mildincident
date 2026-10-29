@@ -6,6 +6,7 @@ export const BUFFER_READ_QUERIES = Object.freeze({
   account: 'query AuditAccount { account { id organizations { id name } } }',
   channels: 'query AuditChannels($org:OrganizationId!) { channels(input:{organizationId:$org}) { id name service isDisconnected isLocked timezone } }',
   post: `query AuditPost($id:PostId!) { post(input:{id:$id}) { ${POST_FIELDS} } }`,
+  metrics: 'query AuditPostMetrics($id:PostId!) { post(input:{id:$id}) { id metricsUpdatedAt metrics { name value unit type description } } }',
   posts: `query AuditPosts($org:OrganizationId!,$channel:ChannelId!,$after:String) { posts(first:100,after:$after,input:{organizationId:$org,filter:{channelIds:[$channel]}}) { edges { node { ${POST_FIELDS} } } pageInfo { hasNextPage endCursor } } }`,
 });
 
@@ -58,6 +59,12 @@ export class BufferReader {
   async post(id) {
     const data = await this.#read('post', { id });
     requireThat(data.post?.id === id, 'BUFFER_INVALID_RESPONSE', 'Buffer returned a different or missing post.');
+    return data.post;
+  }
+
+  async metrics(id) {
+    const data = await this.#read('metrics', { id });
+    requireThat(data.post?.id === id && (data.post.metrics === null || Array.isArray(data.post.metrics)), 'BUFFER_INVALID_RESPONSE', 'Buffer metric response is incomplete.');
     return data.post;
   }
 

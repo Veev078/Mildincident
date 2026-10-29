@@ -18,14 +18,15 @@ export const workflowTargets = [
 export function n8nReader(apiKey, fetchImpl = fetch) {
   requireThat(typeof apiKey === 'string' && apiKey.length > 0, 'CONNECTION_REQUIRED', 'Configure N8N_API_KEY securely in environment settings before running the read-only audit.');
   return async resource => {
-    requireThat(resource.startsWith('/api/v1/') && !resource.includes('..') && !resource.includes('#'), 'INVALID_AUDIT_PATH', 'Only fixed n8n API read paths are supported.');
+    const url = auditReadUrl(resource);
     let response;
     try {
-      response = await fetchImpl(new URL(resource, ORIGIN), {
+      response = await fetchImpl(url, {
         method: 'GET', headers: { Accept: 'application/json', 'X-N8N-API-KEY': apiKey },
         redirect: 'error', signal: AbortSignal.timeout(15_000),
       });
     } catch { throw new HandoffError('NETWORK_UNAVAILABLE', 'n8n could not be reached through the configured proxy. No remote changes were made.'); }
+    requireThat(response.redirected !== true && (!response.url || response.url === url.href), 'AUDIT_REDIRECT_DENIED', 'n8n read redirected or returned a different resource. No redirect is permitted.');
     requireThat(response.ok, `N8N_HTTP_${response.status}`, `n8n read-only request returned HTTP ${response.status}. Response bodies and credentials are omitted.`);
     const chunks = [];
     let size = 0;
@@ -37,6 +38,33 @@ export function n8nReader(apiKey, fetchImpl = fetch) {
     try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
     catch { throw new HandoffError('INVALID_AUDIT_RESPONSE', 'n8n did not return valid JSON.'); }
   };
+}
+
+function auditReadUrl(resource) {
+  const deny = () => { throw new HandoffError('INVALID_AUDIT_PATH', 'Only explicitly supported n8n read resources and query parameters are permitted.'); };
+  if (typeof resource !== 'string' || resource.length > 4096 || /[\s\\#\u0000-\u001f\u007f]/u.test(resource)) deny();
+  const question = resource.indexOf('?');
+  const pathname = question < 0 ? resource : resource.slice(0, question);
+  // Match BEFORE URL parsing: percent-encoded dot segments and backslashes must never
+  // normalize an apparently safe API resource into a webhook or another route.
+  if (!/^\/api\/v1\/(?:workflows(?:\/[A-Za-z0-9_-]{1,200})?|executions(?:\/[0-9]{1,30})?|data-tables(?:\/[A-Za-z0-9_-]{1,200}(?:\/rows)?)?)$/.test(pathname)) deny();
+  const url = new URL(resource, ORIGIN);
+  if (url.origin !== ORIGIN || url.pathname !== pathname || url.hash) deny();
+  const catalog = /^\/api\/v1\/(?:workflows|executions|data-tables)$/.test(pathname) || pathname.endsWith('/rows');
+  const executions = pathname === '/api/v1/executions';
+  const executionDetail = /^\/api\/v1\/executions\/[0-9]+$/.test(pathname);
+  const seen = new Set();
+  for (const [name, value] of url.searchParams) {
+    if (seen.has(name) || /[\u0000-\u001f\u007f]/u.test(value)) deny();
+    seen.add(name);
+    if (catalog && name === 'limit' && /^(?:[1-9][0-9]?|100)$/.test(value)) continue;
+    if (catalog && name === 'cursor' && value.length > 0 && value.length <= 2048) continue;
+    if ((executions || executionDetail) && name === 'includeData' && /^(?:true|false)$/.test(value)) continue;
+    if (executions && name === 'workflowId' && /^[A-Za-z0-9_-]{1,200}$/.test(value)) continue;
+    if (executions && name === 'status' && /^(?:new|running|success|error|canceled|crashed|waiting|unknown)$/.test(value)) continue;
+    deny();
+  }
+  return url;
 }
 
 const safeId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,200}$/.test(value) ? value : null;

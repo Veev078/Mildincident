@@ -52,3 +52,68 @@ test('n8n audit requires a secure binding and does not print remote error bodies
   assert.equal(report.workflows[0].error, 'N8N_HTTP_401');
   assert.ok(!JSON.stringify(report).includes('sensitive remote error body'));
 });
+
+test('n8n reader permits only the exact inventory, execution-detail and paginated row GET routes', async () => {
+  const calls = [];
+  const read = n8nReader('synthetic-test-key', async (url, options) => {
+    calls.push({ url, options });
+    return Response.json({ data: [] });
+  });
+  const resources = [
+    '/api/v1/workflows?limit=100&cursor=a%2Fb%2Bc',
+    '/api/v1/workflows/existing_workflow-1',
+    '/api/v1/executions?workflowId=existing&limit=10&includeData=false',
+    '/api/v1/executions?status=error&limit=100&cursor=next',
+    '/api/v1/executions/2242?includeData=true',
+    '/api/v1/data-tables?limit=100',
+    '/api/v1/data-tables/table_1',
+    '/api/v1/data-tables/table_1/rows?limit=100&cursor=next',
+  ];
+  for (const resource of resources) await read(resource);
+  assert.equal(calls.length, resources.length);
+  assert.ok(calls.every(call => call.options.method === 'GET' && call.url.origin === 'https://rickywelch.app.n8n.cloud'));
+});
+
+test('encoded traversal, webhook/execution actions, ambiguous parameters and arbitrary routes are rejected before auth is sent', async () => {
+  let calls = 0;
+  const read = n8nReader('synthetic-test-key', async () => { calls++; return Response.json({}); });
+  const resources = [
+    '/api/v1/workflows/%2e%2e/%2e%2e/webhook/send',
+    '/api/v1/workflows/%252e%252e/webhook/send',
+    '/api/v1/workflows/../../webhook/send',
+    '/api/v1/workflows\\..\\..\\webhook\\send',
+    '//example.org/api/v1/workflows',
+    'https://example.org/api/v1/workflows',
+    '/api/v1/webhook/send',
+    '/api/v1/workflows/id/activate',
+    '/api/v1/executions/42/retry',
+    '/api/v1/credentials',
+    '/api/v1/workflows?id=any',
+    '/api/v1/workflows?limit=100&limit=1',
+    '/api/v1/workflows?limit=1000',
+    '/api/v1/workflows?cursor=next%00secret',
+    '/api/v1/workflows#ignored-fragment',
+    '/api/v1/workflows?token=must-not-log',
+    '/api/v1/workflows/id?includeData=true',
+    null, {},
+  ];
+  for (const resource of resources) {
+    await assert.rejects(read(resource), error => error.code === 'INVALID_AUDIT_PATH' && !error.message.includes('must-not-log'));
+  }
+  assert.equal(calls, 0);
+});
+
+test('redirect/final-resource mismatches cannot be accepted even if an injected transport ignores redirect:error', async () => {
+  for (const properties of [
+    { redirected: true },
+    { url: 'https://example.org/elsewhere' },
+    { url: 'https://rickywelch.app.n8n.cloud/webhook/elsewhere' },
+  ]) {
+    const read = n8nReader('synthetic-test-key', async () => {
+      const response = Response.json({ data: [] });
+      for (const [key, value] of Object.entries(properties)) Object.defineProperty(response, key, { value });
+      return response;
+    });
+    await assert.rejects(read('/api/v1/workflows'), { code: 'AUDIT_REDIRECT_DENIED' });
+  }
+});

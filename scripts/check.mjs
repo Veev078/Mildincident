@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 
 function files(directory) {
@@ -9,7 +9,7 @@ function files(directory) {
   });
 }
 
-for (const filename of [...files('src'), ...files('test'), ...files('scripts')]) {
+for (const filename of [...files('src'), ...files('test'), ...files('scripts'), ...(existsSync('web') ? files('web') : [])]) {
   const result = spawnSync(process.execPath, ['--check', filename], { stdio: 'inherit' });
   if (result.status !== 0) process.exit(result.status || 1);
 }

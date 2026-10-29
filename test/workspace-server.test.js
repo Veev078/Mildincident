@@ -1,0 +1,72 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import http from 'node:http';
+import { createWorkspaceServer } from '../src/workspace/server.js';
+import { WorkspaceSource } from '../src/workspace/data-source.js';
+import { LocalDraftStore } from '../src/workspace/store.js';
+import { workspaceSnapshot } from './helpers/workspace-fixture.js';
+
+test('workspace API exposes sanitized reads and local-only versioned editing while rejecting cross-origin/production actions', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mi-api-'));
+  const drafts = new LocalDraftStore(path.join(root, 'drafts.sqlite'));
+  const webRoot = path.join(root, 'web');
+  await fs.mkdir(webRoot);
+  await fs.writeFile(path.join(webRoot, 'index.html'), '<!doctype html><title>Private test</title>');
+  await fs.writeFile(path.join(root, 'private.js'), 'sensitive-local-content');
+  await fs.symlink(path.join(root, 'private.js'), path.join(webRoot, 'leak.js'));
+  const source = new WorkspaceSource({ root, loadLive: async () => workspaceSnapshot() });
+  source.snapshot = workspaceSnapshot();
+  const server = createWorkspaceServer({ source, drafts, webRoot });
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  t.after(async () => { await new Promise(resolve => server.close(resolve)); drafts.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const response = await fetch(`${origin}/api/workspace`);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-security-policy'), /connect-src 'self'/);
+  const workspace = await response.json();
+  assert.equal(workspace.source.productionMutationsEnabled, false);
+  assert.ok(!JSON.stringify(workspace).includes('never-expose'));
+  const story = workspace.stories[0];
+  const url = `${origin}/api/stories/${story.id}/draft`;
+  const patch = { baseRevision: story.revision, expectedVersion: 0, caption: 'Saved through actual HTTP locally' };
+  const options = { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-Mildincident-Intent': 'local-edit' }, body: JSON.stringify(patch) };
+  assert.equal((await fetch(url, { ...options, headers: { ...options.headers, Origin: 'https://foreign.example' } })).status, 403);
+  assert.equal((await fetch(url, { ...options, headers: { 'Content-Type': 'application/json' } })).status, 403);
+  const saved = await fetch(url, options);
+  assert.equal(saved.status, 200);
+  assert.equal((await saved.json()).productionApplied, false);
+  assert.equal((await fetch(url, options)).status, 409);
+  const proposal = await fetch(`${origin}/api/stories/${story.id}/proposal`);
+  assert.match(proposal.headers.get('content-disposition'), /attachment/);
+  assert.equal((await proposal.json()).publicationApproved, false);
+  assert.equal((await fetch(`${origin}/api/publish`, { method: 'POST', headers: options.headers })).status, 404);
+  assert.equal((await fetch(`${origin}/.local/workspace/drafts.sqlite`)).status, 404);
+  assert.equal((await fetch(`${origin}/leak.js`)).status, 404);
+  const reboundStatus = await new Promise((resolve, reject) => {
+    const request = http.get(`${origin}/api/workspace`, { headers: { Host: `attacker.example:${server.address().port}` } }, result => {
+      result.resume(); resolve(result.statusCode);
+    });
+    request.on('error', reject);
+  });
+  assert.equal(reboundStatus, 403);
+
+  let started;
+  const readStarted = new Promise(resolve => { started = resolve; });
+  const originalView = source.view.bind(source);
+  source.view = (...args) => { const value = originalView(...args); if (started) { started(); started = null; } return value; };
+  const slowBody = JSON.stringify({ ...patch, expectedVersion: 1, caption: 'A stale request must not overwrite' });
+  let slowRequest;
+  const slowResult = new Promise((resolve, reject) => {
+    slowRequest = http.request(url, { method: 'PATCH', headers: options.headers }, result => { result.resume(); resolve(result.statusCode); });
+    slowRequest.on('error', reject);
+    slowRequest.write(slowBody.slice(0, 40));
+  });
+  await readStarted;
+  source.snapshot.records.packages[0].caption_draft = 'A new authoritative source edit during body upload';
+  slowRequest.end(slowBody.slice(40));
+  assert.equal(await slowResult, 409);
+  assert.equal(drafts.get(story.id).caption, patch.caption);
+});
