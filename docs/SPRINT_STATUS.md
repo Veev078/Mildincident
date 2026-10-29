@@ -1,3 +1,15 @@
+# Verified resume checkpoint — 2026-10-29
+
+Four completed increments from ea1ebf0: recovered discovery routing (370eed3), bounded source passages/Studio excerpts (b614fc6), figure/lazy-photo extraction with stable references (6bab8b7), then durable on-demand receipts/reconciliation. Receipt validation binds job/execution/scope/status, bounds JSON, preserves acknowledged runs across read outages, blocks redispatch via durable identity even if a stale state says queued, and never discards imported stories/decisions after incomplete reads. UI distinguishes generated results and pending reconciliation. Actual2254 response contract verified offline.
+
+Final verification:164 automated tests,30 Chromium flows, syntax and actual19-story smoke PASS, no JS errors. Actual native reconciliation against a PRIVATE RESEARCH-STORE COPY passes:2254, local version3, needs_research decision, selected1, no stale draft. Original research store untouched. Native worker remains INACTIVE065f440c-50e7-47db-a3d3-ee07b6ed7b47; generationEnabled=false. No additional paid call, recurring automation, production mutation or publishing.
+
+Preserved actual story: “The photographer in the mirror,” corrected1974 caption, original1920×1286 source privately cached at1600×1072; optional three-frame plan keeps1967 documents separate. All three local draft versions and development decisions remain. Metadata sound shortlist currently These Days/Nico, Midnight Cowboy/John Barry, Deep Blue Day/Brian Eno; none auditioned or automatically selected.
+
+Remaining limits: two Cinémathèque references remain unconfirmed503 captures; rights/recording availability are open. Revised model output quality has NOT been live-tested because the one paid allowance is CONSUMED. Continue safe source/production tooling from this branch; do not rerun2254, enable generation or touch production under the consumed approval. Private recovery patch, native backups/replays and test evidence remain ignored under `.local/engine-build/`; all completed source belongs in GitHub. No Windows update walkthrough is required.
+
+---
+
 # Archive photography extraction — 2026-10-29
 
 Added lazy data-lazy-src/data-original files, picture fallbacks, single-image figure/explicitly linked captions, caption-basis provenance and script/comment decoy exclusion. Shared captions are not assigned to multiple unidentified images. Legitimate noscript references remain first to preserve existing image IDs; responsive variants stay grouped without claiming identical pixels.

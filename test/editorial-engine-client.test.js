@@ -4,13 +4,13 @@ const json=value=>new Response(JSON.stringify(value),{headers:{'Content-Type':'a
 function fake(){const connection={jobsTableId:'devjobs',candidatesTableId:'devresults',editorialWorkerId:'devworker',headerName:'X-Mildincident-Development-Key',token:'synthetic-token-not-a-real-credential-123456',generationEnabled:false};
  const state={jobs:[],candidates:[],posts:0,dispatches:0,loseResponse:false,dispatchError:false,workerActive:false,wrongTables:false,executionStatus:'success'};
  const fetchImpl=async(url,options={})=>{const u=new URL(url);assert.equal(u.origin,'https://rickywelch.app.n8n.cloud');
-  if(u.pathname==='/webhook/mildincident-dev-editorial-job-v1'){state.dispatches++;if(state.dispatchError)throw new TypeError('Synthetic lost dispatch response');return json({accepted:true});}
+  if(u.pathname==='/webhook/mildincident-dev-editorial-job-v1'){state.dispatches++;if(state.dispatchError)throw new TypeError('Synthetic lost dispatch response');return state.dispatchResponse||json(state.dispatchReceipt||{accepted:true,scope:'development_only',productionApplied:false,jobId:JSON.parse(options.body).job_id,executionId:'1001',status:'ready_to_review'});}
   if(u.pathname==='/api/v1/workflows/devworker')return json({name:'MILDINCIDENT DEV — bounded editorial generation',active:state.workerActive,activeVersionId:'approved-v1',activeVersion:{nodes:[{name:'Research Candidates',type:'@n8n/n8n-nodes-langchain.openAi',retryOnFail:false,parameters:{options:{maxTokens:3500,maxToolCalls:2}}},{name:'Draft Editorial Concept',type:'@n8n/n8n-nodes-langchain.openAi',retryOnFail:false,parameters:{options:{maxTokens:1800}}},{name:'Guard Draft Input Budget',type:'n8n-nodes-base.code'}]}});
   if(u.pathname.startsWith('/api/v1/executions/'))return json({workflowId:'devworker',status:state.executionStatus,finished:true});
   if(u.pathname==='/api/v1/data-tables/devjobs')return json({name:state.wrongTables?'content_pipeline':'mildincident_dev_editorial_jobs'});
   if(u.pathname==='/api/v1/data-tables/devresults')return json({name:'mildincident_dev_editorial_candidates'});
   if(u.pathname==='/api/v1/data-tables/devjobs/rows'&&options.method==='POST'){state.posts++;const row=JSON.parse(options.body).data[0];state.jobs.push({...row,id:state.jobs.length+1});if(state.loseResponse){state.loseResponse=false;throw new TypeError('Synthetic lost create response');}return json({data:[row]});}
-  if(u.pathname==='/api/v1/data-tables/devjobs/rows')return json({data:state.jobs,nextCursor:null});
+  if(u.pathname==='/api/v1/data-tables/devjobs/rows'){if(state.failJobReads)throw new Error('Synthetic read outage');return json({data:state.jobs,nextCursor:null});}
   if(u.pathname==='/api/v1/data-tables/devresults/rows')return json({data:state.candidates,nextCursor:null});throw new Error('Unexpected synthetic endpoint '+u.pathname);
  };return {connection,state,client:new EditorialEngineClient({connection,apiKey:'synthetic-api-key',fetchImpl})};}
 async function setup(t){const root=await fs.mkdtemp(path.join(os.tmpdir(),'mi-engine-'));const research=new LocalResearchStore(path.join(root,'research.sqlite'));t.after(async()=>{research.close();await fs.rm(root,{recursive:true,force:true});});const f=fake();return {...f,root,research,service:new EditorialEngineService({research,client:f.client})};}
@@ -60,4 +60,31 @@ test('captured source packets are claim-bound, bounded and never import raw head
  const {developmentCandidateStory}=await import('../src/workspace/development-story.js');const job='418e3861-610b-400a-9cc6-e0635ce6003d';const raw={id:'DEV-'+job+'-1',jobId:job,story:{title:'Source evidence fixture',format:'single_image'},claims:[{claim:'A recorded fixture',source_url:'https://example.org/source'}],media:[],sourceEvidence:[{claimIndex:0,url:'https://example.org/source',access:'source_text_captured',httpStatus:200,title:'Captured fixture',textExcerpt:'x'.repeat(2000),headers:{authorization:'NEVER_EXPOSE'},humanFactVerification:true}],provenance:{kind:'brief',executionId:'2500',generatedAt:'2026-10-29T12:00:00Z'}};
  const row={job_id:job,candidate_id:raw.id,status:'needs_research',candidate_json:JSON.stringify(raw)};const clean=sanitizeDevelopmentCandidate(row);assert.equal(clean.sourceEvidence[0].textExcerpt.length,1800);assert.equal(clean.sourceEvidence[0].humanFactVerification,false);assert.ok(!JSON.stringify(clean).includes('NEVER_EXPOSE'));assert.equal(developmentCandidateStory(clean).research[0].capturedSourceTitle,'Captured fixture');
  raw.sourceEvidence[0].url='https://example.org/foreign';assert.deepEqual(sanitizeDevelopmentCandidate({...row,candidate_json:JSON.stringify(raw)}).sourceEvidence,[]);
+});
+
+test('accepted on-demand receipt survives lagging table reads and restart without enabling another dispatch',async t=>{
+ const {research,service,state,connection,root}=await setup(t);const request=research.create({kind:'brief',prompt:'Investigate a specific source-led photograph'},[]);await service.queue(request.id);connection.generationEnabled=true;connection.approvedWorkerVersion='approved-v1';state.workerActive=true;
+ await service.start(request.id,research.engineJob(request.id).version);await new Promise(r=>setImmediate(r));const accepted=research.engineJob(request.id);assert.equal(accepted.receiptExecutionId,'1001');assert.equal(accepted.state,'generating');assert.equal(accepted.resultPending,true);assert.equal(state.dispatches,1);
+ const restarted=new LocalResearchStore(path.join(root,'research.sqlite'));try{assert.equal(restarted.engineJob(request.id).dispatchReceipt.executionId,'1001');}finally{restarted.close();}
+ await service.refresh();assert.equal(research.engineJob(request.id).state,'generating');
+ // Even a stale state label cannot remove the durable one-dispatch latch.
+ research.recordEngineState(request.id,'queued');await assert.rejects(service.start(request.id,research.engineJob(request.id).version),{code:'ENGINE_ALREADY_DISPATCHED'});assert.equal(state.dispatches,1);
+ state.jobs[0].execution_id='different';state.jobs[0].status='generating';await assert.rejects(service.refresh(),{code:'INVALID_ENGINE_RESULT'});
+});
+test('mismatched or oversized receipts remain uncertain, omit raw data and cannot trigger an automatic retry',async t=>{
+ for(const oversized of [false,true]){
+  const {research,service,state,connection}=await setup(t);const request=research.create({kind:'brief',prompt:'Inspect one original cultural photograph'},[]);await service.queue(request.id);connection.generationEnabled=true;connection.approvedWorkerVersion='approved-v1';state.workerActive=true;
+  if(oversized)state.dispatchResponse=new Response('x'.repeat(65537));else state.dispatchReceipt={accepted:true,scope:'development_only',productionApplied:false,jobId:'foreign-job',executionId:'1001',status:'ready_to_review',privateHeader:'NEVER_EXPOSE'};
+  await service.start(request.id,research.engineJob(request.id).version);await new Promise(r=>setImmediate(r));assert.equal(research.engineJob(request.id).state,'dispatch_uncertain');assert.ok(!JSON.stringify(research.engineJob(request.id)).includes('NEVER_EXPOSE'));assert.equal(state.dispatches,1);await service.refresh();assert.equal(state.dispatches,1);
+ }
+});
+test('read outage after a valid receipt keeps the acknowledged execution and a read-only recovery state',async t=>{
+ const {research,service,state,connection}=await setup(t);const request=research.create({kind:'brief',prompt:'Inspect an original archive photograph'},[]);await service.queue(request.id);connection.generationEnabled=true;connection.approvedWorkerVersion='approved-v1';state.workerActive=true;state.failJobReads=true;
+ await service.start(request.id,research.engineJob(request.id).version);await new Promise(r=>setImmediate(r));const job=research.engineJob(request.id);assert.equal(job.state,'generating');assert.equal(job.receiptExecutionId,'1001');assert.equal(job.lastError,'ENGINE_RECONCILIATION_PENDING');assert.equal(state.dispatches,1);
+});
+
+test('an incomplete remote read cannot remove an imported story or its editorial decision',async t=>{
+ const {research,service,state}=await setup(t);const request=research.create({kind:'brief',prompt:'Preserve an already generated cultural story'},[]);await service.queue(request.id);const id='DEV-'+request.id+'-1';const raw={id,jobId:request.id,story:{title:'Existing generated fixture'},claims:[],media:[],provenance:{kind:'brief',executionId:'1000',generatedAt:new Date().toISOString()}};
+ state.jobs[0].status='ready_to_review';state.jobs[0].execution_id='1000';state.candidates.push({job_id:request.id,candidate_id:id,status:'ready_to_review',candidate_json:JSON.stringify(raw)});await service.refresh();service.review(request.id,{candidateId:id,decision:'needs_research',reason:'Preserve this existing editorial decision.',expectedVersion:research.engineJob(request.id).version});const before=research.engineJob(request.id);
+ state.jobs[0].status='queued';state.jobs[0].execution_id='';state.candidates=[];await assert.rejects(service.refresh(),{code:'ENGINE_RECONCILIATION_INCOMPLETE'});const after=research.engineJob(request.id);assert.deepEqual(after.candidates,before.candidates);assert.deepEqual(after.reviewDecisions,before.reviewDecisions);assert.equal(after.state,before.state);
 });

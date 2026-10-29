@@ -57,7 +57,11 @@ export class EditorialEngineClient {
   async executionStatus(id){requireThat(/^[0-9]{1,30}$/.test(id),'INVALID_ENGINE_RESULT','Invalid engine execution identity.');const result=await this.api('/executions/'+id+'?includeData=false');requireThat(result.workflowId===this.connection.editorialWorkerId,'INVALID_ENGINE_RESULT','Execution does not belong to the development worker.');return {status:result.status,finished:result.finished===true};}
   async dispatch(request,dispatchId){const inspection=await this.inspect();requireThat(inspection.generationAvailable,'GENERATION_NOT_APPROVED','Paid generation is not enabled: the development worker must be approved and active.');
     const response=await this.fetchImpl(EDITORIAL_ENGINE_ORIGIN+'/webhook/mildincident-dev-editorial-job-v1',{method:'POST',headers:{'Content-Type':'application/json',[this.connection.headerName]:this.connection.token},body:JSON.stringify({job_id:request.id,request_hash:requestFingerprint(request),dispatch_id:dispatchId}),redirect:'error',signal:AbortSignal.timeout(270000)});
-    requireThat(response.ok,'ENGINE_DISPATCH_UNCERTAIN','Generation dispatch did not complete cleanly. Reconcile before considering another execution.');return response.json();
+    requireThat(response.ok,'ENGINE_DISPATCH_UNCERTAIN','Generation dispatch did not complete cleanly. Reconcile before considering another execution.');
+    let bytes=0;const chunks=[];for await(const chunk of response.body||[]){bytes+=chunk.byteLength;requireThat(bytes<=65536,'ENGINE_DISPATCH_UNCERTAIN','Generation receipt exceeded its limit. Reconcile before considering another execution.');chunks.push(chunk);}
+    let receipt;try{receipt=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw new HandoffError('ENGINE_DISPATCH_UNCERTAIN','Generation did not return a valid receipt. Reconcile read-only.');}
+    requireThat(receipt?.accepted===true&&receipt.scope==='development_only'&&receipt.productionApplied===false&&receipt.jobId===request.id&&/^[0-9]{1,30}$/.test(String(receipt.executionId||''))&&['ready_to_review','needs_research'].includes(receipt.status),'ENGINE_DISPATCH_UNCERTAIN','Generation receipt does not match the requested development job. Reconcile read-only; do not resend.');
+    return {jobId:request.id,executionId:String(receipt.executionId),status:receipt.status,scope:'development_only',productionApplied:false};
   }
 }
 export async function loadEditorialEngineClient({filename='.local/engine-build/development-connection.json',apiKey=process.env.N8N_API_KEY}={}) {

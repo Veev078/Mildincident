@@ -56,7 +56,7 @@ export class LocalResearchStore {
       this.db.prepare('INSERT INTO research_engine_events VALUES(?,?,?,?,?)').run(id,version,state,encoded,now);this.db.exec('COMMIT');return this.engineJob(id);
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
-  claimEngineDispatch(id,version,dispatchId){const previous=this.engineJob(id);requireThat(previous?.state==='queued','ENGINE_ALREADY_DISPATCHED','Only an undispatched queued job can start. Reconcile existing work.');return this.recordEngineState(id,'dispatching',{dispatchId},version);}
+  claimEngineDispatch(id,version,dispatchId){const previous=this.engineJob(id);requireThat(previous?.state==='queued'&&!previous.dispatchId&&!previous.receiptExecutionId&&!previous.executionId,'ENGINE_ALREADY_DISPATCHED','Only an undispatched queued job can start. Reconcile existing work.');return this.recordEngineState(id,'dispatching',{dispatchId},version);}
   engineHistory(id){return this.db.prepare('SELECT version,state,created_at FROM research_engine_events WHERE request_id=? ORDER BY version DESC LIMIT 30').all(id).map(r=>({version:r.version,state:r.state,createdAt:r.created_at}));}
   close(){this.db.close();}
 }
