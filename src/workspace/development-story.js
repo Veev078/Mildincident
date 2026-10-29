@@ -28,7 +28,7 @@ export function developmentCandidateStory(candidate,{soundtrack=[],drafts=new Ma
   const working=story.localDraft&&!story.localDraft.stale?{...story,...story.localDraft}:story;
   story.intelligence=analyzeStory(working,{catalog:soundtrack});story.musicRecommendations=story.intelligence.musicRecommendations;
   story.editorialDirection=buildEditorialDirection(working,{creativeBrief:story.localDraft?.creativeBrief});
-  story.editorialAudit=assessEditorialPackage({...candidate,captionDraft:working.caption,format:working.format,targetSlideCount:working.targetSlideCount,proposedAssetIds:working.selectedAssetIds},evidence?{...evidence,selectionProposal:{...evidence.selectionProposal,assetIds:working.selectedAssetIds}}:null);
+  story.editorialAudit=assessEditorialPackage({...candidate,title:working.title,hook:working.hook,captionDraft:working.caption,format:working.format,targetSlideCount:working.targetSlideCount,proposedAssetIds:working.selectedAssetIds},evidence?{...evidence,selectionProposal:{...evidence.selectionProposal,assetIds:working.selectedAssetIds}}:null);
   story.selectionProposalBasis=proposed.length?'source_caption_metadata_match':'no_automatic_selection';
   story.generationFormat=format;story.discoveryPlan=candidate.discoveryPlan||null;
   story.origin='n8n_development';story.engineCandidateId=candidate.id;story.engineJobId=candidate.jobId;story.engineProvenance=candidate.provenance;story.developmentDecision=decision;

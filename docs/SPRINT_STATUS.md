@@ -1,3 +1,13 @@
+# First proactive paid test consumed — 2026-10-29
+
+Executed the ONE new approved proactive discovery as2258 under actual forgotten_pop_culture/visual_first. Worker deactivated in finally; no repeat. Result: Wendy Phillips/Library of Congress mystery portrait. Actual PNG inspected/cached through non-AI2259. Original AI title/caption miscredit subject alone; source names reader James Owen. Local working title “One portrait, dozens of wrong guesses,” corrected attributed caption, single image, silent sound brief, needs_research feedback; version2 preserves first working revision. Old2254/version3 untouched.
+
+Fixed source-body/contributor extraction, attribution review/prompt, courtesy credits and tool telemetry. Actual research reported2 searches, with3 emitted records (2completed/1searching); usage20624input/2018output total, one research/one draft. Offline2258 replay catches original error without another generation. Worker saved INACTIVE89d5db0d-2745-4857-aa49-ef782d523cee. generationEnabled remainsfalse.
+
+171 tests/31 browser workflows and actual20-story/8-tab smoke pass. Private before/after backups verified. Details: PROACTIVE_QUALITY_TEST.md. New one-shot marker `.local/engine-build/proactive-quality-run.json` is CONSUMED; never rerun. Both live paid approvals are spent. Source claims/date/photographer/rights remain review items; updated prompt quality is only offline-tested. Continue safe development without further paid calls or production actions.
+
+---
+
 # Editorial completion checkpoint — 2026-10-29
 
 Completed three increments from1530811: unified evidence/readiness (fbfe762), inline editorial decisions without false source conflicts (2f09452), private SQLite/media backup and verification. `npm run workspace:backup` creates a new ignored private snapshot/checksum manifest; `-- --verify DIRECTORY` checks integrity. Recovery instructions: PRIVATE_BACKUP.md. Actual backup2026-10-29T22-37-35-144Z-81c3521c verifies13files and reopens the real version3 draft; separate private engine connection is intentionally excluded.

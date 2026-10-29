@@ -1,4 +1,4 @@
-import {recordedSourceEvidence} from './source-evidence.js';
+import {recordedSourceEvidence,providerWebSearchUsage,attributionReviewSignals} from './source-evidence.js';
 import {createHash} from 'node:crypto';
 import {requireThat} from './errors.js';
 import {safePhotoReference} from './n8n/photo-url-guard.js';
@@ -53,9 +53,9 @@ export function photoEvidenceTools(publicReference) {
     const storyYears=[...new Set(String(story.subject||'').match(/\b(?:18|19|20)\d{2}\b/g)||[])].map(Number);
     return images.map((m,index)=>{const terms=captionTokens[index];const matched=subject.filter(t=>terms.includes(t));const anchors=distinctive.filter(t=>terms.includes(t));
       const related=!m.isCover&&distinctive.length>0&&anchors.length>=Math.min(2,distinctive.length);
-      const credit=(m.caption.match(/©\s*(.+)$/)||[])[1]?.trim().replace(/[.\s]+$/,'')||'';const credited=credit.split(/\s*\/\s*/)[0].trim();const creator=/mus[ée]e|museum|foundation|archive|collection|library/i.test(credited)?'':credited;
+      const courtesy=(m.caption.match(/(?:Photo(?:graph)?\s*:\s*)?Courtesy\s+[^.]+/i)||[])[0]||'';const credit=(m.caption.match(/©\s*(.+)$/)||[])[1]?.trim().replace(/[.\s]+$/,'')||'';const credited=credit.split(/\s*\/\s*/)[0].trim();const creator=/mus[ée]e|museum|foundation|archive|collection|library/i.test(credited)?'':credited;
       const years=[...new Set(m.caption.match(/\b(?:18|19|20)\d{2}\b/g)||[])].map(Number);
-      return {...m,id:`${story.id||'source'}-${m.isCover?'og':'img'}-${hash(page+'|'+m.url)}`,creator,credit:credit?'© '+credit:'',sourceUrl:page,years,storyYears,dateContext:years.length&&storyYears.length&&!years.some(y=>storyYears.includes(y))?'different_year_context':'not_established',
+      return {...m,id:`${story.id||'source'}-${m.isCover?'og':'img'}-${hash(page+'|'+m.url)}`,creator,credit:credit?'© '+credit:courtesy,sourceUrl:page,years,storyYears,dateContext:years.length&&storyYears.length&&!years.some(y=>storyYears.includes(y))?'different_year_context':'not_established',
         materialType:/croquis|sketch|drawing|costume design/i.test(m.caption)?'design_documentation':'photograph_reference',relation:m.isCover?'page_cover':related?'subject_caption_match':'context_only',matchedTerms:matched,distinctiveTerms:anchors,matchingBasis:'source_caption_metadata_only',pixelAnalysisPerformed:false,rightsGranted:false};
     }).slice(0,16);
   }
@@ -89,7 +89,7 @@ export function captureEditorialEvidence(execution,{workerId,jobId,requestHash,c
     else if(image.relation==='subject_caption_match'&&additionalMedia.length<7){image.assetId=image.id;image.additionalSourceReference=true;additionalMedia.push({id:image.id,title:image.caption.slice(0,180)||'Source image reference',creator:image.creator,sourceUrl:image.sourceUrl,previewUrl:image.url,provider:'captured_source_page_image',rightsStatus:'preview_unreviewed',license:'UNKNOWN — source visibility is not publication permission',width:null,height:null});}}
 
   const models=['Research Candidates','Draft Editorial Concept'].map(name=>{const runs=data[name]||[];const usages=runs.map(r=>r.metadata?.tokenUsage);const measurable=runs.length>0&&usages.every(u=>Number.isFinite(u?.inputTokens)&&Number.isFinite(u?.outputTokens));const output=nodeItems(data,name)[0];const fullResponse=Boolean(output?.usage||output?.object==='response');
-    return {node:name,runs:runs.length,inputTokens:measurable?usages.reduce((n,u)=>n+u.inputTokens,0):null,outputTokens:measurable?usages.reduce((n,u)=>n+u.outputTokens,0):null,toolCalls:fullResponse?(output.output||[]).filter(x=>x.type==='web_search_call').length:null,usageSource:measurable?'n8n_execution_metadata':'unavailable'};});
+    return {node:name,runs:runs.length,inputTokens:measurable?usages.reduce((n,u)=>n+u.inputTokens,0):null,outputTokens:measurable?usages.reduce((n,u)=>n+u.outputTokens,0):null,toolCalls:providerWebSearchUsage(fullResponse?output:null).calls,toolExecutionEvidence:providerWebSearchUsage(fullResponse?output:null),usageSource:measurable?'n8n_execution_metadata':'unavailable'};});
   const measured=models.filter(m=>m.runs>0);const complete=measured.length>0&&measured.every(m=>m.inputTokens!==null&&m.outputTokens!==null);
   const related=images.filter(m=>m.relation==='subject_caption_match'&&m.assetId);
   const target=candidate.format==='single_image'?1:candidate.targetSlideCount||5;
@@ -107,7 +107,7 @@ export function captionReviewSignals(caption) {
 }
 
 export function assessEditorialPackage(candidate,evidence) {
-  const caption=candidate.captionDraft||'';const issues=captionReviewSignals(caption);
+  const caption=candidate.captionDraft||'';const issues=[...captionReviewSignals(caption),...attributionReviewSignals({title:candidate.title,hook:candidate.hook,caption},evidence?.sources||candidate.sourceEvidence||[])];
   const unconfirmed=candidate.claims.filter(c=>c.linkStatus!=='live');if(unconfirmed.length)issues.push({code:'UNCONFIRMED_CLAIM_SOURCES',message:`${unconfirmed.length} claim source${unconfirmed.length===1?' is':'s are'} not accessible enough to substantiate here.`});
   const imageEvidence=evidence?.images||candidate.media.map(m=>({assetId:m.id,relation:m.sourceRelation,dateContext:m.dateContext,years:m.sourceYears||[]}));
   const proposedIds=evidence?.selectionProposal.assetIds||candidate.proposedAssetIds||[];

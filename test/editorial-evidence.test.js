@@ -55,3 +55,7 @@ test('linked captions and picture fallbacks are supported without replacing esta
 test('noscript photograph fallbacks preserve the original reference when a lazy responsive duplicate follows',()=>{
  const page='https://archive.example.org/gallery';const images=inspectPhotoSource('<noscript><img src="/images/_gallery_1/Photo.jpg" alt="Mira Sol, 1974"></noscript><img data-srcset="/images/_gallery_4/Photo.jpg 1600w, /images/_gallery_1/Photo.jpg 250w" alt="Mira Sol, 1974">',page,{subject:'Mira Sol'});assert.equal(images.length,1);assert.equal(images[0].url,page.replace('/gallery','')+'/images/_gallery_1/Photo.jpg');assert.equal(images[0].referenceVariants.length,2);
 });
+
+test('courtesy credit remains source credit and never becomes a claimed photographer',()=>{
+ const [image]=inspectPhotoSource('<figure><img src="/portrait.jpg"><figcaption>Mira Sol today. Photo: Courtesy Mira Sol.</figcaption></figure>','https://archive.example.org/article',{subject:'Mira Sol'});assert.equal(image.credit,'Photo: Courtesy Mira Sol');assert.equal(image.creator,'');
+});
