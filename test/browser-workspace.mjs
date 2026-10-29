@@ -59,11 +59,30 @@ try {
   assert.equal(research.all()[0].linkedStoryId,snapshot.records.stories[0].concept_id);
   assert.equal(research.all()[0].executionConfirmed,false);
   checks.push('creative brief persists, targets existing authenticated n8n form and links an actual source story without claiming execution');
-  await page.getByRole('button',{name:'Prepare a discovery run',exact:true}).click();
+
+  const originalBriefCount=research.all().length;
+  await page.getByLabel('Creative direction',{exact:true}).fill('Investigate another cultural connection with reliable source photographs');
+  let discardResponse=true;
+  await page.route('**/api/research/requests',async route=>{
+    if(route.request().method()==='POST'&&discardResponse){discardResponse=false;await route.fetch();await route.abort();}
+    else await route.continue();
+  });
+  await page.getByRole('button',{name:'Save brief for n8n',exact:true}).click();
+  await page.locator('[data-research-status]').filter({hasText:'could not be reached'}).waitFor();
+  assert.equal(research.all().length,originalBriefCount+1);
+  await page.getByRole('button',{name:'Save brief for n8n',exact:true}).click();
   await page.waitForFunction(()=>document.querySelectorAll('[data-request-id]').length===2);
+  assert.equal(research.all().length,originalBriefCount+1);
+  await page.unroute('**/api/research/requests');
+  checks.push('a lost local research-create response can be retried without creating a duplicate ticket');
+  await page.getByLabel('Creative direction',{exact:true}).fill('Keep this unsaved creative direction while preparing discovery');
+  await page.getByRole('button',{name:'Prepare a discovery run',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelectorAll('[data-request-id]').length===3);
+  assert.equal(await page.getByLabel('Creative direction',{exact:true}).inputValue(),'Keep this unsaved creative direction while preparing discovery');
   const discoveryLink=await page.locator('[data-research-handoff]').first().getAttribute('href');
   assert.equal(new URL(discoveryLink).pathname,'/form/mildincident-start-editorial-discovery');
   assert.equal(research.all()[0].kind,'discovery');
+  await page.getByLabel('Creative direction',{exact:true}).fill('');
   checks.push('discovery uses the same persistent research handoff and existing n8n preset without scheduled or paid browser execution');
 
 
@@ -150,6 +169,14 @@ try {
   assert.equal(await page.getByLabel('Editorial decision').inputValue(),'reject');
   await page.getByRole('button',{name:'Close image details'}).click();
   checks.push('image taste feedback persists with explicit rejection warning while source rights and selected slides remain unchanged');
+  await page.getByLabel('Editorial view',{exact:true}).selectOption('reject');
+  assert.equal(await page.locator('.asset-card').count(),1);
+  await page.getByLabel('Editorial view',{exact:true}).selectOption('shortlist');
+  assert.equal(await page.locator('.asset-card').count(),0);
+  await page.getByLabel('Editorial view',{exact:true}).selectOption('all');
+  assert.equal(await page.locator('.asset-card').count(),3);
+  checks.push('editorial image filters surface saved decisions without changing source rights or selection');
+
 
   await page.route('https://example.org/thumb/**', route => route.abort());
   await page.reload();
@@ -265,6 +292,10 @@ try {
   const result = { passed: true, checks, fixtureOnly: true, productionWrites: 0, browserErrors: errors };
   await fs.writeFile(path.join(artifactRoot, 'report.json'), JSON.stringify(result, null, 2), { mode: 0o600 });
   console.log(JSON.stringify(result, null, 2));
+} catch (error) {
+  const failedPage=browser?.contexts()[0]?.pages()[0];
+  if(failedPage){await fs.writeFile(path.join(artifactRoot,'failure.html'),await failedPage.content(),{mode:0o600});await failedPage.screenshot({path:path.join(artifactRoot,'failure.png'),fullPage:true});console.log(JSON.stringify({failedRoute:failedPage.url(),browserErrors:errors}));}
+  throw error;
 } finally {
   await browser?.close();
   await new Promise(resolve => server.close(resolve));

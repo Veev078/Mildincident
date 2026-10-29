@@ -75,3 +75,12 @@ export function proposalContent(story, label = 'Download local proposal ↗', cl
 export function proposalControl(story, label = 'Download local proposal ↗', className = 'button button-light') {
   return `<span class="proposal-control" data-proposal-for="${esc(story.id)}" data-proposal-label="${esc(label)}" data-proposal-class="${esc(className)}">${proposalContent(story, label, className)}</span>`;
 }
+
+export function matchesEditorialReview(asset, filter = 'all') {
+  if (filter === 'all') return true;
+  if (filter === 'unreviewed') return !asset.localReview;
+  return ['shortlist','reject','hold'].includes(filter) && asset.localReview?.decision === filter;
+}
+export function editorialReviewFilter(value = 'all') {
+  return `<label class="select-field">Editorial view<select id="image-editorial-filter" aria-label="Editorial view">${[['all','All decisions'],['shortlist','Shortlisted'],['reject','Rejected for this story'],['hold','Held for review'],['unreviewed','Not reviewed']].map(([key,label])=>`<option value="${key}" ${value===key?'selected':''}>${label}</option>`).join('')}</select></label>`;
+}

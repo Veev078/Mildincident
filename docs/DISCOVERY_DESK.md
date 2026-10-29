@@ -14,3 +14,9 @@ Requests/events live in ignored `.local/workspace/research.sqlite`; include the 
 Verified: local request validation, restart persistence, concurrent-event conflict, invalid story links, source slate caps, render escaping and HTTP intent checks. Chromium covers request creation/reload, fixed authenticated-form targeting, linking an existing source story and discovery preparation. Live research generation/submission was not performed: it requires the user's n8n browser session. Existing prompt has ordinary research-call/tool limits; drafting adds cost, exact prices are unavailable. No new schedule or paid execution was enabled.
 
 This is a working research handoff/review experience, **not** unattended discovery or verified automatic project creation from the app. Remaining integration: an authenticated, bounded execution API and execution-to-story correlation before those stronger claims can be made.
+
+## Retry and draft recovery
+
+Creative/discovery ticket creation now uses a stable local idempotency identity per submission. If the server saves a request but the HTTP response is lost, retrying the same input recovers that request rather than duplicating it. Reusing an identity with different content is rejected. The original source-ID baseline is retained across retries/restarts. Preparing a discovery ticket no longer clears an unsaved creative brief; only saving that brief clears its input. Browser tests explicitly simulate a lost response and verify one stored request.
+
+Populated creative textareas and image-review controls have explicit accessible names, so their labels remain stable after reload. No retry logic invokes paid research or performs production writes.

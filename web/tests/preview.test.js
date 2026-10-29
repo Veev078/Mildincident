@@ -17,3 +17,10 @@ test('private preview review discloses rights and identity uncertainty and escap
  assert.match(html,/data-preview-upload/);
  assert.ok(!html.includes('<unsafe>'));
 });
+
+test('editorial image filters keep human decisions separate from rights clearance',async()=>{
+ const {matchesEditorialReview,editorialReviewFilter}=await import('../components.js');
+ const asset={rightsStatus:'cleared',localReview:{decision:'reject'}};
+ assert.equal(matchesEditorialReview(asset,'reject'),true);assert.equal(matchesEditorialReview(asset,'shortlist'),false);assert.equal(matchesEditorialReview(asset,'unreviewed'),false);assert.equal(matchesEditorialReview({rightsStatus:'pending'},'unreviewed'),true);assert.equal(matchesEditorialReview(asset,'<unsafe>'),false);
+ assert.ok(!editorialReviewFilter('<unsafe>').includes('<unsafe>'));
+});

@@ -30,3 +30,11 @@ test('research HTTP writes require intent and never create or overwrite producti
  const response=await fetch(origin+'/api/research/requests',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(data)});assert.equal(response.status,201);assert.equal((await response.json()).productionApplied,false);
  const workspace=await(await fetch(origin+'/api/workspace')).json();assert.equal(workspace.researchRequests.length,1);assert.equal(workspace.stories.length,1);assert.equal(JSON.stringify(source.snapshot),baseline);
 });
+
+test('repeated local request identity recovers a saved brief after lost response without duplicating it',async t=>{
+ const {store,root}=await setup(t);const input={kind:'brief',prompt:'Investigate a distinctive archival scene',idempotencyKey:'418e3861-610b-400a-9cc6-e0635ce6003d'};
+ const first=store.create(input,[{id:'CON-BASELINE'}]);const second=store.create(input,[{id:'CON-NEW'}]);assert.equal(first.id,second.id);assert.deepEqual(second.baselineIds,['CON-BASELINE']);assert.equal(store.all().length,1);
+ const other=new LocalResearchStore(path.join(root,'research.sqlite'));try{assert.equal(other.create(input,[]).id,first.id);assert.equal(other.all().length,1);}finally{other.close();}
+ assert.throws(()=>store.create({...input,prompt:'A different request must not overwrite the saved brief'},[]),{code:'EDIT_CONFLICT'});
+ assert.throws(()=>store.create({...input,idempotencyKey:'../invalid'},[]),{code:'INVALID_RESEARCH_REQUEST'});
+});

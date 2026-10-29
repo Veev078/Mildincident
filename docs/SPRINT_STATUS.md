@@ -1,3 +1,17 @@
+# Full-stack development checkpoint — 2026-10-29
+
+Branch `development/photography-review-20261029`; original baseline9702ce1 preserved. Increments: c0cfe58 active-version n8n sandbox builder;879e04f persistent research/discovery handoffs and review slate;0eb995c carousel rehearsal and image taste history; final increment adds editorial filters, request retry idempotency, unsaved-brief preservation and stable accessible labels.
+
+Verified: syntax;115 automated tests;24 fixture-based Chromium workflows (ten pages at four widths). Actual18-story cached-source smoke covers Discovery/brief/rehearsal/image review with temporary local stores, zero JS errors and no actual user-draft writes. Active qualifier replay accepted7 existing photo references locally. Native n8n form GETs returned401 without a browser login; no research generation was executed. Current new-review slate is0; continuing slate5. Do not describe the handoff UI as unattended AI generation or claim newly researched stories.
+
+Live n8n creation was rejected twice by automatic approval review despite attached authorization and local safety evidence. It treated persistent workflow creation as unapproved. No n8n workflow was created/changed/activated. Private export/replay artifacts: `.local/engine-build/`; source builder: photo-review-sandbox.js. Need direct chat confirmation accepted by review before creating an inactive development workflow. Saved/active research graph differs (16nodes); do not publish the saved research workflow. No schedules, credentials, Buffer actions, environments or deployments changed.
+
+Next highest-value work: get direct approval for the inactive sandbox, verify it in the actual n8n engine, then establish authenticated bounded execution + request-to-story correlation for fully integrated discovery/on-demand projects. Existing native forms work as explicit login/submission handoffs, with source refresh and manual story linking. Scheduled/paid recurring discovery remains separately approval-gated. Other remaining work: real image URL accessibility testing across networks, genuine vision provider, full production writer, stronger model-generated captions, cost measurement. Do not rebuild existing n8n research/sourcing.
+
+Windows update: download development branch ZIP to a new folder; stop old app; copy `.env.local` and entire `.local` directory; run `npm ci --omit=dev` then `npm run workspace:local`; open localhost4174 and hard-refresh. Preserve old folder as rollback. No extra API tokens required; n8n forms require an authenticated browser session. See DISCOVERY_DESK.md, N8N_ACTIVE_REVIEW.md, CAROUSEL_AND_TASTE_REVIEW.md and PHOTOGRAPHY_REVIEW.md.
+
+---
+
 # Carousel and image-taste checkpoint — 2026-10-29
 
 Third production increment: large carousel rehearsal (keyboard, framing, roles/caption/music) and per-image human shortlist/reject/hold feedback with reasons, append-only history and optimistic conflicts. No automatic slide removal or rights changes.113 automated tests and22 Chromium workflows pass; actual18-story source smoke passes with only temporary local stores. Discovery shows0 new candidates and5 developing stories, rather than invented research. See CAROUSEL_AND_TASTE_REVIEW.md. Next improve feedback filtering and harden research handoff validation; n8n create remains blocked by auto-review pending direct confirmation.

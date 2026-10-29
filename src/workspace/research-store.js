@@ -22,11 +22,16 @@ export class LocalResearchStore {
       executionConfirmed:false,productionApplied:false};
   }
   all(){return this.db.prepare('SELECT id FROM research_requests ORDER BY rowid DESC LIMIT 100').all().map(row=>this.get(row.id));}
-  create(input,stories){requireThat(input&&Object.keys(input).every(k=>['kind','prompt','sourceUrl'].includes(k)),'INVALID_RESEARCH_REQUEST','Unsupported research request fields.');
+  create(input,stories){requireThat(input&&Object.keys(input).every(k=>['kind','prompt','sourceUrl','idempotencyKey'].includes(k)),'INVALID_RESEARCH_REQUEST','Unsupported research request fields.');
     requireThat(['discovery','brief'].includes(input.kind),'INVALID_RESEARCH_REQUEST','Choose discovery or creative brief.');
     const prompt=String(input.prompt||'').trim();requireThat(prompt.length>=12&&prompt.length<=2000&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(prompt),'INVALID_RESEARCH_REQUEST','Use a direction between 12 and 2000 characters.');
     const sourceUrl=String(input.sourceUrl||'').trim();requireThat(!sourceUrl||browserUrl(sourceUrl),'INVALID_RESEARCH_REQUEST','Use an HTTPS source link without credentials.');
-    const id=randomUUID();this.db.prepare('INSERT INTO research_requests VALUES(?,?,?,?,?,?)').run(id,input.kind,prompt,sourceUrl,JSON.stringify(stories.map(s=>s.id)),new Date().toISOString());return this.get(id);
+    requireThat(input.idempotencyKey === undefined || typeof input.idempotencyKey === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(input.idempotencyKey), 'INVALID_RESEARCH_REQUEST', 'Use a valid local request identity.');
+    const id=input.idempotencyKey || randomUUID();
+    this.db.prepare('INSERT OR IGNORE INTO research_requests VALUES(?,?,?,?,?,?)').run(id,input.kind,prompt,sourceUrl,JSON.stringify(stories.map(s=>s.id)),new Date().toISOString());
+    const result=this.get(id);
+    requireThat(result.kind===input.kind && result.prompt===prompt && result.sourceUrl===sourceUrl, 'EDIT_CONFLICT', 'This request identity belongs to a different brief. Preserve it and create a new request.');
+    return result;
   }
   event(id,input,stories){const request=this.get(id);requireThat(request,'RESEARCH_REQUEST_NOT_FOUND','Research request is unavailable.');
     requireThat(Object.keys(input).every(k=>['event','storyId','expectedVersion'].includes(k))&&['handoff_requested','story_linked'].includes(input.event),'INVALID_RESEARCH_REQUEST','Unsupported request action.');

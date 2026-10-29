@@ -1,4 +1,4 @@
-import { esc, date, human, storyUrl, effective, proposalContent } from './components.js';
+import { esc, date, human, storyUrl, effective, mediaFor, proposalContent } from './components.js';
 import * as views from './views.js';
 import { creativeBriefFor, emptyCreativeBrief, directionReviewSummary, directionSequenceObservations } from './direction.js';
 
@@ -225,7 +225,7 @@ function openDialog(html) {
 
 function showRehearsal(story, index = 0, fit = 'frame') {
   if (!story) return;
-  const count = effective(story).selectedAssetIds.length;
+  const count = mediaFor(story).length;
   if (!count) return;
   const focusAction = document.activeElement?.dataset.action;
   rehearsal = { storyId: story.id, index: Math.max(0, Math.min(count - 1, index)), fit };
@@ -411,7 +411,7 @@ document.addEventListener('click', event => {
 
 document.addEventListener('input', event => {
   const input = event.target;
-  if (input.closest('[data-research-form]')) { state.researchDraft = { ...(state.researchDraft || {}), [input.name]: input.value }; }
+  if (input.closest('[data-research-form]')) { state.briefRequestKey = null; state.researchDraft = { ...(state.researchDraft || {}), [input.name]: input.value }; }
   if (input.dataset.briefField && input.matches('textarea,input[type="text"]')) {
     editCreativeBrief(input.dataset.story, brief => { brief[input.dataset.briefField] = input.value; });
   }
@@ -445,6 +445,7 @@ document.addEventListener('change', event => {
     document.querySelector('[data-rehearsal-fit]')?.focus(); return;
   }
   const input = event.target;
+  if (input.id === 'image-editorial-filter') { state.imageEditorialFilter = input.value; render(); }
   if (input.id === 'library-rights') { state.libraryRights = input.value; render(); }
   if (input.dataset.briefField && !input.matches('textarea,input[type="text"]')) {
     editCreativeBrief(input.dataset.story, brief => { brief[input.dataset.briefField] = input.value; }, { immediate: true });
@@ -523,9 +524,14 @@ document.addEventListener('error', event => {
 }, true);
 
 async function createResearchRequest(input) {
-  const result = await api('/api/research/requests', {method:'POST', headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(input)});
-  state.researchDraft = {};
-  await loadWorkspace({quiet:true});
+  const keyField = input.kind==='brief' ? 'briefRequestKey' : 'discoveryRequestKey';
+  state[keyField] ||= crypto.randomUUID();
+  const result = await api('/api/research/requests', {method:'POST', headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({...input,idempotencyKey:state[keyField]})});
+  state[keyField] = null;
+  if (input.kind==='brief') state.researchDraft = {};
+  if (!state.workspace.researchRequests.some(r=>r.id===result.request.id)) state.workspace.researchRequests.unshift(result.request);
+  render();
+  await loadWorkspace({quiet:true}).catch(()=>{});
   toast('Saved locally. Open the n8n form and submit there to start research.');
   document.querySelector(`[data-request-id="${result.request.id}"]`)?.scrollIntoView({block:'center'});
 }
@@ -586,7 +592,7 @@ document.addEventListener('keydown', event => {
   if (!input && document.querySelector('#asset-dialog[open] [data-rehearsal]') && rehearsal && !event.metaKey && !event.ctrlKey && !event.altKey && ['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) {
     event.preventDefault();
     const story = storyById(rehearsal.storyId);
-    const index = event.key==='Home'?0:event.key==='End'?effective(story).selectedAssetIds.length-1:rehearsal.index+(event.key==='ArrowRight'?1:-1);
+    const index = event.key==='Home'?0:event.key==='End'?mediaFor(story).length-1:rehearsal.index+(event.key==='ArrowRight'?1:-1);
     showRehearsal(story,index,rehearsal.fit); return;
   }
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's' && route().view === 'story') {
