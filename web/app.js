@@ -313,6 +313,12 @@ document.addEventListener('click', event => {
   const action = button.dataset.action;
   const story = storyById(button.dataset.story);
   switch (action) {
+    case 'retry-preview': {
+      const photo = button.closest('.photo'); const img = photo.querySelector('img');
+      photo.classList.remove('preview-failed'); button.hidden = true;
+      photo.querySelector('.preview-status').textContent = 'Retrying preview…';
+      const src = img.getAttribute('src'); img.removeAttribute('src'); img.setAttribute('src', src); break;
+    }
     case 'reload': loadWorkspace().catch(() => {}); break;
     case 'refresh': refreshSource(); break;
     case 'close-toast': document.querySelector('#toast').hidden = true; break;
@@ -477,11 +483,43 @@ document.addEventListener('drop', event => {
 });
 document.addEventListener('dragend', () => { drag = null; for (const slide of document.querySelectorAll('.dragging')) slide.classList.remove('dragging'); });
 
-document.addEventListener('error', event => {
-  if (event.target.tagName !== 'IMG' || !event.target.closest('.photo')) return;
-  event.target.closest('.photo').classList.add('preview-failed');
-  event.target.alt = 'Preview unavailable. Original source record is still available.';
+document.addEventListener('load', event => {
+  const photo = event.target.tagName === 'IMG' && event.target.closest('.photo');
+  if (!photo) return;
+  photo.classList.remove('preview-failed');
+  photo.querySelector('.preview-status')?.replaceChildren();
+  const retry = photo.querySelector('.preview-retry'); if (retry) retry.hidden = true;
 }, true);
+document.addEventListener('error', event => {
+  const photo = event.target.tagName === 'IMG' && event.target.closest('.photo');
+  if (!photo) return;
+  photo.classList.add('preview-failed');
+  const status = photo.querySelector('.preview-status');
+  if (status) status.textContent = 'This browser could not load the preview. Open the source record or attach a private file.';
+  const retry = photo.querySelector('.preview-retry'); if (retry) retry.hidden = false;
+}, true);
+
+document.addEventListener('submit', async event => {
+  const form = event.target.closest('[data-preview-upload]'); if (!form) return;
+  event.preventDefault();
+  const status = form.querySelector('[data-upload-status]'); const button = form.querySelector('button[type="submit"]');
+  const file = form.elements.preview.files[0];
+  if (!file || !form.elements.declaration.checked) return;
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size === 0 || file.size > 25 * 1024 * 1024) {
+    status.textContent = 'Choose a still JPG, PNG or WebP of at most 25 MiB.'; return;
+  }
+  button.disabled = true; status.textContent = 'Decoding and saving privately…';
+  try {
+    await api(`/api/stories/${encodeURIComponent(form.dataset.story)}/assets/${encodeURIComponent(form.dataset.asset)}/preview`, {
+      method: 'POST', headers: { 'Content-Type': file.type, 'X-Mildincident-Intent': 'local-edit',
+        'X-Mildincident-Preview-Declaration': 'private_review_only', 'X-Mildincident-Filename': encodeURIComponent(file.name) }, body: file });
+    await loadWorkspace({ quiet: true });
+    const story = storyById(form.dataset.story); const asset = story?.media.find(a => a.id === form.dataset.asset);
+    if (form.isConnected && asset) openDialog(views.assetDialog(story, asset));
+    toast('Private preview saved. Source identity and publication rights remain unverified.');
+  } catch (error) { status.textContent = error.message; }
+  finally { button.disabled = false; }
+});
 
 document.addEventListener('keydown', event => {
   const input = event.target.closest('input,textarea,select,[contenteditable="true"]');

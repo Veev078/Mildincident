@@ -41,9 +41,13 @@ export function nextAction(story) {
   if (!effective(story).caption.trim()) return { label: 'Develop the caption', tab: 'caption', reason: 'A caption has not been saved.' };
   return { label: 'Review the carousel', tab: 'carousel', reason: 'Check image order, caption and current package together.' };
 }
+export function previewUrl(value) {
+  if (typeof value === 'string' && /^\/api\/stories\/CON-[A-Za-z0-9_-]{1,120}\/assets\/[^/?#\\\s]+\/preview\?hash=[a-f0-9]{64}$/.test(value)) return value;
+  return safeUrl(value);
+}
 export function image(asset, { className = '', index, storyId, eager = false } = {}) {
-  const url = safeUrl(asset?.previewUrl);
-  return `<div class="photo ${esc(className)} ${url ? '' : 'no-preview'}">${url ? `<img src="${esc(url)}" alt="${esc(asset.title || 'Archival image candidate')}" loading="${eager ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer">` : `<span class="photo-placeholder"><span aria-hidden="true">◫</span><small>No preview available</small></span>`}${index !== undefined ? `<span class="photo-number">${String(index + 1).padStart(2, '0')}</span>` : ''}${storyId && asset ? `<button class="photo-expand" data-action="inspect" data-story="${esc(storyId)}" data-asset="${esc(asset.id)}" aria-label="Review provenance: ${esc(asset.title || 'image')}">↗</button>` : ''}</div>`;
+  const url = previewUrl(asset?.previewUrl);
+  return `<div class="photo ${esc(className)} ${url ? '' : 'no-preview'}">${url ? `<img src="${esc(url)}" alt="${esc(asset.title || 'Archival image candidate')}" loading="${eager ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer"><span class="preview-status" role="status">Loading preview…</span><button type="button" class="preview-retry small-button" data-action="retry-preview" hidden>Retry preview</button>` : `<span class="photo-placeholder"><span aria-hidden="true">◫</span><small>No preview available</small></span>`}${index !== undefined ? `<span class="photo-number">${String(index + 1).padStart(2, '0')}</span>` : ''}${storyId && asset ? `<button class="photo-expand" data-action="inspect" data-story="${esc(storyId)}" data-asset="${esc(asset.id)}" aria-label="Review provenance: ${esc(asset.title || 'image')}">↗</button>` : ''}</div>`;
 }
 export function empty(title, message, action = '') { return `<div class="empty-state"><span aria-hidden="true">↳</span><h3>${esc(title)}</h3><p>${esc(message)}</p>${action}</div>`; }
 export function external(url, label, className = '') {

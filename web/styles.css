@@ -1,16 +1,16 @@
 :root {
-  --paper:#f4f1eb;
-  --surface:#fbfaf6;
-  --white:#fffefa;
-  --ink:#24251f;
-  --quiet:#73746a;
-  --line:#d8d8ce;
-  --soft-line:#e7e5dd;
-  --accent:#5b6549;
-  --accent-soft:#e7ebdd;
-  --rust:#8b503c;
+  --paper:#f5f8fc;
+  --surface:#ffffff;
+  --white:#ffffff;
+  --ink:#172339;
+  --quiet:#596a82;
+  --line:#cbd6e5;
+  --soft-line:#e2e9f2;
+  --accent:#254fba;
+  --accent-soft:#e8efff;
+  --rust:#9b4b32;
   --warn-soft:#f3e9df;
-  --sidebar:#ebebe2;
+  --sidebar:#edf3fb;
   --serif:Georgia,'Times New Roman',serif;
   --sans:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   font-family:var(--sans);
@@ -1907,7 +1907,7 @@ textarea {
   gap:25px;
   background:var(--white);
   border:1px solid #acb49d;
-  box-shadow:0 5px 30px #24251f1a;
+  box-shadow:0 5px 30px #1723391a;
   padding:16px 22px;
   width:max-content;
   max-width:calc(100vw - 270px)
@@ -3639,3 +3639,15 @@ dialog::backdrop {
 }
 
 .story-direction-links { display:flex; flex-wrap:wrap; gap:16px; margin-top:18px; }
+
+/* Browser-observed preview state; never an automated judgment of the photograph. */
+.preview-status { position:absolute; inset:auto 12px 12px; font-size:11px; color:var(--ink); background:var(--surface); padding:6px; pointer-events:none; }
+.preview-status:empty { display:none; }
+.photo.preview-failed::after { content:none; }
+.photo.preview-failed { background:var(--accent-soft); flex-direction:column; }
+.photo.preview-failed .preview-status { position:static; max-width:240px; text-align:center; }
+.preview-retry { position:absolute; top:12px; left:12px; z-index:2; }
+.preview-retry[hidden] { display:none; }
+[data-preview-upload] { margin-top:20px; padding:16px; border:1px solid var(--line); border-radius:6px; background:var(--paper); }
+[data-preview-upload] input[type=file] { display:block; max-width:100%; margin:12px 0; }
+[data-preview-upload] input[type=checkbox] { width:auto; }

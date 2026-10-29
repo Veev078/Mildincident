@@ -1,3 +1,7 @@
+# Photography review increment — 2026-10-29
+
+New branch `development/photography-review-20261029` from verified staging532a199. Private-preview upload UI now uses preserved backend; relative hashed previews render; load/failure/retry states and blue-white tokens implemented.104 tests/18 browser workflows pass. Live sourcing workflow backed up read-only (165nodes); no production mutations. See PHOTOGRAPHY_REVIEW.md for Windows update/preservation steps and remaining discovery work. This supersedes the earlier instruction to pause major development; user has now reviewed the Windows app and authorized development.
+
 # Local inspection handoff — 2026-10-29
 
 Added `npm run workspace:local`, ignored `.env.local` loading, credential-free `.env.example` and `docs/LOCAL_START.md`. Smoke verified on an isolated empty directory: root HTTP 200, source API 503 without credentials, production writes disabled. GitHub source excludes private snapshots; fresh downloads need both existing API credentials for actual editorial content. No deployment or feature sprint.

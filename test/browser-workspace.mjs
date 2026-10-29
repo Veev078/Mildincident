@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import sharp from 'sharp';
+import { LocalPreviewStore } from '../src/workspace/previews.js';
 import { chromium } from 'playwright';
 import { createWorkspaceServer } from '../src/workspace/server.js';
 import { WorkspaceSource } from '../src/workspace/data-source.js';
@@ -20,7 +22,8 @@ source.snapshot = snapshot;
 const originalView = source.view.bind(source);
 source.view = (...args) => { const model = originalView(...args); model.source.kind = 'test_fixture'; return model; };
 const drafts = new LocalDraftStore(path.join(root, 'drafts.sqlite'));
-const server = createWorkspaceServer({ source, drafts });
+const previews = new LocalPreviewStore(path.join(root, 'previews'));
+const server = createWorkspaceServer({ source, drafts, previews });
 await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
 const origin = `http://127.0.0.1:${server.address().port}`;
 let browser;
@@ -78,6 +81,29 @@ try {
   assert.ok((await page.getByRole('dialog').textContent()).includes('Compare the evidence.'));
   await page.getByRole('button', { name: 'Close image comparison' }).click();
   checks.push('image comparison opens provenance-aware accessible dialog');
+  await page.locator('[data-action="inspect"]').first().click();
+  const upload = page.locator('[data-preview-upload]');
+  const bytes = await sharp({ create: { width: 900, height: 1200, channels: 3, background: '#2451a4' } }).jpeg().toBuffer();
+  await upload.getByLabel('Private preview file').setInputFiles({ name: 'synthetic-private.jpg', mimeType: 'image/jpeg', buffer: bytes });
+  await upload.getByRole('checkbox').check();
+  await upload.getByRole('button', { name: 'Save private preview' }).click();
+  await page.getByRole('dialog').getByText(/Private local preview ·/).waitFor();
+  await page.waitForFunction(() => { const img = document.querySelector('#asset-dialog img'); return img?.complete && img.naturalWidth === 900; });
+  assert.equal(source.snapshot.records.media[0].rights_status, 'preview_unreviewed');
+  await page.reload();
+  await page.locator('[data-action="inspect"]').first().click();
+  await page.getByRole('dialog').getByText(/Private local preview ·/).waitFor();
+  await page.waitForFunction(() => { const img = document.querySelector('#asset-dialog img'); return img?.complete && img.naturalWidth === 900; });
+  await page.getByRole('button', { name: 'Close image details' }).click();
+  checks.push('private preview upload renders actual decoded bytes, persists on reload and preserves source rights');
+  await page.route('https://example.org/thumb/**', route => route.abort());
+  await page.reload();
+  await page.locator('.preview-retry:visible').first().waitFor();
+  await page.locator('.preview-retry:visible').first().click();
+  await page.locator('.preview-retry:visible').first().waitFor();
+  await page.unroute('https://example.org/thumb/**');
+  checks.push('failed external previews expose an explicit retry without inferring global source failure');
+
 
   await page.goto(`${origin}/#/story/${id}/music`);
   await page.getByRole('textbox', { name: 'Track', exact: true }).fill('Fixture track');
@@ -188,5 +214,6 @@ try {
   await browser?.close();
   await new Promise(resolve => server.close(resolve));
   drafts.close();
+  previews.close();
   await fs.rm(root, { recursive: true, force: true });
 }
