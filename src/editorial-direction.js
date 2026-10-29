@@ -22,7 +22,7 @@ export const SOURCE_LANE_IDS = Object.freeze([
 export const SEQUENCE_ROLES = Object.freeze(['question', 'context', 'evidence', 'payoff']);
 export const CAPTION_APPROACHES = Object.freeze(['sentence_case', 'lowercase', 'retain_source']);
 const RATING_KEYS = ['hook', 'visual', 'shareability', 'timelessness'];
-const BRIEF_KEYS = ['hookType', 'angle', 'visualIntent', 'captionApproach', 'sequenceRoles', 'ratings', 'notes', 'sourceLaneIds'];
+const BRIEF_KEYS = ['hookType', 'angle', 'visualIntent', 'captionApproach', 'sequenceRoles', 'ratings', 'notes', 'sourceLaneIds', 'musicIntent'];
 const CODE = 'INVALID_CREATIVE_BRIEF';
 
 function object(value, allowed, label) {
@@ -79,6 +79,18 @@ export function validateCreativeBrief(brief, story = {}) {
     requireThat(brief.sourceLaneIds.every(id => SOURCE_LANE_IDS.includes(id)), CODE, 'Unknown source lane.');
     requireThat(new Set(brief.sourceLaneIds).size === brief.sourceLaneIds.length, CODE, 'Source lanes cannot be repeated.');
     valid.sourceLaneIds = [...brief.sourceLaneIds];
+  }
+  if (Object.hasOwn(brief, 'musicIntent')) {
+    const intent=brief.musicIntent;
+    object(intent,['mode','moods','avoidTags','eraApproach','notes'],'Music intent');
+    requireThat(['suggestions','silent'].includes(intent.mode),CODE,'Choose soundtrack suggestions or a silent post.');
+    requireThat(['open','period_echo','contrast'].includes(intent.eraApproach),CODE,'Choose a supported era approach.');
+    valid.musicIntent={mode:intent.mode,eraApproach:intent.eraApproach};
+    for(const key of ['moods','avoidTags']){
+      requireThat(Array.isArray(intent[key])&&intent[key].length<=8,CODE,'Use at most eight tags per sound preference.');
+      valid.musicIntent[key]=[...new Set(intent[key].map(tag=>text(tag,40,'Sound tag')).filter(Boolean))];
+    }
+    if(Object.hasOwn(intent,'notes'))valid.musicIntent.notes=text(intent.notes,700,'Music intent notes');
   }
   return valid;
 }

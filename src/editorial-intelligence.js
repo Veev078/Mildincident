@@ -1,3 +1,4 @@
+import {captionReviewSignals} from './editorial-evidence.js';
 // Editorial decision support from text/metadata only. No source fetch, pixel/audio
 // analysis, rights clearance, automatic merge or publication decision occurs here.
 const TRACKING = /^(utm_.+|fbclid|gclid|dclid|msclkid|mc_cid|mc_eid)$/i;
@@ -49,6 +50,7 @@ export function lintCaption(value, { research = [] } = {}) {
   if (/\b(?:TODO|TK|TBC)\b|\[(?:insert|add|source|caption|credit)[^\]]*\]/iu.test(caption)) add('UNFINISHED_PLACEHOLDER', 'warning', 'Resolve editorial placeholders before final review.');
   if (/locate original production photographs|can anchor a .*photo essay|all photographic reuse requires|check rights before selecting|source previews are unlicensed/iu.test(caption)) add('PRODUCTION_NOTES_IN_CAPTION', 'warning', 'This caption contains production directions. Keep the published narrative separate from internal notes.');
   if (/\b(?:verified_fact|hypothesis|interpretation)\s*:/iu.test(caption)) add('DOSSIER_LABEL_IN_CAPTION', 'warning', 'Research labels appear in the caption; review the final editorial wording.');
+  for(const signal of captionReviewSignals(caption))if(signal.code==='AUDIENCE_PITCH_IN_CAPTION')add(signal.code,'warning',signal.message);
   const { sources } = deduplicateCitations(research);
   const factualCues = /\b(?:1[5-9]\d{2}|20\d{2}|first|only|oldest|largest|never|always)\b/iu.test(caption);
   if (factualCues && !sources.length) add('FACTUAL_CLAIMS_WITHOUT_SOURCES', 'warning', 'Dates or categorical claims need supporting original-source references.');
@@ -100,20 +102,26 @@ const CONTEXT_EXPANSIONS = [
 function contextTokens(story) {
   const selected = new Set(Array.isArray(story.selectedAssetIds) ? story.selectedAssetIds : []);
   const photos = (Array.isArray(story.media) ? story.media : []).filter(m => m && selected.has(m.id));
-  const text = `${story.title || ''} ${story.subject || ''} ${story.hook || ''} ${story.caption || ''} ${photos.map(p => `${p.title || ''} ${p.creator || ''}`).join(' ')}`;
+  const text = `${story.title || ''} ${story.subject || ''} ${story.hook || ''} ${story.caption || ''} ${story.creativeBrief?.angle || ''} ${photos.map(p => `${p.title || ''} ${p.creator || ''}`).join(' ')}`;
   const literal = new Set(tokens(text));
   const result = new Set(literal);
   for (const [triggers, themes] of CONTEXT_EXPANSIONS) if (triggers.some(t => literal.has(t))) for (const t of themes) result.add(t);
   for (const match of text.matchAll(/\b(1[6-9]\d{2}|20\d{2})(?:s)?\b/g)) result.add(`${Math.floor(Number(match[1]) / 10) * 10}s`);
-  return { literal, themes: result };
+  const imageYears=photos.flatMap(p=>p.sourceYears||[]).filter(Number.isInteger);
+  const years=imageYears.length?imageYears:[...text.matchAll(/\b(1[6-9]\d{2}|20\d{2})\b/g)].map(m=>Number(m[1]));
+  return { literal, themes: result, decades:new Set(years.map(year=>`${Math.floor(year/10)*10}s`)), periodBasis:imageYears.length?'selected_image_source_dates':'editorial_text_dates' };
 }
 
 export function rankSoundtracks(story = {}, catalog = [], { limit = 3 } = {}) {
   const maximum = Number.isInteger(limit) ? Math.max(0, Math.min(10, limit)) : 3;
   if (!maximum) return [];
   const context = contextTokens(story);
+  const rawIntent=story.creativeBrief?.musicIntent||{};
+  const intent={mode:rawIntent.mode==='silent'?'silent':'suggestions',moods:Array.isArray(rawIntent.moods)?rawIntent.moods.filter(x=>typeof x==='string').slice(0,8):[],avoidTags:Array.isArray(rawIntent.avoidTags)?rawIntent.avoidTags.filter(x=>typeof x==='string').slice(0,8):[],eraApproach:rawIntent.eraApproach||'open'};
   const selected = story.musicSelection;
   const selectionKey = selected?.track && selected?.artist ? normalized(`${selected.artist}|${selected.track}`).trim() : null;
+  const tagMatch=(a,b)=>{const needle=tokens(a);const haystack=new Set(tokens(b));return needle.length&&needle.every(word=>haystack.has(word));};
+  const decade=tag=>/^(?:1[6-9]\d0|20\d0)s$/i.test(tag);
   const seen = new Set();
   const ranked = [];
   for (const track of Array.isArray(catalog) ? catalog : []) {
@@ -122,29 +130,37 @@ export function rankSoundtracks(story = {}, catalog = [], { limit = 3 } = {}) {
     const key = normalized(`${track.artist}|${track.track}`).trim();
     if (seen.has(key)) continue;
     seen.add(key);
-    const matches = [];
-    const literalMatches = [];
-    const inferredMatches = [];
-    let score = 0;
+    const retained = selectionKey === key;
+    const allTags=[...tags(track.themes),...tags(track.moods),...tags(track.eras)];
+    const avoided=(intent.avoidTags||[]).filter(avoid=>allTags.some(tag=>tagMatch(avoid,tag)));
+    if((intent.mode==='silent'||avoided.length)&&!retained)continue;
+    const matches = [],literalMatches = [],inferredMatches = [];
+    let score = 0, substantive=false;
     for (const [field, weight] of [['themes', 3], ['moods', 2], ['eras', 1]]) {
       for (const tag of tags(track[field])) {
         const words = tokens(tag);
-        if (!words.length || !words.every(w => context.themes.has(w))) continue;
-        score += weight;
-        if (!matches.includes(tag)) matches.push(tag);
+        if (!words.length || matches.includes(tag) || !words.every(w => context.themes.has(w))) continue;
+        score += decade(tag)?1:weight;
+        if(!decade(tag)&&field!=='eras')substantive=true;
+        matches.push(tag);
         const target = words.every(w => context.literal.has(w)) ? literalMatches : inferredMatches;
-        if (!target.includes(tag)) target.push(tag);
+        target.push(tag);
       }
     }
-    const retained = selectionKey === key;
-    if (!score && !retained) continue;
-    ranked.push({ track: string(track.track), artist: string(track.artist), score, selected: retained,
-      reason: retained ? 'Your saved music direction is retained. Availability and permissions still need review.' :
-        [literalMatches.length ? `Literal metadata cues: ${literalMatches.slice(0, 4).join(', ')}.` : '', inferredMatches.length ? `Broader themes inferred from those cues: ${inferredMatches.slice(0, 4).join(', ')}; review the fit.` : ''].filter(Boolean).join(' '),
-      matchedTags: matches, literalMatchedTags: literalMatches, inferredMatchedTags: inferredMatches, basis: 'editorial_metadata', availability: 'not_verified', licenseVerified: false });
+    const moodMatches=(intent.moods||[]).filter(mood=>tags(track.moods).some(tag=>tagMatch(mood,tag)));
+    if(moodMatches.length){score+=moodMatches.length*6;substantive=true;}
+    const catalogEraTags=tags(track.eras).filter(decade);
+    const echoes=catalogEraTags.filter(era=>context.decades.has(era));
+    const contrast=catalogEraTags.length&&context.decades.size&&!echoes.length;
+    if(substantive&&intent.eraApproach==='period_echo'&&echoes.length)score+=2;
+    if(substantive&&intent.eraApproach==='contrast'&&contrast)score+=2;
+    if(!substantive&&!retained)continue; // A decade alone cannot justify a recommendation.
+    const briefWarnings=[...(intent.mode==='silent'?['The working brief calls for a silent post.']:[]),...(avoided.length?[`Saved selection matches avoided tags: ${avoided.join(', ')}.`]:[])];
+    const reasons=[retained?'Saved music direction retained.':'',moodMatches.length?`Working mood tags: ${moodMatches.join(', ')}.`:'',literalMatches.length?`Literal metadata cues: ${literalMatches.slice(0,4).join(', ')}.`:'',inferredMatches.length?`Broader themes inferred from those cues: ${inferredMatches.slice(0,4).join(', ')}; review the fit.`:'',intent.eraApproach==='period_echo'&&echoes.length?`Catalog-era association: ${echoes.join(', ')}. This is not a verified recording date.`:'',intent.eraApproach==='contrast'&&contrast?`Catalog-era contrast: ${catalogEraTags.join(', ')} versus ${[...context.decades].join(', ')} context; recording dates are unverified.`:''];
+    ranked.push({track:string(track.track),artist:string(track.artist),score,selected:retained,reason:reasons.filter(Boolean).join(' '),matchedTags:matches,literalMatchedTags:literalMatches,inferredMatchedTags:inferredMatches,moodMatches,catalogEraTags,periodBasis:context.periodBasis,briefWarnings,catalogNote:safeText(track.editorial_note),basis:'editorial_metadata',availability:'not_verified',licenseVerified:false,audioAuditioned:false});
   }
   if (selectionKey && !ranked.some(r => r.selected)) ranked.push({ track: string(selected.track), artist: string(selected.artist), score: 0, selected: true,
-    reason: 'Your saved music direction is retained even though it is outside the current catalog.', matchedTags: [], basis: 'saved_preference', availability: 'not_verified', licenseVerified: false });
+    reason: 'Saved music direction retained outside the current active catalog. Availability and permissions need review.', matchedTags: [], briefWarnings:intent.mode==='silent'?['The working brief calls for a silent post.']:[], basis: 'saved_preference', availability: 'not_verified', licenseVerified: false, audioAuditioned:false });
   ranked.sort((a, b) => Number(b.selected) - Number(a.selected) || b.score - a.score || a.artist.localeCompare(b.artist) || a.track.localeCompare(b.track));
   const result = [];
   const artists = new Set();

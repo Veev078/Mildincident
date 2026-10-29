@@ -121,3 +121,11 @@ test('working titles, hooks and format persist, export and rebase without changi
  assert.throws(()=>store.save(changed,{baseRevision:changed.revision,expectedVersion:2,title:' '}),{code:'INVALID_LOCAL_EDIT'});
  assert.equal(store.get(story.id).version,2);
 });
+
+test('sound brief saves with history and proposal without clearing an existing music preference',async t=>{
+ const {store,story}=await fixture(t);const musicIntent={mode:'silent',moods:['reflective'],avoidTags:['uneasy'],eraApproach:'period_echo',notes:'Working preference; no recording auditioned.'};
+ store.save(story,{baseRevision:story.revision,expectedVersion:0,musicSelection:{track:'Existing direction',artist:'Fixture'},creativeBrief:{musicIntent}});
+ assert.equal(store.proposal(story).changes.creativeBrief.musicIntent.mode,'silent');assert.equal(store.get(story.id).musicSelection.track,'Existing direction');assert.deepEqual(store.history(story.id)[0].creativeBrief.musicIntent.moods,['reflective']);
+ assert.throws(()=>store.save(story,{baseRevision:story.revision,expectedVersion:1,creativeBrief:{musicIntent:{...musicIntent,rightsGranted:true}}}),{code:'INVALID_CREATIVE_BRIEF'});
+ assert.throws(()=>store.save(story,{baseRevision:story.revision,expectedVersion:1,creativeBrief:{musicIntent:{...musicIntent,moods:Array(9).fill('reflective')}}}),{code:'INVALID_CREATIVE_BRIEF'});
+});

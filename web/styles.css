@@ -3690,3 +3690,10 @@ dialog::backdrop {
 .source-sequence-slides li { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 1rem; margin: 1rem 0; }
 .source-sequence-slides .photo { aspect-ratio: 1; }
 .source-sequence-slides p { overflow-wrap: anywhere; }
+
+[data-form="editorial-setup"] input,
+[data-form="editorial-setup"] select,
+[data-form="music-intent"] select { display: block; width: 100%; padding: 12px 14px; margin-top: 8px; font-size: 12px; line-height: 1.5; }
+[data-form="music-intent"] label { display: block; font-size: 11px; }
+[data-form="music-intent"] textarea { margin-top: 8px; }
+[data-form="music-intent"] button[type="submit"] { margin-top: 16px; }

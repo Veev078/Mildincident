@@ -159,6 +159,8 @@ async function flushDraft(id) {
       if (result.intelligence) current.intelligence = result.intelligence;
       if (result.musicRecommendations) current.musicRecommendations = result.musicRecommendations;
       if (result.editorialDirection) current.editorialDirection = result.editorialDirection;
+      if (result.editorialAudit) { current.editorialAudit=result.editorialAudit;const notice=document.querySelector('[data-editorial-audit]');if(notice&&route().id===id)notice.innerHTML=views.editorialAuditNotice(current); }
+      if (result.sourceSequencePlan) current.sourceSequencePlan=result.sourceSequencePlan;
       const sequenceIssues = document.querySelector('[data-direction-sequence-issues]');
       if (sequenceIssues && route().id === id) sequenceIssues.innerHTML = directionSequenceObservations(current);
       const checks = document.querySelector('[data-caption-checks]');
@@ -405,6 +407,7 @@ document.addEventListener('click', event => {
       editDraft(story.id, { selectedAssetIds: selected }, { rerender: true, immediate: true });
       announce(`Slide ${index + 1} moved to position ${destination + 1}.`); break;
     }
+    case 'clear-track': editDraft(story.id,{musicSelection:null},{rerender:true,immediate:true});flushDraft(story.id).then(saved=>{if(saved&&route().id===story.id&&route().tab==='music')render();});break;
     case 'choose-track': {
       const track = (story?.musicRecommendations || story?.intelligence?.musicRecommendations || [])[Number(button.dataset.index)];
       if (track) editDraft(story.id, { musicSelection: { track: track.track || track.title, artist: track.artist } }, { rerender: true, immediate: true });
@@ -437,6 +440,8 @@ document.addEventListener('input', event => {
     searchTimer = setTimeout(() => { if (!['pipeline', 'publishing', 'archive'].includes(route().view)) location.hash = '#/pipeline'; else render(); }, 150);
   }
   if (input.id === 'library-search') { state.librarySearch = input.value; clearTimeout(searchTimer); searchTimer = setTimeout(render, 150); }
+  const soundForm=input.closest('[data-form="music-intent"]');
+  if(soundForm){state.musicIntentDrafts??={};state.musicIntentDrafts[soundForm.dataset.story]=readMusicIntentForm(soundForm);}
   const setup=input.closest('[data-form="editorial-setup"]');
   if(setup){state.editorialSetupDrafts??={};state.editorialSetupDrafts[setup.dataset.story]={title:setup.elements.title.value,hook:setup.elements.hook.value,format:setup.elements.format.value,targetSlideCount:Number(setup.elements.targetSlideCount.value)};}
   if (input.dataset.draftField) {
@@ -465,6 +470,8 @@ document.addEventListener('change', event => {
     else if (Number(target.value) < Number(target.min)) target.value = target.min;
     state.editorialSetupDrafts??={};state.editorialSetupDrafts[input.form.dataset.story]={title:input.form.elements.title.value,hook:input.form.elements.hook.value,format:input.value,targetSlideCount:Number(target.value)};
   }
+  const soundForm=input.closest('[data-form="music-intent"]');
+  if(soundForm){state.musicIntentDrafts??={};state.musicIntentDrafts[soundForm.dataset.story]=readMusicIntentForm(soundForm);}
   if (input.id === 'image-editorial-filter') { state.imageEditorialFilter = input.value; render(); }
   if (input.id === 'library-rights') { state.libraryRights = input.value; render(); }
   if (input.dataset.briefField && !input.matches('textarea,input[type="text"]')) {
@@ -495,6 +502,17 @@ document.addEventListener('change', event => {
   }
 });
 
+function readMusicIntentForm(form){
+  const split=value=>value.split(',').map(tag=>tag.trim()).filter(Boolean);
+  return {mode:form.elements.mode.value,eraApproach:form.elements.eraApproach.value,moods:split(form.elements.moods.value),avoidTags:split(form.elements.avoidTags.value),notes:form.elements.notes.value};
+}
+document.addEventListener('submit',async event=>{
+ const form=event.target.closest('[data-form="music-intent"]');if(!form)return;event.preventDefault();
+ const story=storyById(form.dataset.story);if(!story)return;const intent=readMusicIntentForm(form);
+ if(state.musicIntentDrafts)delete state.musicIntentDrafts[story.id];
+ editCreativeBrief(story.id,brief=>{brief.musicIntent=intent;},{immediate:true});
+ if(await flushDraft(story.id)&&route().id===story.id&&route().tab==='music')render();
+});
 document.addEventListener('submit', event => {
   const form = event.target.closest('[data-form="editorial-setup"]');
   if (!form) return;
@@ -653,7 +671,7 @@ document.querySelector('#asset-dialog').addEventListener('click', event => {
   if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) event.currentTarget.close(); }
 });
 window.addEventListener('hashchange', () => { document.querySelector('#asset-dialog').close(); render({ focusMain: true }); window.scrollTo({ top: 0, behavior: 'instant' }); });
-window.addEventListener('beforeunload', event => { if (pending.size || saving.size || Object.keys(state.editorialSetupDrafts||{}).length || state.researchDraft?.prompt?.trim()) { event.preventDefault(); event.returnValue = ''; } });
+window.addEventListener('beforeunload', event => { if (pending.size || saving.size || Object.keys(state.editorialSetupDrafts||{}).length || Object.keys(state.musicIntentDrafts||{}).length || state.researchDraft?.prompt?.trim()) { event.preventDefault(); event.returnValue = ''; } });
 
 render();
 loadWorkspace().catch(() => {});

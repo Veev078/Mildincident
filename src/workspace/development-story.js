@@ -1,3 +1,5 @@
+import {analyzeStory} from '../editorial-intelligence.js';
+import {buildEditorialDirection} from '../editorial-direction.js';
 import {assessEditorialPackage} from '../editorial-evidence.js';
 import {buildWorkspace,WORKSPACE_TABLES} from './model.js';
 
@@ -19,7 +21,10 @@ export function developmentCandidateStory(candidate,{soundtrack=[],drafts=new Ma
   const story=buildWorkspace(snapshot,drafts).stories[0];
   for(const asset of story.media){const original=allMedia.find(m=>m.id===asset.id);const captured=metadata.get(asset.id);if(captured){asset.sourceCaption=captured.caption;asset.sourceCredit=captured.credit;asset.sourceYears=captured.years;asset.sourceRelation=captured.relation;asset.materialType=captured.materialType;asset.dateContext=captured.dateContext;}else if(original?.sourceCaption){for(const key of ['sourceCaption','sourceCredit','sourceYears','sourceRelation','materialType','dateContext'])asset[key]=original[key];}}
   story.research=story.research.map((claim,index)=>({...claim,linkStatus:candidate.claims[index]?.linkStatus||'unknown',capturedAccess:evidence?.sources.find(s=>s.claimIndex===index)?.access||'not_inspected'}));
-  story.editorialAudit=assessEditorialPackage({...candidate,captionDraft:story.localDraft?.caption??candidate.captionDraft},evidence);
+  const working=story.localDraft&&!story.localDraft.stale?{...story,...story.localDraft}:story;
+  story.intelligence=analyzeStory(working,{catalog:soundtrack});story.musicRecommendations=story.intelligence.musicRecommendations;
+  story.editorialDirection=buildEditorialDirection(working,{creativeBrief:story.localDraft?.creativeBrief});
+  story.editorialAudit=assessEditorialPackage({...candidate,captionDraft:working.caption,format:working.format,targetSlideCount:working.targetSlideCount,proposedAssetIds:working.selectedAssetIds},evidence?{...evidence,selectionProposal:{...evidence.selectionProposal,assetIds:working.selectedAssetIds}}:null);
   story.selectionProposalBasis=proposed.length?'source_caption_metadata_match':'no_automatic_selection';
   story.generationFormat=format;
   story.origin='n8n_development';story.engineCandidateId=candidate.id;story.engineJobId=candidate.jobId;story.engineProvenance=candidate.provenance;story.developmentDecision=decision;

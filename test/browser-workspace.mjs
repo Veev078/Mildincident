@@ -199,6 +199,20 @@ try {
   await page.waitForFunction(() => document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));
   assert.equal(drafts.get(id).musicSelection.track, 'Fixture track');
   checks.push('manual soundtrack direction saves locally without availability claims');
+  await page.getByLabel('Sound approach',{exact:true}).selectOption('silent');
+  await page.getByLabel('Desired mood tags',{exact:true}).fill('reflective, cinematic');
+  await page.getByLabel('Tags to avoid',{exact:true}).fill('uneasy');
+  await page.getByLabel('Relationship to the period',{exact:true}).selectOption('period_echo');
+  await page.getByLabel('Sound brief notes',{exact:true}).fill('Synthetic working mood; not an audition.');
+  await page.getByRole('button',{name:'Save sound brief',exact:true}).click();
+  await page.getByText('The working brief calls for a silent post.',{exact:true}).waitFor();
+  assert.equal(drafts.get(id).musicSelection.track,'Fixture track');
+  await page.getByRole('button',{name:'Clear local track selection',exact:true}).click();
+  await page.getByRole('heading',{name:'A silent post',exact:true}).waitFor();
+  await page.reload();await page.getByRole('heading',{name:'A silent post',exact:true}).waitFor();
+  assert.equal(drafts.get(id).musicSelection,null);assert.equal(drafts.get(id).creativeBrief.musicIntent.eraApproach,'period_echo');
+  checks.push('sound brief survives reload, retains conflicting saved choices until explicit clearing, and supports a silent post without AI or audio claims');
+
 
   await page.goto(`${origin}/#/story/${id}/direction`);
   await page.locator('#direction-angle').waitFor();

@@ -102,3 +102,19 @@ test('broad themes never manufacture a named scene, venue or creature in soundtr
   assert.ok(inferred.inferredMatchedTags.includes('nightlife'));
   assert.match(inferred.reason, /inferred/);
 });
+
+test('sound brief prefers mood over decade-only nostalgia, uses selected-image dates and preserves conflicting saved choices',()=>{
+ const catalog=[{track:'Decade-only fixture',artist:'One',themes:'1970s',eras:'1970s',active:true},{track:'Reflective fixture',artist:'Two',moods:'reflective',eras:'1970s',active:true},{track:'Film-era fixture',artist:'Three',moods:'reflective',eras:'1960s',active:true},{track:'Uneasy fixture',artist:'Four',themes:'photography',moods:'reflective|uneasy',eras:'1970s',active:true}];
+ const story={caption:'A 1967 film.',selectedAssetIds:['photo'],media:[{id:'photo',sourceYears:[1974]}],creativeBrief:{musicIntent:{mode:'suggestions',moods:['reflective'],avoidTags:['uneasy'],eraApproach:'period_echo'}}};
+ const ranked=rankSoundtracks(story,catalog);assert.equal(ranked[0].track,'Reflective fixture');assert.ok(!ranked.some(t=>t.track==='Decade-only fixture'||t.track==='Uneasy fixture'));assert.equal(ranked[0].periodBasis,'selected_image_source_dates');assert.match(ranked[0].reason,/not a verified recording date/);assert.equal(ranked[0].audioAuditioned,false);
+ const retained=rankSoundtracks({...story,musicSelection:{track:'Uneasy fixture',artist:'Four'}},catalog);assert.equal(retained[0].selected,true);assert.ok(retained[0].briefWarnings.some(w=>w.includes('uneasy')));
+ const silent={...story,creativeBrief:{musicIntent:{...story.creativeBrief.musicIntent,mode:'silent'}}};assert.deepEqual(rankSoundtracks(silent,catalog),[]);
+ const personal=rankSoundtracks({...silent,musicSelection:{track:'Saved personal choice',artist:'Outside catalog'}},catalog);assert.equal(personal.length,1);assert.match(personal[0].briefWarnings[0],/silent/);
+ const contrast=rankSoundtracks({...story,creativeBrief:{musicIntent:{...story.creativeBrief.musicIntent,eraApproach:'contrast'}}},catalog);assert.equal(contrast[0].track,'Film-era fixture');assert.match(contrast[0].reason,/recording dates are unverified/);
+ assert.ok(lintCaption('For a younger audience, the appeal is simple.').issues.some(i=>i.code==='AUDIENCE_PITCH_IN_CAPTION'));
+});
+
+test('landscape framing instructions cannot invent a landscape subject in soundtrack reasons',()=>{
+ const story={title:'A studio portrait',creativeBrief:{visualIntent:'Preserve full landscape framing.'}};
+ assert.deepEqual(rankSoundtracks(story,[{track:'Landscape fixture',artist:'Fixture',themes:'landscape',active:true}]),[]);
+});

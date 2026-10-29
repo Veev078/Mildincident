@@ -1,3 +1,11 @@
+# Sound brief + live working checks — 2026-10-29
+
+Added validated/versioned local musicIntent (moods, avoid tags, period echo/contrast/open, silent option). Explicit mood matches outweigh broad era tags; a decade alone cannot recommend a track. Selected-image source dates guide era associations; catalog dates/audio/IG/license remain unverified. Saved choices survive conflicting briefs until explicitly cleared. Recording-search links and catalog notes support a real audition. Framing instructions cannot manufacture a landscape subject.
+
+Development stories now recompute analysis after source metadata attaches, and local caption/selection/format edits update editorial checks immediately. Actual local2254 version3 adds an assistant-proposed restrained reflective/cinematic brief, preserving caption/selection and choosing no track. Actual shortlist: Nico These Days; Ryuichi Sakamoto Bibo no Aozora; John Barry Midnight Cowboy (metadata only). Actual browser smoke passes, worker inactive.149-test full regression + additional focused framing test pass;29 browser flows pass. Next: correct proactive discovery context so it respects current n8n presets rather than being treated as a generic founder submission. No extra paid calls.
+
+---
+
 # Working editorial identity + source sequences — 2026-10-29
 
 Studio Direction now saves versioned local title/hook/format/frame target; all views use working identity without changing source revisions. History/export/rebase/restore preserve the fields. Unsaved setup form text survives quiet refresh/save completion. Carousel offers optional source-caption plans, excludes covers/rejected references, preserves dates/material types and never grants rights or trims assets implicitly.
