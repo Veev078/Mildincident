@@ -42,3 +42,11 @@ export interface EditorialStory {
   publishing: { manualStatus: string; observed: string; auditComplete: boolean; postIds: string[];
     multipleHandoffs: boolean; instagramVerified: boolean; reportedInstagramLinks: { postId: string; url: string }[]; requiresReview: boolean };
 }
+
+/** Local tracking only; opening a native n8n form is not confirmation of an execution. */
+export interface ResearchRequest {
+  id: string; kind: 'discovery' | 'brief'; prompt: string; sourceUrl: string; createdAt: string;
+  baselineIds: string[]; version: number; linkedStoryId: string | null; handoffUrl: string;
+  events: {version: number; event: 'handoff_requested' | 'story_linked'; storyId: string | null; createdAt: string}[];
+  executionConfirmed: false; productionApplied: false;
+}

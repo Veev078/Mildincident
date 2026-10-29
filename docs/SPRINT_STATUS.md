@@ -1,3 +1,7 @@
+# Discovery desk checkpoint — 2026-10-29
+
+Second increment: persisted local discovery/creative briefs, versioned append-only handoff/link events, n8n-native authenticated form links and source-derived small review slates.111 automated tests and20 browser workflows passed before final documentation changes. Existing form GETs return401 without session; no research submission/new stories created. Both modes reuse the actual existing engine, with explicit user submission and refresh/link steps. See DISCOVERY_DESK.md. Continue next with carousel rehearsal.
+
 # Active sourcing integration checkpoint — 2026-10-29
 
 Prepared six-node manual-only sandbox from the captured ACTIVE sourcing workflow; isolated actualmetadata replay returned7 qualified references. Code/tests in photo-review-sandbox; private artifact in `.local/engine-build/`. Live creation rejected twice by automatic approval review; no n8n mutations. See N8N_ACTIVE_REVIEW.md. Continue with Studio discovery/creative handoff using verified existing authenticated research forms; current source refresh is read-only.

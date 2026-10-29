@@ -10,7 +10,7 @@ const savePromises = new Map();
 const history = new Map();
 const timers = new Map();
 const versions = new Map();
-const nav = [['home', 'Editorial home', '01'], ['pipeline', 'Story pipeline', '02'], ['library', 'Image library', '03'], ['publishing', 'Publishing', '04'], ['archive', 'Published archive', '05'], ['analytics', 'Performance', '06']];
+const nav = [['discovery', 'Discovery desk', '00'], ['home', 'Editorial home', '01'], ['pipeline', 'Story pipeline', '02'], ['library', 'Image library', '03'], ['publishing', 'Publishing', '04'], ['archive', 'Published archive', '05'], ['analytics', 'Performance', '06']];
 let pollTimer;
 let searchTimer;
 let toastTimer;
@@ -21,7 +21,7 @@ function route() {
   const [view = 'home', encodedId, tab = 'overview'] = location.hash.replace(/^#\/?/, '').split('/');
   let id = encodedId;
   try { id = encodedId && decodeURIComponent(encodedId); } catch { id = ''; }
-  return { view: ['home', 'pipeline', 'library', 'publishing', 'archive', 'analytics', 'story'].includes(view) ? view : 'home', id, tab };
+  return { view: ['discovery', 'home', 'pipeline', 'library', 'publishing', 'archive', 'analytics', 'story'].includes(view) ? view : 'home', id, tab };
 }
 
 const storyById = id => state.workspace?.stories?.find(story => story.id === id);
@@ -319,6 +319,9 @@ document.addEventListener('click', event => {
       photo.querySelector('.preview-status').textContent = 'Retrying preview…';
       const src = img.getAttribute('src'); img.removeAttribute('src'); img.setAttribute('src', src); break;
     }
+    case 'prepare-discovery':
+      button.disabled = true;
+      createResearchRequest({kind:'discovery',prompt:'Discover a small culture-led slate using the current n8n editorial preset.',sourceUrl:''}).catch(error=>toast(error.message,{error:true})).finally(()=>{button.disabled=false;}); break;
     case 'reload': loadWorkspace().catch(() => {}); break;
     case 'refresh': refreshSource(); break;
     case 'close-toast': document.querySelector('#toast').hidden = true; break;
@@ -393,6 +396,7 @@ document.addEventListener('click', event => {
 
 document.addEventListener('input', event => {
   const input = event.target;
+  if (input.closest('[data-research-form]')) { state.researchDraft = { ...(state.researchDraft || {}), [input.name]: input.value }; }
   if (input.dataset.briefField && input.matches('textarea,input[type="text"]')) {
     editCreativeBrief(input.dataset.story, brief => { brief[input.dataset.briefField] = input.value; });
   }
@@ -499,6 +503,31 @@ document.addEventListener('error', event => {
   const retry = photo.querySelector('.preview-retry'); if (retry) retry.hidden = false;
 }, true);
 
+async function createResearchRequest(input) {
+  const result = await api('/api/research/requests', {method:'POST', headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(input)});
+  state.researchDraft = {};
+  await loadWorkspace({quiet:true});
+  toast('Saved locally. Open the n8n form and submit there to start research.');
+  document.querySelector(`[data-request-id="${result.request.id}"]`)?.scrollIntoView({block:'center'});
+}
+document.addEventListener('click', event => {
+  const link=event.target.closest('[data-research-handoff]'); if(!link)return;
+  api(`/api/research/requests/${link.dataset.researchHandoff}/events`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({event:'handoff_requested',expectedVersion:Number(link.dataset.version)})})
+    .then(()=>loadWorkspace({quiet:true})).catch(error=>toast(error.message,{error:true}));
+});
+document.addEventListener('submit', async event => {
+  const form=event.target.closest('[data-research-form],[data-research-link]');if(!form)return;
+  event.preventDefault();const button=form.querySelector('button[type="submit"]');button.disabled=true;
+  const status=form.querySelector('[data-research-status]');status.textContent='Saving locally…';
+  try {
+    if(form.matches('[data-research-form]')) await createResearchRequest({kind:'brief',prompt:form.elements.prompt.value,sourceUrl:form.elements.sourceUrl.value});
+    else {
+      await api(`/api/research/requests/${form.dataset.request}/events`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({event:'story_linked',storyId:form.elements.storyId.value,expectedVersion:Number(form.dataset.version)})});
+      await loadWorkspace({quiet:true});toast('Existing source story linked locally. Production records are unchanged.');
+    }
+  }catch(error){status.textContent=error.message;}finally{button.disabled=false;}
+});
+
 document.addEventListener('submit', async event => {
   const form = event.target.closest('[data-preview-upload]'); if (!form) return;
   event.preventDefault();
@@ -539,7 +568,7 @@ document.querySelector('#asset-dialog').addEventListener('click', event => {
   if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) event.currentTarget.close(); }
 });
 window.addEventListener('hashchange', () => { document.querySelector('#asset-dialog').close(); render({ focusMain: true }); window.scrollTo({ top: 0, behavior: 'instant' }); });
-window.addEventListener('beforeunload', event => { if (pending.size || saving.size) { event.preventDefault(); event.returnValue = ''; } });
+window.addEventListener('beforeunload', event => { if (pending.size || saving.size || state.researchDraft?.prompt?.trim()) { event.preventDefault(); event.returnValue = ''; } });
 
 render();
 loadWorkspace().catch(() => {});

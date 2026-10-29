@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import sharp from 'sharp';
+import { LocalResearchStore } from '../src/workspace/research-store.js';
 import { LocalPreviewStore } from '../src/workspace/previews.js';
 import { chromium } from 'playwright';
 import { createWorkspaceServer } from '../src/workspace/server.js';
@@ -23,7 +24,8 @@ const originalView = source.view.bind(source);
 source.view = (...args) => { const model = originalView(...args); model.source.kind = 'test_fixture'; return model; };
 const drafts = new LocalDraftStore(path.join(root, 'drafts.sqlite'));
 const previews = new LocalPreviewStore(path.join(root, 'previews'));
-const server = createWorkspaceServer({ source, drafts, previews });
+const research = new LocalResearchStore(path.join(root, 'research.sqlite'));
+const server = createWorkspaceServer({ source, drafts, previews, research });
 await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
 const origin = `http://127.0.0.1:${server.address().port}`;
 let browser;
@@ -39,13 +41,38 @@ try {
   await page.locator('.stats-row').waitFor();
   assert.ok((await page.locator('.source-bar').textContent()).includes('Test fixture'));
   checks.push('frontend loads from actual local API with explicitly labeled test fixtures');
+  await page.goto(`${origin}/#/discovery`);
+  await page.getByRole('heading', {name:'Find the next extraordinary story.'}).waitFor();
+  await page.getByLabel('Creative direction', {exact:true}).fill('Find unusual connections between portrait photography and cinema');
+  await page.getByLabel('Source link (optional)', {exact:true}).fill('https://example.org/photography');
+  await page.getByRole('button', {name:'Save brief for n8n',exact:true}).click();
+  await page.locator('[data-research-handoff]').waitFor();
+  let href=await page.locator('[data-research-handoff]').getAttribute('href');
+  assert.equal(new URL(href).pathname,'/form/submit-idea');
+  assert.equal(new URL(href).searchParams.get('request'),'Find unusual connections between portrait photography and cinema');
+  await page.reload();
+  await page.locator('[data-research-handoff]').waitFor();
+  const firstRequest=page.locator('[data-request-id]').first();
+  await firstRequest.getByLabel('Link a resulting story').selectOption(snapshot.records.stories[0].concept_id);
+  await firstRequest.getByRole('button',{name:'Link existing story',exact:true}).click();
+  await page.getByText('Existing story linked',{exact:true}).waitFor();
+  assert.equal(research.all()[0].linkedStoryId,snapshot.records.stories[0].concept_id);
+  assert.equal(research.all()[0].executionConfirmed,false);
+  checks.push('creative brief persists, targets existing authenticated n8n form and links an actual source story without claiming execution');
+  await page.getByRole('button',{name:'Prepare a discovery run',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelectorAll('[data-request-id]').length===2);
+  const discoveryLink=await page.locator('[data-research-handoff]').first().getAttribute('href');
+  assert.equal(new URL(discoveryLink).pathname,'/form/mildincident-start-editorial-discovery');
+  assert.equal(research.all()[0].kind,'discovery');
+  checks.push('discovery uses the same persistent research handoff and existing n8n preset without scheduled or paid browser execution');
 
-  for (const view of ['home', 'pipeline', 'library', 'publishing', 'archive', 'analytics']) {
+
+  for (const view of ['discovery', 'home', 'pipeline', 'library', 'publishing', 'archive', 'analytics']) {
     await page.goto(`${origin}/#/${view}`);
     await page.locator('h1').waitFor();
     assert.ok((await page.locator('h1').innerText()).length > 0);
   }
-  checks.push('six product-wide views render without JavaScript errors');
+  checks.push('seven product-wide views render without JavaScript errors');
   await page.goto(`${origin}/#/pipeline`);
   await page.getByRole('searchbox', { name: 'Find a story', exact: true }).fill('nothing-matches-this');
   await page.waitForFunction(() => document.querySelectorAll('.pipeline-row').length === 0);
@@ -215,5 +242,6 @@ try {
   await new Promise(resolve => server.close(resolve));
   drafts.close();
   previews.close();
+  research.close();
   await fs.rm(root, { recursive: true, force: true });
 }

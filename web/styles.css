@@ -3651,3 +3651,12 @@ dialog::backdrop {
 [data-preview-upload] { margin-top:20px; padding:16px; border:1px solid var(--line); border-radius:6px; background:var(--paper); }
 [data-preview-upload] input[type=file] { display:block; max-width:100%; margin:12px 0; }
 [data-preview-upload] input[type=checkbox] { width:auto; }
+
+.research-layout { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin:28px 0; }
+.discovery-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; margin:24px 0 42px; }
+.discovery-evidence { padding:18px; border:1px solid var(--line); background:var(--surface); }
+.research-requests { display:grid; gap:20px; margin:24px 0; }
+.research-request select { max-width:100%; }
+.research-layout textarea { min-height:140px; }
+.research-request .section-heading { flex-wrap:wrap; }
+@media(max-width:800px) { .research-layout,.discovery-grid { grid-template-columns:1fr; } }

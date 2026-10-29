@@ -3,6 +3,7 @@ import { canonical } from '../package.js';
 import { editorialReadiness } from '../reconciliation.js';
 import { analyzeStory, findDuplicateStories } from '../editorial-intelligence.js';
 import { calculateAnalytics } from '../analytics.js';
+import { buildDiscoveryDesk } from '../editorial-discovery.js';
 import { buildEditorialDirection } from '../editorial-direction.js';
 
 export const WORKSPACE_TABLES = Object.freeze({
@@ -99,6 +100,7 @@ export function buildWorkspace(snapshot, drafts = new Map()) {
       stale: Date.now() - Date.parse(snapshot.observedAt) > 15 * 60_000,
       warnings: [...(snapshot.warnings || [])], bufferObservedAt: buffer.observedAt, productionMutationsEnabled: false },
     stories,
+    discovery: buildDiscoveryDesk(stories),
     imageArchives: records.imageArchives.filter(a => a.active !== false).map(a => ({ id: String(a.archive_key || a.id),
       name: String(a.name || ''), url: browserUrl(a.home_url), searchDomain: String(a.search_domain || ''), rightsHint: String(a.rights_hint || '') })),
     activity,

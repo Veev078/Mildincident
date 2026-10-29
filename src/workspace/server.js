@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WorkspaceSource } from './data-source.js';
+import { LocalResearchStore } from './research-store.js';
 import { LocalDraftStore } from './store.js';
 import { HandoffError, requireThat } from '../errors.js';
 import { LocalPreviewStore, attachLocalPreviews, MAX_PREVIEW_BYTES } from './previews.js';
@@ -41,9 +42,11 @@ async function imageBody(request) {
   return Buffer.concat(chunks);
 }
 
-export function createWorkspaceServer({ source, drafts, previews, webRoot = WEB_ROOT }) {
+export function createWorkspaceServer({ source, drafts, previews, research, webRoot = WEB_ROOT }) {
   const view = () => {
     const workspace = attachLocalPreviews(source.view(drafts.all()), previews);
+    workspace.researchRequests = research?.all() || [];
+    workspace.researchHandoffAvailable = Boolean(research);
     return workspace;
   };
   return http.createServer(async (request, response) => {
@@ -66,6 +69,17 @@ export function createWorkspaceServer({ source, drafts, previews, webRoot = WEB_
         json(response, 200, { status: 'ok', mode: 'local_editorial_workspace', productionMutationsEnabled: false, sourceAvailable: Boolean(source.snapshot), refreshing: Boolean(source.inflight) }); return;
       }
       if (url.pathname === '/api/workspace' && request.method === 'GET') { json(response, 200, view()); return; }
+      if (url.pathname === '/api/research/requests' && request.method === 'POST') {
+        requireThat(research, 'RESEARCH_UNAVAILABLE', 'The private research request store is unavailable.');
+        const input = await body(request); const workspace = view();
+        json(response, 201, { request: research.create(input, workspace.stories), scope: 'local_only', productionApplied: false }); return;
+      }
+      const requestMatch = url.pathname.match(/^\/api\/research\/requests\/([a-f0-9-]{36})\/events$/);
+      if (requestMatch && request.method === 'POST') {
+        requireThat(research, 'RESEARCH_UNAVAILABLE', 'The private research request store is unavailable.');
+        const input = await body(request); const workspace = view();
+        json(response, 200, { request: research.event(requestMatch[1], input, workspace.stories), scope: 'local_only', productionApplied: false }); return;
+      }
       if (url.pathname === '/api/refresh' && request.method === 'POST') {
         source.refresh().catch(() => {}); // Failure is exposed by next workspace read, never logged with secrets.
         json(response, 202, { refreshing: true, productionChanges: 0 }); return;
@@ -150,7 +164,7 @@ export function createWorkspaceServer({ source, drafts, previews, webRoot = WEB_
       const message = error instanceof HandoffError ? error.message : 'The local operation did not complete. No production changes were made.';
       const status = ['INVALID_HOST', 'INVALID_ORIGIN', 'INTENT_REQUIRED'].includes(code) ? 403 :
         ['STALE_SOURCE', 'STALE_LOCAL_DRAFT', 'EDIT_CONFLICT'].includes(code) ? 409 :
-          ['STORY_NOT_FOUND', 'DRAFT_NOT_FOUND', 'FILE_NOT_FOUND', 'PREVIEW_NOT_FOUND'].includes(code) ? 404 : code === 'SOURCE_UNAVAILABLE' ? 503 : 400;
+          ['STORY_NOT_FOUND', 'DRAFT_NOT_FOUND', 'FILE_NOT_FOUND', 'PREVIEW_NOT_FOUND', 'RESEARCH_REQUEST_NOT_FOUND'].includes(code) ? 404 : code === 'SOURCE_UNAVAILABLE' ? 503 : 400;
       if (!response.headersSent) json(response, status, { error: { code, message } });
       else response.end();
     }
@@ -162,7 +176,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   await source.initialize();
   const drafts = new LocalDraftStore('.local/workspace/drafts.sqlite');
   const previews = new LocalPreviewStore('.local/workspace/previews');
-  const server = createWorkspaceServer({ source, drafts, previews });
+  const research = new LocalResearchStore('.local/workspace/research.sqlite');
+  const server = createWorkspaceServer({ source, drafts, previews, research });
   const port = Number(process.env.PORT || 4174);
   requireThat(Number.isSafeInteger(port) && port > 0 && port <= 65535, 'INVALID_PORT', 'PORT must be from 1 to 65535.');
   server.on('error', error => { console.error(`Workspace startup failed: ${error.code || 'LOCAL_ERROR'}`); process.exitCode = 1; drafts.close(); });
