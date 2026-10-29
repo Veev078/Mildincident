@@ -1,0 +1,2 @@
+import {backupWorkspace,verifyWorkspaceBackup} from '../src/workspace/backup.js';
+try{const args=process.argv.slice(2);if(args[0]==='--verify'&&args.length===2)console.log(JSON.stringify(await verifyWorkspaceBackup(args[1])));else if(!args.length)console.log(JSON.stringify(await backupWorkspace()));else throw new Error('Use npm run workspace:backup, or pass -- --verify BACKUP_DIRECTORY.');}catch(error){console.error(error.code||'PRIVATE_BACKUP_FAILED');process.exitCode=1;}

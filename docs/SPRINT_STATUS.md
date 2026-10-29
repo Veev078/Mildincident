@@ -1,3 +1,15 @@
+# Editorial completion checkpoint — 2026-10-29
+
+Completed three increments from1530811: unified evidence/readiness (fbfe762), inline editorial decisions without false source conflicts (2f09452), private SQLite/media backup and verification. `npm run workspace:backup` creates a new ignored private snapshot/checksum manifest; `-- --verify DIRECTORY` checks integrity. Recovery instructions: PRIVATE_BACKUP.md. Actual backup2026-10-29T22-37-35-144Z-81c3521c verifies13files and reopens the real version3 draft; separate private engine connection is intentionally excluded.
+
+Final validation:167 automated tests,31 Chromium workflows, syntax and actual8-tab editorial journey pass. Actual first generation2254 remains single_image, selected1/target1,7media; cached source photo decodes1600px, readiness needs_research, no browser errors. Source evidence, direction, carousel, caption, sound and inline decision stay in one story. All existing local decisions/history retained; no new AI result was generated. No n8n changes this sprint; worker stays inactive and generation disabled.
+
+Remaining: two503 source references, per-image rights and claim verification remain unresolved. Metadata matching and decoding do not prove photographic identity or taste. The existing real story is the regression reference; revised prompts still require a new controlled live validation.
+
+Recommended NEXT paid validation (NOT authorized/executed): one NEW proactive discovery UUID under the actual current preset, one candidate, at most1 research+1 draft call on existing GPT-5.4 connection,2 research tool calls,3500 research/1800 draft output tokens,30000 input characters per call,240-second worker timeout; temporarily activate only for that approved dispatch and deactivate in finally. Check novelty, source support, exact original image/date/credit, single-image/sequence integrity and Studio persistence. No recurring automation, publish/send or second generation. Confirm provider spending approval separately; token limits are not a currency ceiling. Do not reuse2254 or reset its consumed approval marker.
+
+---
+
 # Completion sprint: decisions inside the editorial vertical slice — 2026-10-29
 
 The existing development decision form now appears in the story Overview, using the same versioned job/event ledger as Discovery. Local decision/stage presentation is excluded from native source-revision hashing, fixing false stale-draft conflicts after approving/rejecting an already-edited candidate. Original native candidates, local history and reasoned feedback remain preserved. Existing actual needs_research/version3 hash is unchanged.
