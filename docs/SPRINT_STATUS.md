@@ -6,9 +6,9 @@ The published environment restored this branch cleanly. A product-wide local edi
 
 Implemented: home/pipeline/unified story/research/image library/carousel/caption/music/publishing/archive/analytics views; image comparison/provenance; local autosave/history/proposal downloads; reviewed stale-draft recovery; caption/source intelligence; duplicate-story candidates; metadata-only soundtrack ranking; measured analytics and missing-data handling. Existing n8n notes are displayed separately from local proposals. Remote source credentials and founder tokens are not exposed to the browser.
 
-Milestone checks: 80 unit/integration tests passed; 11 Chromium workflow checks passed, including eight views at four viewport widths. Four of nine eligible editorial sends supplied usable performance measurements; other metrics remain unavailable. Real source cache contains 18 existing stories and 264 images. Cloud-browser archival thumbnails are currently unavailable; graceful original-source links remain visible, and no fake imagery is substituted.
+Milestone checks: 80 unit/integration tests passed; 15 Chromium workflow checks passed, including eight views at four viewport widths. Four of nine eligible editorial sends supplied usable performance measurements; other metrics remain unavailable. Real source cache contains 18 existing stories and 264 images. Cloud-browser archival thumbnails are currently unavailable; graceful original-source links remain visible, and no fake imagery is substituted.
 
-Pending final checkpoint: finish failure-state browser checks, deployment/rollback documentation and final source-note smoke. Production frontend deployment and the earlier n8n patches remain unapproved. Read the extended-workspace documentation once added rather than re-running the old inventory.
+Completed recovery checkpoint: failure-state browser checks, deployment/rollback documentation and actual source-note smoke are complete. Actual-data checks found no browser errors or mobile page overflow. Production frontend deployment and the earlier n8n patches remain unapproved. See WORKSPACE.md and PRODUCT_FRICTION.md. Next: integrate the user-supplied inspiration research as reviewable editorial direction, not verified live account metrics or mandatory publishing rules.
 
 ---
 

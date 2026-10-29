@@ -1,5 +1,7 @@
 # Architecture and boundaries
 
+The extended sprint adds a local product-wide frontend/BFF, read-only source cache and private proposal history. See [workspace architecture and API](WORKSPACE.md). Existing n8n remains the production backend. The additional analytics/intelligence modules use real observations and metadata; no publishing service or deployment was added.
+
 Current production inventory and dependencies were verified in the subsequent sprint: see [live architecture](LIVE_ARCHITECTURE.md) and [live audit](LIVE_AUDIT.md). The diagram below preserves the initial historical context.
 
 ## Historical production architecture (not verified live)

@@ -1,8 +1,10 @@
 # MILDINCIDENT
 
-Private editorial production for an independent archival publication.
+An editorial workspace for an independent archival publication, backed by the existing n8n and Buffer system.
 
-This repository now contains a **local draft-handoff foundation**, a read-only Halloween launch brief, and a read-only n8n audit tool. It does not replace the working Founder Studio. **No live workflow, story, Buffer item, schedule, or Instagram post has been changed.**
+The product-wide development workspace includes editorial home, story pipeline, unified research/caption/music desk, image library, carousel review, publishing center, archive and measured analytics. It uses actual source snapshots and keeps edits in versioned private local proposals. **It has not replaced Founder Studio or changed any live workflow, story, Buffer item, schedule or Instagram post.**
+
+Start with [workspace usage and deployment boundaries](docs/WORKSPACE.md), [product friction addressed](docs/PRODUCT_FRICTION.md), [editorial intelligence](docs/EDITORIAL_INTELLIGENCE.md), and the [current checkpoint](docs/SPRINT_STATUS.md).
 
 The autonomous sprint connected both APIs and inspected the actual production system. Start with [current live findings](docs/LIVE_AUDIT.md), [sprint checkpoint](docs/SPRINT_STATUS.md), [Halloween review](docs/HALLOWEEN_REVIEW.md), and [proposed production changes](docs/PRODUCTION_REVIEW.md). The connection failures described in the initial assessment are resolved.
 
@@ -17,12 +19,14 @@ cd /workspace/Mildincident
 npm ci
 npm run check
 npm test
-npm run studio
+npm run workspace
 ```
 
-The Studio command starts a **loopback-only, read-only launch brief** on port 4173. It shows references to the four existing Halloween stories and the next review steps. It has no send, schedule, upload, or publish endpoint. It is not a replacement production frontend. In a sandbox, the HTTP smoke test and subprocess tests may require execution permission; do not skip them or call a denied test passing.
+The workspace starts on **loopback port 4174**, loads the last completed source cache and refreshes read-only n8n/Buffer observations. Local caption, sequence, notes and music edits autosave with history and revision checks. Proposal JSON downloads are review artifacts, not production updates. There is no send, schedule, publish, delete or rights-clearance endpoint. In a sandbox, HTTP/child-process/browser tests may require execution permission; do not skip them or call a denied test passing.
 
-No build step is required: the modules run directly in Node; the brief uses server-rendered HTML and CSS. Tests fully decode generated JPGs, exercise durable state across processes, simulate remote failures, and make functional HTTP requests to the brief. They use no real editorial assets or remote services.
+`npm run test:browser` runs the local Chromium workflow/regression suite with labeled synthetic fixtures and a temporary private store. The system Chromium path is configurable with `CHROMIUM_PATH`. Screenshots/reports stay under ignored `.local/`. `npm run studio` still starts the older historical launch brief on port 4173; it is not the primary product-wide workspace.
+
+No build step is required: backend modules run directly in Node; the frontend uses browser ES modules and reusable components. Tests decode generated JPGs, exercise durable state across processes, simulate remote failures, and make functional HTTP/browser requests. Automated edit tests use fixtures, not real editorial assets or production writes. Production dependency audit reported zero vulnerabilities.
 
 ## Prepare private JPGs
 
@@ -77,7 +81,7 @@ These guarantees apply to clients sharing **one preserved SQLite file**. Indepen
 
 The ChatGPT apps **BUFFER** and **Business HQ – N8N** are visible in the supplied screenshot, but their tools are not exposed in this Codex session. A ChatGPT app permission setting does not establish Codex tool access.
 
-If those apps can be attached here, use them for read-only inspection first. The environment draft also declares secure `N8N_API_KEY` and `BUFFER_ACCESS_TOKEN` requirements. Enter rotated credentials in **environment settings**, never in repository files, logs, or chat. Draft saving is separate from applying/publishing configuration. Cloudinary signing credentials are not needed for the local implementation and are not configured.
+The existing environment has working secure `N8N_API_KEY` and `BUFFER_ACCESS_TOKEN` bindings. Reuse them; no new token or rotation is required by this code. Keep values out of repository files, logs and chat. The browser receives only allowlisted editorial fields, never credentials or founder tokens. Cloudinary signing credentials are not needed for this local workspace.
 
 Both n8n and Buffer access were verified after the new environment was published. Use the existing configured credentials; no new token is needed. Commands remain read-only:
 
@@ -101,6 +105,6 @@ node scripts/validate-private-workflow-snapshots.mjs .local/audits/production-RU
 
 Replace RUN paths with actual audit outputs. Generated patches stay private because workflow code/metadata can contain sensitive material. Patch preparation has no remote update/activation function. The existing-table atomic claim contract is a tested protocol, not a verified deployed migration. Local SQLite is not a second production backend.
 
-## Next publishing action
+## Next product actions
 
-Read-only audit the three reported Tippi sends and the internal test against actual Buffer and Instagram evidence. Then review the **existing** Oct 28 nine-image Halloween draft `6ae09b4fd477c7b7130dd484`, including each image's permission and current caption. The brief retains references to the other three existing packages. No scheduled time is authorized by the historical launch dates.
+Review the local frontend across existing stories and stage it only after authentication/origin/deployment approval. Use proposal downloads to review caption/sequence work against current n8n records. Existing source permissions, atomic claim validation and provider/Instagram reconciliation remain separate prerequisites for production publishing changes; see [atomic claim review](docs/ATOMIC_CLAIM_REVIEW.md). No dates or UI actions grant scheduling/publication approval.

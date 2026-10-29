@@ -87,8 +87,9 @@ export function buildWorkspace(snapshot, drafts = new Map()) {
     story.musicRecommendations = story.intelligence.musicRecommendations;
     return story;
   });
+  const activityLabels = { draft_created: 'Draft creation recorded at transfer', reserved: 'Draft handoff reserved', review_needed: 'Handoff needs reconciliation', abandoned: 'Transfer stopped before Buffer' };
   const activity = records.imports.map(r => ({ id: `handoff-${r.id}`, type: 'handoff', storyId: r.concept_id,
-    summary: `Recorded handoff: ${r.state || 'unknown'}`, at: r.imported_on || r.createdAt || null }))
+    summary: activityLabels[r.state] || `Handoff state recorded: ${String(r.state || 'unknown').replace(/_/g, ' ')}`, at: r.imported_on || r.createdAt || null }))
     .filter(r => r.at).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30);
   return {
     source: { kind: 'live_snapshot', observedAt: snapshot.observedAt,

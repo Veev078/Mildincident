@@ -14,6 +14,7 @@ await fs.mkdir(artifactRoot, { recursive: true, mode: 0o700 });
 const snapshot = workspaceSnapshot();
 snapshot.observedAt = new Date().toISOString();
 snapshot.records.stories[0].title = 'Synthetic UI regression fixture — no editorial content';
+snapshot.records.packages[0].founder_notes = 'Existing n8n notes from a synthetic test fixture';
 const source = new WorkspaceSource({ root, loadLive: async () => snapshot });
 source.snapshot = snapshot;
 const originalView = source.view.bind(source);
@@ -51,6 +52,10 @@ try {
   checks.push('global search filters existing story rows and has an honest empty state');
 
   const id = snapshot.records.stories[0].concept_id;
+  await page.goto(`${origin}/#/story/${id}/overview`);
+  await page.getByRole('heading', { name: 'Existing n8n notes', exact: true }).waitFor();
+  assert.ok((await page.locator('.existing-source-notes').textContent()).includes('synthetic test fixture'));
+  checks.push('existing n8n editorial notes stay visible and separate from local edits');
   await page.goto(`${origin}/#/story/${id}/caption`);
   const caption = 'Locally edited through Chromium. Source and rights still need review.';
   await page.getByLabel('Local caption draft').fill(caption);
@@ -104,6 +109,31 @@ try {
   assert.ok((await page.getByRole('dialog').textContent()).includes('Local version history.'));
   await page.getByRole('button', { name: 'Close local version history' }).click();
   checks.push('saved local version history is inspectable');
+
+  source.loadLive = () => { throw new Error('synthetic refresh failure'); };
+  await page.getByRole('button', { name: 'Refresh source ↻', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('#toast')?.textContent.includes('previous source snapshot is preserved'));
+  assert.equal(drafts.get(id).caption, caption);
+  assert.ok(await page.getByRole('button', { name: 'Refresh source ↻', exact: true }).isEnabled());
+  source.loadLive = async () => snapshot;
+  checks.push('failed read refresh reports failure, preserves edits/cache and remains retryable');
+
+  await page.goto(`${origin}/#/home`);
+  await page.keyboard.press('/');
+  assert.equal(await page.locator('#global-search').evaluate(node => node === document.activeElement), true);
+  await page.locator('#global-search').blur();
+  await page.keyboard.press('g'); await page.keyboard.press('p');
+  await page.waitForURL('**/#/pipeline');
+  checks.push('keyboard shortcuts focus search and navigate without fake actions');
+
+  const failurePage = await browser.newPage();
+  failurePage.on('pageerror', error => errors.push(error.message));
+  await failurePage.route('**/api/workspace', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'TEST_SOURCE_UNAVAILABLE', message: 'Synthetic read-only source outage' } }) }));
+  await failurePage.goto(origin);
+  await failurePage.getByRole('heading', { name: 'The desk could not be loaded.', exact: true }).waitFor();
+  assert.equal(await failurePage.locator('.story-card').count(), 0);
+  await failurePage.close();
+  checks.push('source outage shows an actionable error without inventing sample stories');
 
   for (const width of [1440, 768, 390, 375]) {
     await page.setViewportSize({ width, height: 900 });
