@@ -1,3 +1,13 @@
+# Recovered discovery routing + evidence ordering — 2026-10-29
+
+Resumed exact ea1ebf0 work; preserved tracked patch/untracked sources privately before repairs. Proactive requests no longer masquerade as founder submissions. Existing n8n preset/territory preparation runs; one branch is selected within the same budget, recent development subjects/territories reduce repetition, tested saved seed leads are skipped. On-demand founder direction/link remain exact. Selected route/preset provenance is retained with future candidates.
+
+Offline replay using captured native context verifies proactive visual_first under actual forgotten_pop_culture preset vs founder_submission for a specific brief (16840/16784 input chars). Zero paid calls. Existing40-node worker saved INACTIVE as faaa669f-19c1-459a-93de-b4e51bc45202, version checked/backed up/read back. Discovery desk now distinguishes captured text, blocked sources and caption-matched imagery instead of ranking URL volume alone; music remains optional.
+
+23 focused checks and29 browser flows passed, no JS errors/production writes. Original2254 and needs_research decision preserved; actual working title/format/caption/selection/sound brief remain local version3 with all three historical versions. Next: continue isolated source validation/photography and on-demand reliability. Single paid allowance remains CONSUMED; no further generation is enabled.
+
+---
+
 # Sound brief + live working checks — 2026-10-29
 
 Added validated/versioned local musicIntent (moods, avoid tags, period echo/contrast/open, silent option). Explicit mood matches outweigh broad era tags; a decade alone cannot recommend a track. Selected-image source dates guide era associations; catalog dates/audio/IG/license remain unverified. Saved choices survive conflicting briefs until explicitly cleared. Recording-search links and catalog notes support a real audition. Framing instructions cannot manufacture a landscape subject.

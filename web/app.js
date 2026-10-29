@@ -578,7 +578,7 @@ async function createResearchRequest(input) {
   if (!state.workspace.researchRequests.some(r=>r.id===result.request.id)) state.workspace.researchRequests.unshift(result.request);
   render();
   await loadWorkspace({quiet:true}).catch(()=>{});
-  toast('Saved locally. Open the n8n form and submit there to start research.');
+  toast(state.workspace.engine?.configured?'Saved locally. Queue this request in the development engine below. Queueing does not start a paid generation.':'Saved locally. Open the n8n form and submit there to start research.');
   document.querySelector(`[data-request-id="${result.request.id}"]`)?.scrollIntoView({block:'center'});
 }
 document.addEventListener('click', async event=>{

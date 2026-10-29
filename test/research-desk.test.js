@@ -38,3 +38,9 @@ test('repeated local request identity recovers a saved brief after lost response
  assert.throws(()=>store.create({...input,prompt:'A different request must not overwrite the saved brief'},[]),{code:'EDIT_CONFLICT'});
  assert.throws(()=>store.create({...input,idempotencyKey:'../invalid'},[]),{code:'INVALID_RESEARCH_REQUEST'});
 });
+
+test('discovery prioritizes captured evidence over URL volume, labels blocked sources and does not require music',()=>{
+ const base=buildWorkspace(workspaceSnapshot()).stories[0];const strong={...base,id:'CON-STRONG',stage:'idea',publishing:{observed:'none'},research:[{claim:'Captured source text',url:'https://example.org/one',capturedAccess:'source_text_captured',linkStatus:'live'}],media:[{id:'photo',previewUrl:'https://example.org/photo.jpg',sourceRelation:'subject_caption_match'}],selectedAssetIds:['photo'],localDraft:{musicSelection:null,creativeBrief:{musicIntent:{mode:'silent'}}}};
+ const blocked={...strong,id:'CON-BLOCKED',research:Array.from({length:4},(_,i)=>({claim:'Unconfirmed reference',url:'https://example.org/'+i,capturedAccess:'access_unconfirmed',linkStatus:'unconfirmed'})),media:[],selectedAssetIds:[],localDraft:null};
+ const desk=buildDiscoveryDesk([blocked,strong]);assert.equal(desk.candidates[0].storyId,'CON-STRONG');assert.equal(desk.candidates[0].capturedSourceCount,1);assert.equal(desk.candidates[1].unconfirmedSourceCount,4);assert.ok(!desk.candidates[0].gaps.some(g=>/Music direction/.test(g)));
+});
