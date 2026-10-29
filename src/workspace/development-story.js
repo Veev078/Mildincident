@@ -30,7 +30,8 @@ export function developmentCandidateStory(candidate,{soundtrack=[],drafts=new Ma
   story.editorialDirection=buildEditorialDirection(working,{creativeBrief:story.localDraft?.creativeBrief});
   story.editorialAudit=assessEditorialPackage({...candidate,title:working.title,hook:working.hook,captionDraft:working.caption,format:working.format,targetSlideCount:working.targetSlideCount,proposedAssetIds:working.selectedAssetIds},evidence?{...evidence,selectionProposal:{...evidence.selectionProposal,assetIds:working.selectedAssetIds}}:null);
   story.selectionProposalBasis=proposed.length?'source_caption_metadata_match':'no_automatic_selection';
-  story.generationFormat=format;story.discoveryPlan=candidate.discoveryPlan||null;
+  story.editorialSelection=candidate.editorialSelection||null;story.editorialCase=candidate.editorialCase||null;story.leadComparison=candidate.leadComparison||[];story.selectionProvenance=candidate.selectionProvenance||null;
+  story.generationFormat=format;story.generationFormatBasis=candidate.formatBasis;story.discoveryPlan=candidate.discoveryPlan||null;
   story.origin='n8n_development';story.engineCandidateId=candidate.id;story.engineJobId=candidate.jobId;story.engineProvenance=candidate.provenance;story.developmentDecision=decision;
   return story;
 }

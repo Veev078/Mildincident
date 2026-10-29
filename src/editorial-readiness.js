@@ -25,5 +25,6 @@ export function assessStudioReadiness(story){
  add('rights','Rights and delivery',rights||!selected.length?'review':'recorded',`${rights} selected references lack recorded clearance. Private previews are not production exports or permission evidence.`,'publishing');
  if(draft.stale)add('revision','Source revision','needs_research','Resolve the changed source before saving further local edits.','overview');
  if(story.developmentDecision)add('decision','Recorded editorial decision',story.developmentDecision.decision==='needs_research'?'needs_research':'recorded',`${story.developmentDecision.decision}: ${story.developmentDecision.reason}. This does not grant publication approval.`,'overview');
- return {status:checks.some(c=>c.status==='needs_research')?'needs_research':'ready_for_editorial_review',checks,automatedBasis:'text_records_and_decoded_private_files',tasteAssessed:false,factsVerified:false,publicationApproved:false,rightsGranted:false};
+ const founderPass=story.developmentDecision?.reviewer==='founder'&&story.developmentDecision.basis==='editorial_taste'&&story.developmentDecision.decision==='rejected';
+ return {status:founderPass?'editorial_pass':checks.some(c=>c.status==='needs_research')?'needs_research':'ready_for_editorial_review',checks,automatedBasis:'text_records_and_decoded_private_files',tasteAssessed:false,factsVerified:false,publicationApproved:false,rightsGranted:false};
 }

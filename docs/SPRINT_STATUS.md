@@ -1,3 +1,11 @@
+# Taste sprint: comparative selection before drafting — 2026-10-29
+
+One research call now requests two compact contrasting leads (at most3 if evidence/output budget permits), one persisted candidate/draft maximum. Cases explain cultural payoff, specific visual detail, image/story/preset connections, familiarity risk, claim indices and reasoned preference/hold/pass. Gate distinguishes model proposals from source-caption correspondence and human taste; age, fame, archive prestige and valid URLs cannot substitute. Eligible leads respect reasoned preference, then recent-territory diversity. Briefs retain their requested subject. Budget remains3500/1800 output tokens,2 research tools,30000 input chars and240s.
+
+Native40-node worker saved INACTIVE after version-checked backup/readback. Existing native preset/brand/history readers retained; no generation. Offline prompt with founder feedback fits21079chars under30k. Recorded replay:2254 generic hook hold; manually reframed mirrored-camera case provisionally advance on captured sources;2258 puzzle hold without feedback and founder-taste reject with it. Curated public-reference scenarios are explicitly conditional fixtures, not new verified stories. See scripts/replay-editorial-taste.mjs/private output. Next finish browser/import/feedback verification; originals and working versions remain preserved.
+
+---
+
 # Taste sprint: explicit founder feedback and request context — 2026-10-29
 
 Recorded Wendy2258 as founder/editorial_taste rejection, explicitly not factual error/objective attractiveness. Original native candidate, corrected local version2, prior editor reviews and2254/version3 are intact. Typed review basis/reviewer now persist in the existing append-only job ledger. Recent founder taste feedback survives later source/editor reviews.
