@@ -25,3 +25,11 @@ test('an explicit weak-lead disposition is respected and reasoned preference pre
  const scene=scenario('An unfamiliar scene','fashion_subculture','patterned club clothing and makeup','Nightlife fashion connects participants across an underground scene.');const preferred=scenario('A particular music portrait','music_film_pop','camera reflection beside the performer','The reflected photographer documents a specific musical creative collaboration.');preferred.editorialCase.recommendation='preferred';preferred.editorialCase.comparison_reason='The reflected photographer makes the creative relationship more specific than the other proposed scene survey.';const picked=tools.select([scene,preferred],{recentTerritories:['music_film_pop']});assert.equal(picked.candidate.subject,preferred.subject);
  preferred.editorialCase.recommendation='hold';assert.equal(tools.select([preferred,scene]).candidate.subject,scene.subject);
 });
+
+test('flattering generic adjectives do not satisfy the specific visual-detail requirement',()=>{
+ const c=scenario('A celebrity portrait','music_film_pop','A beautiful compelling authentic vintage photograph','A film and fashion collaboration with recorded cultural context.');assert.equal(tools.assess(c).decision,'hold');
+});
+
+test('a recognizable name in a legitimate caption cannot masquerade as a specific visual detail',()=>{
+ const c=scenario('Mira Sol','music_film_pop','An iconic beautiful portrait of Mira Sol','A documented relationship between a film role and a designer.');const result=tools.assess(c,{phase:'sources',sources:[{claimIndex:0,access:'source_text_captured'}],photos:[{source_relation:'subject_caption_match',source_caption:'Mira Sol publicity portrait'}]});assert.equal(result.decision,'hold');assert.ok(result.reasons.some(r=>r.code==='VISUAL_DETAIL_NOT_SPECIFIC'));
+});

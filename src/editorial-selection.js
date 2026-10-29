@@ -2,7 +2,7 @@
 export function editorialSelectionTools(){
  const clean=v=>typeof v==='string'?v.trim():'';
  const normal=v=>clean(v).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
- const words=v=>new Set(normal(v).split(' ').filter(w=>w.length>=4&&!['photograph','photography','portrait','image','photo','source','archive','beautiful','strong','visually','iconic','subject','cultural','story','original','about','with','from','this','that','their','there','which'].includes(w)));
+ const words=v=>new Set(normal(v).split(' ').filter(w=>w.length>=4&&!['photograph','photography','portrait','image','photo','source','archive','beautiful','strong','visually','iconic','authentic','remarkable','compelling','unusual','interesting','nostalgic','nostalgia','vintage','historic','historical','fascinating','striking','famous','celebrity','recognizable','forgotten','rare','exceptional','visual','subject','cultural','story','original','about','with','from','this','that','their','there','which'].includes(w)));
  const meaningful=v=>words(v).size>1;
  const caseOf=c=>c.editorialCase||c.editorial_case||{};
  function assess(c,{phase='research',feedback=[],photos=[],sources=[]}={}){
@@ -14,6 +14,9 @@ export function editorialSelectionTools(){
   const text=[c.subject,c.hook_fact,c.why_interesting,c.visual?.notes].filter(Boolean).join(' ');
   const puzzle=ec.primary_appeal==='identification_puzzle'||/mystery photo|identification (?:puzzle|story)|unidentified.{0,70}(?:actress|face|portrait)|recognition and misrecognition/i.test(text);
   const fields=['cultural_payoff','visual_detail','image_story_connection','preset_connection','familiarity_risk'];
+  const nameContext=words([c.subject,c.visual?.creator,...photos.map(p=>p.creator)].filter(Boolean).join(' '));
+  const visualWords=new Set([...words(ec.visual_detail)].filter(word=>!nameContext.has(word)));
+  if(visualWords.size<2)add('VISUAL_DETAIL_NOT_SPECIFIC','A subject name, creator credit and flattering adjectives are not a visual detail. Describe the actual composition, gesture, styling or material.');
   const missing=fields.filter(key=>!meaningful(ec[key]));if(missing.length)add('EDITORIAL_CASE_INCOMPLETE','Supply a specific cultural payoff, visual detail, image/story connection, preset fit and familiarity check; adjectives or an archive name are insufficient.');
   const indices=Array.isArray(ec.supporting_claim_indices)?[...new Set(ec.supporting_claim_indices)].filter(i=>Number.isInteger(i)&&i>=0&&i<(c.claims||[]).length):[];
   if(!indices.length)add('UNANCHORED_CULTURAL_CASE','The cultural payoff must cite actual claim indices, not an invented dramatic explanation.');
@@ -22,7 +25,7 @@ export function editorialSelectionTools(){
   let visualSupport='not_checked';
   if(phase==='sources'){
    if(indices.some(i=>!sources.some(s=>s.claimIndex===i&&s.access==='source_text_captured')))add('CULTURAL_SOURCE_SUPPORT_OPEN','A source passage for the claims carrying the editorial case is unavailable.');
-   const related=photos.filter(p=>(p.source_relation||p.relation)==='subject_caption_match');const detail=words(ec.visual_detail);
+   const related=photos.filter(p=>(p.source_relation||p.relation)==='subject_caption_match');const detail=visualWords;
    const matching=related.some(p=>{const caption=words((p.source_caption||p.caption||'').replace(/©[\s\S]*$/,''));return [...detail].filter(w=>caption.has(w)).length>=2;});
    visualSupport=matching?'caption_detail_correspondence':'not_established';
    if(!matching)add('VISUAL_CASE_UNSUPPORTED','Source captions do not yet substantiate the proposed visual detail. A valid URL, recognized institution or self-described beautiful portrait cannot establish visual strength.');

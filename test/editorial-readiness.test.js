@@ -7,3 +7,7 @@ test('single image with unresolved claims stays in research; optional silence an
  const result=assessStudioReadiness(story);assert.equal(result.status,'needs_research');assert.equal(result.checks.find(c=>c.id==='format').status,'recorded');assert.equal(result.checks.find(c=>c.id==='sound').status,'recorded');assert.equal(result.checks.find(c=>c.id==='rights').status,'review');assert.equal(result.publicationApproved,false);
  story.selectedAssetIds.push('missing');assert.equal(assessStudioReadiness(story).checks.find(c=>c.id==='format').status,'needs_research');
 });
+
+test('a founder taste rejection is a selection outcome and does not become a factual or photographic error',()=>{
+ const story={format:'single_image',targetSlideCount:1,caption:'A carefully attributed working caption.',selectedAssetIds:['photo'],media:[{id:'photo',sourceRelation:'subject_caption_match'}],research:[{claim:'A supported claim',url:'https://example.org',capturedAccess:'source_text_captured'}],developmentDecision:{decision:'rejected',reviewer:'founder',basis:'editorial_taste',reason:'Insufficient cultural and visual payoff.'}};const result=assessStudioReadiness(story);assert.equal(result.status,'not_selected_on_editorial_taste');assert.equal(result.factsVerified,false);assert.equal(result.tasteAssessed,false);assert.equal(story.research[0].capturedAccess,'source_text_captured');
+});

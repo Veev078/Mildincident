@@ -331,6 +331,10 @@ try {
   checks.push('Studio queues a correlated development job while disabled generation cannot start or spend credits');
   const queued=engineFixture.jobs[0];queued.status='ready_to_review';queued.execution_id='2500';
   const fixtureCandidate={id:'DEV-'+queued.job_id+'-1',jobId:queued.job_id,status:'ready_to_review',story:{title:'Synthetic generated development candidate — fixture only',subject:'Fixture photography',hook:'A fixture-only cultural connection'},captionDraft:'Synthetic candidate caption, not researched content.',carouselOutline:'Opening / context / payoff',claims:[{claim:'A labeled fixture claim',claim_type:'hypothesis',source_name:'Fixture source',source_url:'https://example.org/source'}],media:[{asset_id:'dev-photo-1',title:'Synthetic fixture photograph',source_page_url:'https://example.org/source',thumb_url:'https://example.org/thumb/fixture.jpg',provider:'synthetic_fixture'}],gaps:['Synthetic fixture only; no live generation'],musicGap:'Not verified',provenance:{kind:research.get(queued.job_id).kind,executionId:'2500',generatedAt:new Date().toISOString()}};
+  fixtureCandidate.editorialSelection={decision:'hold',basis:'source_text_and_caption_correspondence',visualSupport:'not_established',reasons:[{code:'VISUAL_CASE_UNSUPPORTED',message:'Fixture visual case needs source-caption evidence.'}]};
+  fixtureCandidate.editorialCase={cultural_payoff:'Synthetic cultural proposal, not a real researched story.',visual_detail:'Synthetic fixture composition for UI coverage only.',preset_connection:'Fixture native preset.'};
+  fixtureCandidate.leadComparison=[{subject:'Fixture institutional identification puzzle',territory:'wildcard',decision:'hold',selected:false,reasons:[{code:'IDENTIFICATION_WITHOUT_INDEPENDENT_PAYOFF',message:'Fixture identification alone is insufficient.'}]},{subject:fixtureCandidate.story.title,territory:'fixture-photography',decision:'hold',selected:true,reasons:[{code:'VISUAL_CASE_UNSUPPORTED',message:'Fixture visual case needs source-caption evidence.'}]}];
+  fixtureCandidate.selectionProvenance={territory:'wildcard',candidateTerritory:'fixture-photography',preset:'fixture-native-preset',considered:2};
   fixtureCandidate.sourceEvidence=[{claimIndex:0,url:'https://example.org/source',title:'Synthetic captured source',httpStatus:200,access:'source_text_captured',textExcerpt:'A labeled source-text fixture, not real editorial research.'}];
   fixtureCandidate.story.format='single_image';fixtureCandidate.proposedAssetIds=['dev-photo-1'];
   Object.assign(fixtureCandidate.media[0],{source_caption:'Synthetic fixture photograph, 1974.',credit_at_source:'Fixture generator',source_years:[1974],source_relation:'subject_caption_match',material_kind:'photograph_reference'});
@@ -344,6 +348,12 @@ try {
   await page.getByText('Read the recorded source excerpt',{exact:true}).click();
   await page.getByText('A labeled source-text fixture, not real editorial research.',{exact:true}).waitFor();
   checks.push('native captured-source packet opens in Studio research without another fetch or asserting human verification');
+  await page.getByRole('heading',{name:'Editorial selection reasoning',exact:true}).waitFor();
+  await page.getByText('Research leads compared · 2',{exact:true}).click();
+  assert.ok((await page.locator('.story-workspace').textContent()).includes('Fixture institutional identification puzzle'));
+  assert.ok((await page.locator('.story-workspace').textContent()).includes('not additional generated stories'));
+  checks.push('selection case and compared research leads retain preset provenance and explicit hold reasons without presenting new generated stories');
+
   await page.goto(`${origin}/#/story/${devStoryId}/caption`);
   await page.getByLabel('Local caption draft').fill('Edited fixture development caption using the normal Studio editor.');
   await page.waitForFunction(()=>document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));
@@ -371,6 +381,7 @@ try {
   await page.goto(`${origin}/#/story/${devStoryId}/overview`);
   const inlineReview=page.locator('[data-engine-review]');
   await inlineReview.getByLabel('Development editorial decision').selectOption('needs_research');
+  await inlineReview.getByLabel('Decision basis',{exact:true}).selectOption('editorial_taste');
   await inlineReview.getByLabel('Decision reason').fill('Keep the original research, refine the documented angle.');
   await inlineReview.getByRole('button',{name:'Save development decision'}).click();
   await page.getByText('Keep the original research, refine the documented angle.',{exact:false}).first().waitFor();
@@ -380,6 +391,7 @@ try {
   await page.waitForFunction(()=>document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));
   assert.ok(drafts.get(devStoryId).version>savedVersion);
   assert.equal(JSON.parse(engineFixture.candidates[0].candidate_json).captionDraft,fixtureCandidate.captionDraft);
+  assert.equal(research.engineJob(queued.job_id).reviewDecisions[fixtureCandidate.id].basis,'editorial_taste');
   checks.push('inline editorial feedback retains native research and local revisions without a false stale-source conflict');
 
   checks.push('correlated development results open and save in existing Studio tools with clear provenance and local approval, without inserting production records');
