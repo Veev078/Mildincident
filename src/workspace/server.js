@@ -6,7 +6,6 @@ import { WorkspaceSource } from './data-source.js';
 import { LocalDraftStore } from './store.js';
 import { HandoffError, requireThat } from '../errors.js';
 import { LocalPreviewStore, attachLocalPreviews, MAX_PREVIEW_BYTES } from './previews.js';
-import { analyzeImageCuration } from '../image-curation.js';
 
 const WEB_ROOT = fileURLToPath(new URL('../../web/', import.meta.url));
 const CONTENT_TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
@@ -45,7 +44,6 @@ async function imageBody(request) {
 export function createWorkspaceServer({ source, drafts, previews, webRoot = WEB_ROOT }) {
   const view = () => {
     const workspace = attachLocalPreviews(source.view(drafts.all()), previews);
-    for (const story of workspace.stories) story.imageCuration = analyzeImageCuration({ ...story, creativeBrief: story.localDraft?.creativeBrief }, { selectedAssetIds: story.localDraft?.selectedAssetIds || story.selectedAssetIds });
     return workspace;
   };
   return http.createServer(async (request, response) => {
@@ -66,10 +64,6 @@ export function createWorkspaceServer({ source, drafts, previews, webRoot = WEB_
       }
       if (url.pathname === '/api/health' && request.method === 'GET') {
         json(response, 200, { status: 'ok', mode: 'local_editorial_workspace', productionMutationsEnabled: false, sourceAvailable: Boolean(source.snapshot), refreshing: Boolean(source.inflight) }); return;
-      }
-      if (url.pathname === '/shared/image-curation.js' && ['GET', 'HEAD'].includes(request.method)) {
-        const bytes = await fs.readFile(new URL('../image-curation.js', import.meta.url));
-        response.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8' }); response.end(request.method === 'HEAD' ? undefined : bytes); return;
       }
       if (url.pathname === '/api/workspace' && request.method === 'GET') { json(response, 200, view()); return; }
       if (url.pathname === '/api/refresh' && request.method === 'POST') {
