@@ -19,3 +19,13 @@ Verification:104 automated tests and18 Chromium workflows pass. Browser upload t
 5. Open http://127.0.0.1:4174/ and hard-refresh (Ctrl+F5). Keep the old folder as rollback. Never copy credentials or private state into GitHub.
 
 Next: review and test the existing n8n qualification contracts before any versioned patch; then connect bounded discovery to the existing intake/research pipeline. Autonomous discovery, on-demand requests, vision analysis and scheduled loops are not implemented by this increment. Ongoing scheduling/cost approval is still required.
+
+## Prepared n8n guard increment
+
+`src/n8n/photo-url-guard.js` prepares a guarded edit of the **existing** `Broaden — Qualify Cross-Source Preview Leads` node. It rejects private/numeric host references and credential/signature query parameters before they become browser preview records. This is URL syntax screening, not DNS validation or availability verification. Existing metadata ranking, output fields, seven-lead cap and per-story query limits remain unchanged. It adds no downloader, external call or second sourcing engine.
+
+The captured existing node code was executed locally with synthetic Brave results: a legitimate archive candidate passes; a172.16 address and a credential-bearing URL do not. Two regression tests cover the self-contained n8n helper, code/version drift, mapping preservation and no input mutation. Final totals: **106 automated tests,18 Chromium workflows**, syntax checks pass. Actual-snapshot Chromium also opens the updated candidate/upload dialog across18 source stories, with no JS errors or actual draft writes.
+
+**Not applied or activated.** Saved workflow version `83023876-09a8-49af-97b1-326fb04f2678` differs from active version `75efdc48-8cdf-467d-983a-fc164524867d`. Do not publish the full saved workflow and accidentally activate unrelated pending changes. Proposed full workflow and version/hash review are private in `.local/photography-review/sourcing-proposed.json` and `guard-review.json`. Before deployment, review callers, derive the exact minimal patch from the chosen active version, capture a fresh rollback export, confirm current hashes, and test on an isolated version. Existing user authorization permits safe non-destructive changes once those checks are complete; no new approval is inferred merely from this drift.
+
+No autonomous recurring jobs, AI charges, Buffer creates or live edits were enabled. Next priority is the active-version sourcing contract, followed by a bounded manual discovery-to-review run in the existing research/intake workflow; recurring activation remains separately approval-gated.

@@ -1,3 +1,9 @@
+# Photography/n8n guard checkpoint — 2026-10-29
+
+Branch `development/photography-review-20261029`; UI increment `e28ad88` pushed. Final checks:106 tests,18 browser workflows, syntax and actual18-story snapshot dialog smoke pass. Private preview upload, reload, rights-preserving source overlay, explicit external preview failure/retry and blue-white design shipped.
+
+Prepared existing-node n8n guard patch, tested captured code with isolated synthetic results. No live modification: saved83023876 differs from active75efdc48, so publishing the saved workflow would risk unrelated changes. Private backup/proposal and review in `.local/photography-review/`; source helper/tests are tracked. Next inspect callers and derive a minimal active-version patch before deployment, then bounded discovery using existing intake/research—not a second backend. Full report and Windows ZIP preservation steps: PHOTOGRAPHY_REVIEW.md. No scheduling, publishing, workflow activation, environment publication or actual editorial writes occurred.
+
 # Photography review increment — 2026-10-29
 
 New branch `development/photography-review-20261029` from verified staging532a199. Private-preview upload UI now uses preserved backend; relative hashed previews render; load/failure/retry states and blue-white tokens implemented.104 tests/18 browser workflows pass. Live sourcing workflow backed up read-only (165nodes); no production mutations. See PHOTOGRAPHY_REVIEW.md for Windows update/preservation steps and remaining discovery work. This supersedes the earlier instruction to pause major development; user has now reviewed the Windows app and authorized development.
