@@ -1,3 +1,11 @@
+# Completion sprint: unified evidence readiness — 2026-10-29
+
+Added Studio editorial review desk covering angle, captured/blocked claims, image relevance/decoding, working format, caption, optional sound, rights and recorded decisions. No objective taste score or automatic approval. Asset inspection distinguishes decoded source copies/private uploads, uninspected references, unavailable previews, unrelated covers and context documents. Local saves refresh readiness immediately.
+
+15 focused checks and30 browser workflows pass. Actual19-story smoke confirms first story stays needs_research, selected1974 photo is a decoded source copy with identity/rights unverified, original version3/caption/selection/sound retained, worker inactive. No paid generation. Next increment: inline existing editorial decision and keep local decision changes separate from source revision identity.
+
+---
+
 # Verified resume checkpoint — 2026-10-29
 
 Four completed increments from ea1ebf0: recovered discovery routing (370eed3), bounded source passages/Studio excerpts (b614fc6), figure/lazy-photo extraction with stable references (6bab8b7), then durable on-demand receipts/reconciliation. Receipt validation binds job/execution/scope/status, bounds JSON, preserves acknowledged runs across read outages, blocks redispatch via durable identity even if a stale state says queued, and never discards imported stories/decisions after incomplete reads. UI distinguishes generated results and pending reconciliation. Actual2254 response contract verified offline.

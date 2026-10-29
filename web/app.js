@@ -160,6 +160,7 @@ async function flushDraft(id) {
       if (result.musicRecommendations) current.musicRecommendations = result.musicRecommendations;
       if (result.editorialDirection) current.editorialDirection = result.editorialDirection;
       if (result.editorialAudit) { current.editorialAudit=result.editorialAudit;const notice=document.querySelector('[data-editorial-audit]');if(notice&&route().id===id)notice.innerHTML=views.editorialAuditNotice(current); }
+      if (result.readiness) {current.readiness=result.readiness;const panel=document.querySelector('[data-readiness-panel]');if(panel&&route().id===id)panel.innerHTML=views.readinessPanel(current);}
       if (result.sourceSequencePlan) current.sourceSequencePlan=result.sourceSequencePlan;
       const sequenceIssues = document.querySelector('[data-direction-sequence-issues]');
       if (sequenceIssues && route().id === id) sequenceIssues.innerHTML = directionSequenceObservations(current);
