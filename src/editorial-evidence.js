@@ -82,14 +82,24 @@ export function captureEditorialEvidence(execution,{workerId,jobId,requestHash,c
   return {executionId:String(execution.id),capturedAt,sources,images,additionalMedia,selectionProposal,usage:{models,inputTokens:complete?measured.reduce((n,m)=>n+m.inputTokens,0):null,outputTokens:complete?measured.reduce((n,m)=>n+m.outputTokens,0):null,price:null,priceVerified:false},fingerprint:digest(JSON.stringify({executionId:execution.id,sourceHashes:sources.map(s=>s.contentHash),images,selectionProposal}))};
 }
 
+/** Source-independent writing checks; review signals, not an automatic author-quality score. */
+export function captionReviewSignals(caption) {
+  const text=String(caption||'');const issues=[];
+  if(/for (?:a |the )?(?:younger|wider|modern) audience|the appeal is|target audience/i.test(text))issues.push({code:'AUDIENCE_PITCH_IN_CAPTION',message:'Move audience-positioning language out of the finished caption.'});
+  if(!text.trim())issues.push({code:'MISSING_CAPTION',message:'A sourced working caption is still needed.'});
+  if([...text].length>2200)issues.push({code:'CAPTION_TOO_LONG',message:'The working caption exceeds the Instagram text limit.'});
+  return issues;
+}
+
 export function assessEditorialPackage(candidate,evidence) {
-  const issues=[];const caption=candidate.captionDraft||'';
-  if(/for (?:a |the )?(?:younger|wider|modern) audience|the appeal is|target audience/i.test(caption))issues.push({code:'AUDIENCE_PITCH_IN_CAPTION',message:'Move audience-positioning language out of the finished caption.'});
+  const caption=candidate.captionDraft||'';const issues=captionReviewSignals(caption);
   const unconfirmed=candidate.claims.filter(c=>c.linkStatus!=='live');if(unconfirmed.length)issues.push({code:'UNCONFIRMED_CLAIM_SOURCES',message:`${unconfirmed.length} claim source${unconfirmed.length===1?' is':'s are'} not accessible enough to substantiate here.`});
-  const scoped=(evidence?.images||[]).filter(m=>evidence.selectionProposal.assetIds.includes(m.assetId));
+  const imageEvidence=evidence?.images||candidate.media.map(m=>({assetId:m.id,relation:m.sourceRelation,dateContext:m.dateContext,years:m.sourceYears||[]}));
+  const proposedIds=evidence?.selectionProposal.assetIds||candidate.proposedAssetIds||[];
+  const scoped=imageEvidence.filter(m=>proposedIds.includes(m.assetId));
   if(scoped.some(m=>m.dateContext==='different_year_context'&&!m.years.every(year=>new RegExp('\\b'+year+'\\b').test(caption))))issues.push({code:'PHOTO_DATE_CONTEXT',message:'The proposed photograph is dated differently from the story subject. State the actual date; do not imply a film still or on-set photograph.'});
   if(scoped.some(m=>m.relation==='page_cover'))issues.push({code:'GENERIC_SOURCE_COVER',message:'A source-page cover is not automatically a suitable story image.'});
-  const proposed=evidence?.selectionProposal.assetIds.length||0;const target=candidate.format==='single_image'?1:candidate.targetSlideCount||5;
+  const proposed=proposedIds.length;const target=candidate.format==='single_image'?1:candidate.targetSlideCount||5;
   if(proposed<target)issues.push({code:'INSUFFICIENT_RELATED_PHOTOGRAPHY',message:`Only ${proposed} existing image reference${proposed===1?' matches':'s match'} the subject through source captions; ${target} would be needed for the proposed format.`});
   return {status:issues.length?'needs_research':'ready_for_human_review',issues,factsVerifiedByHuman:false,rightsGranted:false,pixelAnalysisPerformed:false,assessmentBasis:'recorded_text_and_metadata_checks',accessibleSourceCount:evidence?.sources.filter(s=>s.access==='source_text_captured').length??null};
 }

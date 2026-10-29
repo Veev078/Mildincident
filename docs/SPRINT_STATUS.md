@@ -1,3 +1,11 @@
+# Source-aware producer increment — 2026-10-29
+
+Saved tested 40-node source-aware graph to existing INACTIVE development worker (saved version f9c1f169-4b6e-4640-87d8-dd451424de33). Captured image captions/dates now precede drafting; generic covers cannot unlock a draft. Audience-pitch and chronology gates retain rejected paid copy and photos for revision. Full native response retention preserves future usage/tool evidence. Native metadata reaches Studio without a second evidence fetch.
+
+21 focused tests + syntax pass. Offline replay of actual2254 recovers one1974 Boulat photograph and two1967 costume documents, selects only the photograph for single_image, preserves original copy, correctly flags the audience/date problems. No new provider call; worker never activated. Backup/readback/replay under ignored `.local/engine-build/`. Next: versioned local title/format controls, evidence-led sequence planning and soundtrack intent. The single paid allowance remains CONSUMED.
+
+---
+
 # Evidence/photography recovery checkpoint — 2026-10-29
 
 Second increment: captured-source/usage inspection, full caption/credit/date metadata, source-variant grouping, supplemental museum image references, single-image preservation and no automatic gallery padding. Original AI result remains in n8n. Working local caption now uses the1974 mirror photograph with correct chronology and no audience-pitch copy. Decision remains needs_research (two503 sources/rights gap), not publication approval.
