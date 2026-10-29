@@ -1,0 +1,11 @@
+# Active-version photography integration — 2026-10-29
+
+Current snapshots fetched privately in `.local/engine-build/`: sourcing active75efdc48 vs saved83023876; nodes and connections compare equal in the captured sourcing graph. The research workflow has29 active nodes and16 saved-node differences, so its saved version must not be published as a shortcut.
+
+`buildPhotoReviewSandbox` derives the URL guard from the **active** sourcing graph, never the saved graph. Generated sandbox contains exactly one manual trigger and five Code nodes, no credentials, HTTP, AI, database nodes or schedules. It replays at most seven existing Brave photo references and preserves the existing qualifier's schema. Generated JSON includes private editorial metadata and is not committed.
+
+Local isolated replay using actual cached source records accepted seven reference leads from one existing story. This validates recorded metadata compatibility, not network reachability, pixels, rights or live n8n execution. Missing dimensions/original references remain explicit qualification gaps; no values are invented.
+
+Automatic approval review rejected creating the inactive workflow through n8n's API, including after supplying the newer authorization and local safety evidence. No workflow was created, activated or modified. Private generated workflow: `.local/engine-build/sourcing-sandbox.json`; review: `sourcing-sandbox-review.json`. Source-code builder and regression test are committed so these can be regenerated. The persistent create action needs explicit confirmation accepted by approval review before a live engine smoke is possible. Do not bypass it through an indirect endpoint.
+
+The existing research engine already has login-protected `Submit Idea Form` (`submit-idea`) and `Start Editorial Discovery — Founder` (`mildincident-start-editorial-discovery`) forms. Its active prompt limits ordinary batches to two research calls, one candidate per territory, two tool calls per research call. Drafting adds calls; actual prices and total execution cost are not available here. No extra or recurring runs were started. Studio should reuse these forms and refresh persisted story records, with no false claim that opening a form proves submission/completion.

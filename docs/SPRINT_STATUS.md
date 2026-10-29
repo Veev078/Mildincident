@@ -1,3 +1,7 @@
+# Active sourcing integration checkpoint — 2026-10-29
+
+Prepared six-node manual-only sandbox from the captured ACTIVE sourcing workflow; isolated actualmetadata replay returned7 qualified references. Code/tests in photo-review-sandbox; private artifact in `.local/engine-build/`. Live creation rejected twice by automatic approval review; no n8n mutations. See N8N_ACTIVE_REVIEW.md. Continue with Studio discovery/creative handoff using verified existing authenticated research forms; current source refresh is read-only.
+
 # Photography/n8n guard checkpoint — 2026-10-29
 
 Branch `development/photography-review-20261029`; UI increment `e28ad88` pushed. Final checks:106 tests,18 browser workflows, syntax and actual18-story snapshot dialog smoke pass. Private preview upload, reload, rights-preserving source overlay, explicit external preview failure/retry and blue-white design shipped.
