@@ -1,3 +1,13 @@
+# Development generation worker checkpoint — 2026-10-29
+
+Created inactive development worker6CkqfYc4Pyd4k8vi (36nodes) from captured ACTIVE research+sourcing graphs. All writes target new development jobs/candidate tables; no production writer, schedule, subworkflow call or automatic model retry. Caps:1 research call (3500 output tokens,2 tool calls), at most1 draft (1800 output tokens),1 candidate and bounded first-party HTML preview inspection. Clone retains source prompts/brand readers/duplicate gates and human-verification gaps. No newly generated discovery exists yet.
+
+Live concurrency test on development table: four authenticated calls → exactlyone queued-job claim (execution2252), three no-ops; zero AI calls. Authenticated replay execution2249 succeeded with7 references; sandbox remains inactive, production versions unchanged.
+
+Automatic approval review blocked activating/running the AI worker due to unspecified model context/provider destination and unknown spend. The worker was saved INACTIVE only; generationEnabled=false in private server connection. No AI payload sent or charge incurred. Continue with durable job service, authenticated server-to-server client, result validation and Studio integration without paid calls. Final live generation will need a precise approved payload/spend boundary. Native replay/lease-check development endpoints are active and authenticated, with no schedule or AI.
+
+---
+
 # Approved n8n engine integration — 2026-10-29
 
 User explicitly approved inactive sandbox, supporting development endpoints/connections/schemas and bounded tests. Created inactive sandbox3GKf8xnHA6JmnAJP. Created independent header-auth development replay runnerqyoKwV3QFLhqA4Qj; it is active with no schedule/AI/database/publishing nodes. n8n requires referenced subworkflows to be published, so runner inlines the sandbox's five Code nodes while the sandbox stays inactive. Actual engine execution2249 succeeded with7 references; unauthenticated request403. Production sourcing saved/active versions unchanged on read-back.
