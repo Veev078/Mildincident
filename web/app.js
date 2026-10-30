@@ -161,6 +161,7 @@ async function flushDraft(id) {
       if (result.editorialDirection) current.editorialDirection = result.editorialDirection;
       if (result.editorialAudit) { current.editorialAudit=result.editorialAudit;const notice=document.querySelector('[data-editorial-audit]');if(notice&&route().id===id)notice.innerHTML=views.editorialAuditNotice(current); }
       if (result.readiness) {current.readiness=result.readiness;const panel=document.querySelector('[data-readiness-panel]');if(panel&&route().id===id)panel.innerHTML=views.readinessPanel(current);}
+      if(result.productionDecisions)current.productionDecisions=result.productionDecisions;
       if(result.productionPreparation){current.productionPreparation=result.productionPreparation;const panel=document.querySelector('[data-production-visibility]');if(panel&&route().id===id)panel.innerHTML=views.productionVisibility(current);}
       if (result.sourceSequencePlan) current.sourceSequencePlan=result.sourceSequencePlan;
       const sequenceIssues = document.querySelector('[data-direction-sequence-issues]');
@@ -297,11 +298,18 @@ async function rebaseDraft(story) {
   } catch (error) { toast(error.message, { error: true }); }
 }
 
+async function checkNativePacket(story){
+ if(!story)return;
+ if((pending.has(story.id)||saving.has(story.id))&&!story.localDraft?.stale)await flushDraft(story.id);
+ if(pending.has(story.id)||saving.has(story.id)){toast('Save pending edits before checking the native packet.',{error:true});return;}
+ try{const packet=await api(`/api/stories/${encodeURIComponent(story.id)}/production-packet`);const result=await api(`/api/stories/${encodeURIComponent(story.id)}/production-packet/check`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({packet})});const output=route().id===story.id?document.querySelector('[data-native-import-result]'):null;if(output)output.textContent=result.accepted?'Eligible for disposable development proof only. Production import remains disabled.':'Native import blocked: '+result.issues.map(i=>i.message).join(' ');}catch(error){toast(error.message,{error:true});}
+}
+
 async function downloadProductionPacket(story){
  if(!story)return;
  if((pending.has(story.id)||saving.has(story.id))&&!story.localDraft?.stale)await flushDraft(story.id);
  if(pending.has(story.id)||saving.has(story.id)){toast('Save or export your pending edits before preparing the production review packet.',{error:true});return;}
- try{const packet=await api(`/api/stories/${encodeURIComponent(story.id)}/production-packet`);const url=URL.createObjectURL(new Blob([JSON.stringify(packet,null,2)],{type:'application/json'}));const anchor=document.createElement('a');anchor.href=url;anchor.download=`${story.id}-production-review.json`;document.body.append(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Production review packet downloaded. Existing production records are unchanged.');}catch(error){toast(error.message,{error:true});}
+ try{const packet=await api(`/api/stories/${encodeURIComponent(story.id)}/production-packet`);const url=URL.createObjectURL(new Blob([JSON.stringify(packet,null,2)],{type:'application/json'}));const anchor=document.createElement('a');anchor.href=url;anchor.download=`${story.id}-production-review.json`;document.body.append(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Validated review packet downloaded with its import blockers. Production import remains disabled.');}catch(error){toast(error.message,{error:true});}
 }
 
 async function downloadProposal(story) {
@@ -337,6 +345,7 @@ document.addEventListener('click', event => {
   const button = event.target.closest('[data-action]');
   if (!button || button.disabled) return;
   const action = button.dataset.action;
+  if(action==='check-native-packet'){checkNativePacket(storyById(button.dataset.story));return;}
   const story = storyById(button.dataset.story);
   switch (action) {
     case 'retry-preview': {

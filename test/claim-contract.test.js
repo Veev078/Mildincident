@@ -1,14 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { acquirePackageClaim, transitionPackageClaim } from '../src/n8n/claim-contract.js';
+import { acquirePackageClaim, transitionPackageClaim, retainPackageCandidate } from '../src/n8n/claim-contract.js';
 
 // Exercise equivalent conditional UPDATE ... RETURNING semantics on an actual SQL engine.
 // This proves the protocol, not the version/engine in the remote n8n Cloud deployment.
 function fixture(t) {
   const db = new DatabaseSync(':memory:');
   t.after(() => db.close());
-  db.exec(`CREATE TABLE packages(id INTEGER PRIMARY KEY, concept_id TEXT, production_version INTEGER,
+  db.exec(`CREATE TABLE imports(import_key TEXT PRIMARY KEY, concept_id TEXT, package_version INTEGER, state TEXT, buffer_id TEXT, details TEXT);
+    CREATE TABLE packages(id INTEGER PRIMARY KEY, concept_id TEXT, production_version INTEGER,
     buffer_claim_state TEXT, buffer_claim_owner TEXT, buffer_claim_digest TEXT);
     INSERT INTO packages VALUES (1, 'existing-story', 4, 'idle', '', '');`);
   const repository = { atomicConditionalUpdate: true, async updateMatching(update) {
@@ -19,6 +20,8 @@ function fixture(t) {
     return db.prepare(`UPDATE packages SET ${pairs.map(([key]) => `${key} = ?`).join(', ')} WHERE ${filters.map(f => `${f.keyName} = ?`).join(' AND ')} RETURNING *`)
       .all(...pairs.map(([, value]) => value), ...filters.map(f => f.keyValue));
   } };
+  repository.persistCandidate=async input=>{const current=db.prepare('SELECT * FROM packages WHERE id=?').get(input.packageRowId);if(current.buffer_claim_owner!==input.owner||current.buffer_claim_digest!==input.digest||!['create_started','needs_reconciliation'].includes(current.buffer_claim_state))throw new Error('CANDIDATE_OWNER_CONFLICT');db.prepare('INSERT INTO imports VALUES(?,?,?,?,?,?) ON CONFLICT(import_key) DO NOTHING').run(input.owner,input.conceptId,input.packageVersion,'review_needed',input.candidatePostId,input.digest);};
+  repository.readCandidate=async input=>{const row=db.prepare('SELECT * FROM imports WHERE import_key=?').get(input.owner);return row?{recordId:row.import_key,owner:row.import_key,conceptId:row.concept_id,packageVersion:row.package_version,digest:row.details,candidatePostId:row.buffer_id}:null;};
   const input = { packageRowId: 1, conceptId: 'existing-story', packageVersion: 4, owner: 'execution-owner-A', digest: 'a'.repeat(64) };
   return { db, repository, input };
 }
@@ -57,7 +60,7 @@ test('create-started and uncertain claims cannot expire/reset or be released by 
   await assert.rejects(transitionPackageClaim(repository, { ...input, state: 'needs_reconciliation' }, 'idle'), /UNSAFE_CLAIM_TRANSITION/);
   await assert.rejects(acquirePackageClaim(repository, { ...input, owner: 'execution-owner-B' }), /CLAIM_NOT_ACQUIRED/);
   const candidate = { ...input, state: 'needs_reconciliation', candidatePostId: '0123456789abcdef01234567' };
-  await transitionPackageClaim(repository, candidate, 'confirmed_draft', readback(candidate));
+  await retainPackageCandidate(repository,candidate);await transitionPackageClaim(repository, candidate, 'confirmed_draft', readback(candidate));
 });
 
 test('claim protocol refuses repositories with unverified atomic update behavior', async () => {
@@ -95,7 +98,7 @@ test('confirmation cannot be obtained from a flag, mismatched/stale scope, sched
   ];
   for (const invalid of bad) await assert.rejects(transitionPackageClaim(repository, candidate, 'confirmed_draft', invalid), /CLAIM_EVIDENCE|READBACK_PROOF/);
   assert.equal(db.prepare('SELECT buffer_claim_state FROM packages').get().buffer_claim_state, 'create_started');
-  await transitionPackageClaim(repository, candidate, 'confirmed_draft', evidence);
+  await retainPackageCandidate(repository,candidate);await transitionPackageClaim(repository, candidate, 'confirmed_draft', evidence);
   assert.equal(db.prepare('SELECT buffer_claim_state FROM packages').get().buffer_claim_state, 'confirmed_draft');
 });
 
@@ -119,4 +122,16 @@ test('claim inputs reject coercible, oversized and accessor values before reposi
   ];
   for (const invalid of cases) await assert.rejects(acquirePackageClaim(repository, invalid), /INVALID_CLAIM_INPUT/);
   assert.equal((await acquirePackageClaim(repository, input)).buffer_claim_state, 'reserved');
+});
+
+test('manual, guarded and coordinator contenders share one reservation even across package revisions',async t=>{
+ const {repository,input,db}=fixture(t);const paths=['manual-import-path','guarded-handoff-path','release-coordinator-path'];const results=await Promise.allSettled(paths.map(owner=>acquirePackageClaim(repository,{...input,owner})));assert.equal(results.filter(r=>r.status==='fulfilled').length,1);db.exec('UPDATE packages SET production_version=5');await assert.rejects(acquirePackageClaim(repository,{...input,owner:'later-version-path',packageVersion:5}),/CLAIM_NOT_ACQUIRED/);
+});
+test('uncertain create retains its ID before readback, survives adapter restart and cannot confirm a different ID',async t=>{
+ const {repository,input,db}=fixture(t);await acquirePackageClaim(repository,input);await transitionPackageClaim(repository,{...input,state:'reserved'},'create_started',proof(input,'current_package'));const candidate={...input,state:'create_started',candidatePostId:'0123456789abcdef01234567'};
+ await assert.rejects(transitionPackageClaim(repository,candidate,'confirmed_draft',readback(candidate)),/CANDIDATE_NOT_DURABLY_RETAINED/);
+ await retainPackageCandidate(repository,candidate);assert.equal(db.prepare('SELECT buffer_id FROM imports').get().buffer_id,candidate.candidatePostId);await transitionPackageClaim(repository,candidate,'needs_reconciliation');
+ const restarted={...repository,readCandidate:async input=>{const row=db.prepare('SELECT * FROM imports WHERE import_key=?').get(input.owner);return {recordId:row.import_key,owner:row.import_key,conceptId:row.concept_id,packageVersion:row.package_version,digest:row.details,candidatePostId:row.buffer_id};}};
+ await assert.rejects(retainPackageCandidate(restarted,{...candidate,state:'needs_reconciliation',candidatePostId:'different-id'}),/CANDIDATE_NOT_DURABLY_RETAINED/);assert.equal(db.prepare('SELECT buffer_id FROM imports').get().buffer_id,candidate.candidatePostId);
+ await transitionPackageClaim(restarted,{...candidate,state:'needs_reconciliation'},'confirmed_draft',readback(candidate));assert.equal(db.prepare('SELECT buffer_claim_state FROM packages').get().buffer_claim_state,'confirmed_draft');
 });

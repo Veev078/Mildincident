@@ -88,12 +88,22 @@ export async function acquirePackageClaim(repository, input) {
   return rows[0];
 }
 
+// Existing handoff ledgers retain provider IDs; no candidate-ID column or parallel authority is proposed.
+function matchesCandidateRecord(row,input){return plainRecord(row)&&row.recordId&&row.conceptId===input.conceptId&&row.packageVersion===input.packageVersion&&row.owner===input.owner&&row.digest===input.digest&&row.candidatePostId===input.candidatePostId;}
+export async function retainPackageCandidate(repository,input){
+ validateClaim(input);if(!input.candidatePostId||!['create_started','needs_reconciliation'].includes(input.state))throw new Error('CANDIDATE_RETENTION_SCOPE_REQUIRED');
+ if(repository?.atomicConditionalUpdate!==true||typeof repository.persistCandidate!=='function'||typeof repository.readCandidate!=='function')throw new Error('DURABLE_CANDIDATE_ADAPTER_UNVERIFIED');
+ await repository.persistCandidate(input);const record=await repository.readCandidate(input);
+ if(!matchesCandidateRecord(record,input))throw new Error('CANDIDATE_NOT_DURABLY_RETAINED_DO_NOT_RETRY');return record;
+}
+
 export async function transitionPackageClaim(repository, input, nextState, evidence) {
   if (repository?.atomicConditionalUpdate !== true || typeof repository.updateMatching !== 'function') throw new Error('ATOMIC_CONDITIONAL_UPDATE_UNVERIFIED');
   validateClaim(input);
   const allowed = { reserved: ['create_started', 'idle'], create_started: ['confirmed_draft', 'needs_reconciliation'], needs_reconciliation: ['confirmed_draft'] };
   if (!Object.hasOwn(allowed, input.state) || !allowed[input.state].includes(nextState)) throw new Error('UNSAFE_CLAIM_TRANSITION');
   verifyTransitionEvidence(input, nextState, evidence);
+  if(nextState==='confirmed_draft'&&(typeof repository.readCandidate!=='function'||!matchesCandidateRecord(await repository.readCandidate(input),input)))throw new Error('CANDIDATE_NOT_DURABLY_RETAINED_DO_NOT_RETRY');
   const update = claimUpdate(input);
   // Version remains in the conditional UPDATE. A source edit cannot be silently
   // confirmed under the old claim; failure retains the existing claim for review.

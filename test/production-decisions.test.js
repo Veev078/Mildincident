@@ -1,0 +1,7 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {productionDecisions} from '../src/workspace/production-decisions.js';import {buildWorkspace} from '../src/workspace/model.js';import {workspaceSnapshot} from './helpers/workspace-fixture.js';
+test('permissions name the selected photographer without inferring reuse from metadata and preserve draft/sent decisions',()=>{
+ const s=workspaceSnapshot();s.records.media[0].license='Public domain metadata';let story=buildWorkspace(s).stories[0];let d=productionDecisions(story);assert.equal(d.find(x=>x.key==='permissions').evidence.length,2);assert.equal(d.find(x=>x.key==='permissions').evidence[0].creator,'Photographer');assert.match(d.find(x=>x.key==='handoff').title,/existing Buffer draft/);s.buffer.posts[0].status='sent';story=buildWorkspace(s).stories[0];d=productionDecisions(story);assert.match(d.find(x=>x.key==='handoff').title,/do not resend/);
+});
+test('uncurated stories separate selecting photographs, verifying claims and missing final copy',()=>{
+ const s=workspaceSnapshot();s.records.packages[0].slide_sequence_asset_ids='[]';const story=buildWorkspace(s).stories[0];const d=productionDecisions(story);assert.ok(d.some(x=>x.key==='sequence'));assert.ok(d.some(x=>x.key==='claims'));assert.ok(d.find(x=>x.key==='caption').detail.includes('no final caption'));assert.equal(d.find(x=>x.key==='claims').evidence[0].claim,'A stored claim, not newly verified');
+});

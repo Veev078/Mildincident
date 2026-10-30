@@ -103,7 +103,9 @@ try {
   await page.getByText('Recorded handoff history · 1',{exact:true}).click();
   assert.ok((await page.locator('[data-production-visibility]').textContent()).includes('Historical draft creation records'));
   const packetDownload=page.waitForEvent('download');await page.getByRole('link',{name:'Download production review packet ↗',exact:true}).click();
-  const downloadedPacket=await packetDownload;const packet=JSON.parse(await fs.readFile(await downloadedPacket.path(),'utf8'));assert.equal(packet.kind,'mildincident_editorial_to_production_review');assert.equal(packet.identity.conceptId,id);assert.equal(packet.productionApplied,false);assert.equal(packet.publicationApproved,false);assert.equal(packet.bufferCreateEnabled,false);
+  const downloadedPacket=await packetDownload;const packet=JSON.parse(await fs.readFile(await downloadedPacket.path(),'utf8'));assert.equal(packet.kind,'mildincident_editorial_to_production_review');assert.equal(packet.identity.conceptId,id);assert.equal(packet.productionApplied,false);assert.equal(packet.publicationApproved,false);assert.equal(packet.bufferCreateEnabled,false);assert.equal(packet.nativeImportCheck.accepted,false);
+  await page.getByRole('heading',{name:'Your next editorial decisions',exact:true}).waitFor();await page.getByRole('button',{name:'Check native import requirements',exact:true}).click();await page.locator('[data-native-import-result]').filter({hasText:'Native import blocked:'}).waitFor();
+  checks.push('saved review packet carries native validation and exposes photographer, fact-review and final-caption decisions without native writes');
   checks.push('Publishing joins exact native package and handoff history and downloads a blocked review packet without a provider write');
   await page.goto(`${origin}/#/pipeline`);
   await page.getByRole('searchbox', { name: 'Find a story', exact: true }).fill('nothing-matches-this');
