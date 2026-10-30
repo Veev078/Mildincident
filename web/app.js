@@ -1,5 +1,6 @@
 import { esc, date, human, storyUrl, effective, mediaFor, proposalContent } from './components.js';
 import * as views from './views.js';
+import {navigation,resolveRoute,destination,libraryNavigation} from './navigation.js';
 import { creativeBriefFor, emptyCreativeBrief, directionReviewSummary, directionSequenceObservations } from './direction.js';
 import {photoComparison,photographicBrief} from './photography.js';
 
@@ -11,7 +12,7 @@ const savePromises = new Map();
 const history = new Map();
 const timers = new Map();
 const versions = new Map();
-const nav = [['discovery', 'Discovery desk', '00'], ['home', 'Editorial home', '01'], ['pipeline', 'Story pipeline', '02'], ['library', 'Image library', '03'], ['publishing', 'Publishing', '04'], ['archive', 'Published archive', '05'], ['analytics', 'Performance', '06']];
+const nav = navigation;
 let pollTimer;
 let searchTimer;
 let toastTimer;
@@ -19,12 +20,7 @@ let keyboardPrefix = false;
 let drag = null;
 let rehearsal = null;
 
-function route() {
-  const [view = 'home', encodedId, tab = 'overview'] = location.hash.replace(/^#\/?/, '').split('/');
-  let id = encodedId;
-  try { id = encodedId && decodeURIComponent(encodedId); } catch { id = ''; }
-  return { view: ['discovery', 'home', 'pipeline', 'library', 'publishing', 'archive', 'analytics', 'story'].includes(view) ? view : 'home', id, tab };
-}
+function route() { return resolveRoute(location.hash); }
 
 const storyById = id => state.workspace?.stories?.find(story => story.id === id);
 const announce = message => { document.querySelector('#announcement').textContent = message; };
@@ -57,18 +53,19 @@ function render({ focusMain = false } = {}) {
   const focus = rememberFocus();
   const current = route();
   const source = state.workspace?.source || {};
-  const active = current.view === 'story' ? 'pipeline' : current.view;
-  const viewTitle = current.view === 'story' ? 'Story workspace' : nav.find(n => n[0] === current.view)?.[1];
+  const active = destination(current.view);
+  const viewTitle = current.view === 'story' ? 'Stories' : ({archive:'Published archive',analytics:'Insights'}[current.view] || nav.find(n => n[0] === current.view)?.[2]);
   const count = state.workspace?.stories?.length || 0;
   let body;
   if (state.loading) body = `<div class="loading-state"><p class="eyebrow">Retrieving the existing source records</p><h1>Opening the editorial desk.</h1><p>Stories, selected photographs and publishing evidence are loading.</p><div class="loading-line" aria-hidden="true"></div></div>`;
-  else if (state.error) body = `<div class="empty-state error-state"><p class="eyebrow">Connection needs attention</p><h1>The desk could not be loaded.</h1><p>${esc(state.error)}</p><button class="button button-dark" data-action="reload">Try the local connection again</button><p class="small muted">No example stories or invented publishing results are substituted.</p></div>`;
+  else if (state.error) body = `<div class="empty-state error-state"><p class="eyebrow">Connection needs attention</p><h1>The desk could not be loaded.</h1><p>${esc(state.error)}</p><button class="button button-dark" data-action="reload">Try again</button><p class="small muted">No example stories or invented publishing results are substituted.</p></div>`;
   else if (current.view === 'story') {
     const story = storyById(current.id);
-    body = story ? views.storyWorkspace(state, story, current.tab) : `<div class="empty-state"><h1>Story not found in this snapshot.</h1><p>The existing ID may be unavailable or the source may have changed.</p><a class="button button-dark" href="#/pipeline">Return to the pipeline</a></div>`;
+    body = story ? views.storyWorkspace(state, story, current.tab) : `<div class="empty-state"><h1>Story not found in this snapshot.</h1><p>The existing ID may be unavailable or the source may have changed.</p><a class="button button-dark" href="#/pipeline">Back to Stories</a></div>`;
   } else body = views[current.view](state);
   const warnings = source.warnings || [];
-  document.querySelector('#app').innerHTML = `<div class="app-shell"><aside class="sidebar"><a class="masthead" href="#/home" aria-label="MILDINCIDENT editorial home">MILDINCIDENT<span>Independent visual culture</span></a><div class="sidebar-label">The editorial desk</div><nav class="primary-nav" aria-label="Main navigation">${nav.map(([id, label, num]) => `<a href="#/${id}" ${active === id ? 'aria-current="page"' : ''}><span>${num}</span>${label}${id === 'pipeline' ? `<small>${count}</small>` : ''}</a>`).join('')}</nav><div class="sidebar-foot">${state.workspace?.hosted?`<button class="text-button" data-hosted-backup>Download private backup</button><p class="small">${state.workspace.backupStatus?.lastSuccess?'Backup verified '+esc(date(state.workspace.backupStatus.lastSuccess))+' ET':'First backup pending'}${state.workspace.backupStatus?.state==='failed'?' · backup needs attention':''}<br>Keep an offsite copy.</p>${state.workspace.backupStatus?.id?'<a class="text-link" href="/api/backups/latest/archive">Download last verified copy</a>':''}`:''}<span class="edition-mark">M / I</span><p>Unusual histories.<br>Original perspectives.</p><div class="keyboard-hints"><kbd>/</kbd> Find a story<br><kbd>G</kbd> <kbd>H</kbd> Editorial home</div><a href="https://rickywelch.app.n8n.cloud/webhook/founder-command-center" target="_blank" rel="noopener noreferrer">Existing Founder Studio ↗</a></div></aside><div class="workspace-shell"><header class="topbar"><div class="breadcrumb"><span>MILDINCIDENT</span><span aria-hidden="true">/</span><strong>${esc(viewTitle)}</strong></div><label class="global-search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" placeholder="Find a story…" value="${esc(state.search)}" aria-label="Find a story"><kbd>/</kbd></label><span class="private-label">PRIVATE WORKSPACE</span>${state.workspace?.hosted?'<form method="post" action="/auth/logout" data-hosted-logout><button class="text-button" type="submit">Sign out</button></form>':''}</header><div class="source-bar"><span><i class="status-dot ${source.stale ? 'stale' : ''}" aria-hidden="true"></i>${source.kind === 'live_snapshot' ? 'Connected source snapshot' : source.kind ? human(source.kind) : 'Connecting to source'}${source.observedAt ? `<small>${esc(date(source.observedAt))} ET${source.stale ? ' · refresh recommended' : ''}</small>` : ''}</span><button class="text-button" data-action="refresh" ${source.refreshing ? 'disabled' : ''}>${source.refreshing ? 'Refreshing source…' : 'Refresh source ↻'}</button></div>${warnings.length ? `<details class="source-warnings"><summary>${warnings.length} source ${warnings.length === 1 ? 'notice' : 'notices'}</summary><ul>${warnings.map(warning => `<li>${esc(typeof warning === 'string' ? warning : warning.message || warning.code)}</li>`).join('')}</ul></details>` : ''}<main id="main-content" tabindex="-1">${body}</main><footer class="workspace-footer"><span>MILDINCIDENT · Source-led editorial production</span><span>Local edits stay private · n8n remains authoritative</span></footer></div></div>${state.compared.length ? `<div class="compare-tray"><span>${state.compared.length} image${state.compared.length === 1 ? '' : 's'} marked for comparison</span><button class="button button-dark" data-action="open-comparison" ${state.compared.length < 2 ? 'disabled' : ''}>Compare images →</button><button class="text-button" data-action="clear-comparison">Clear comparison</button></div>` : ''}`;
+  const connection = `<details class="connection-details"><summary><i class="status-dot ${source.stale||warnings.length?'stale':''}" aria-hidden="true"></i>Connection status${source.stale?' · cached':''}</summary><div class="connection-panel"><div class="source-bar"><span>${source.kind==='live_snapshot'?'Connected':source.kind?human(source.kind):'Connecting'}${source.observedAt?`<small>Updated ${esc(date(source.observedAt))} ET</small>`:''}</span><button class="text-button" data-action="refresh" ${source.refreshing?'disabled':''}>${source.refreshing?'Checking…':'Check for updates ↻'}</button></div>${warnings.length?`<ul class="source-warnings">${warnings.map(w=>`<li>${esc(typeof w==='string'?w:w.message||w.code)}</li>`).join('')}</ul>`:''}</div></details>`;
+  document.querySelector('#app').innerHTML = `<div class="app-shell"><aside class="sidebar"><a class="masthead" href="#/today" aria-label="MILDINCIDENT Today">MILDINCIDENT<span>Independent visual culture</span></a><div class="sidebar-label">Your publication</div><nav class="primary-nav" aria-label="Main navigation">${nav.map(([id,url,label,num])=>`<a href="#/${url}" ${active===id?'aria-current="page"':''}><span>${num}</span>${label}${id==='pipeline'?`<small>${count}</small>`:''}</a>`).join('')}</nav><div class="sidebar-foot"><details class="sidebar-tools"><summary>Studio tools</summary>${state.workspace?.hosted?`<button class="text-button" data-hosted-backup>Download private backup</button><p class="small">${state.workspace.backupStatus?.lastSuccess?'Backup verified '+esc(date(state.workspace.backupStatus.lastSuccess))+' ET':'First backup pending'}${state.workspace.backupStatus?.state==='failed'?' · backup needs attention':''}<br>Keep an offsite copy.</p>${state.workspace.backupStatus?.id?'<a class="text-link" href="/api/backups/latest/archive">Download last verified copy</a>':''}`:''}<div class="keyboard-hints"><kbd>/</kbd> Find a story<br><kbd>G</kbd> <kbd>H</kbd> Today</div><a href="https://rickywelch.app.n8n.cloud/webhook/founder-command-center" target="_blank" rel="noopener noreferrer">Original Founder Studio ↗</a></details>${state.workspace?.backupStatus?.state==='failed'?'<p class="error-text" role="status">Backup needs attention — open Studio tools.</p>':''}<span class="edition-mark">M / I</span></div></aside><div class="workspace-shell"><header class="topbar"><div class="breadcrumb"><span>MILDINCIDENT</span><span aria-hidden="true">/</span><strong>${esc(viewTitle)}</strong></div><label class="global-search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" placeholder="Find a story…" value="${esc(state.search)}" aria-label="Find a story"><kbd>/</kbd></label>${connection}${state.workspace?.hosted?'<form method="post" action="/auth/logout" data-hosted-logout><button class="text-button" type="submit">Sign out</button></form>':''}</header>${libraryNavigation(current.view)}<main id="main-content" tabindex="-1">${body}</main><footer class="workspace-footer"><span>MILDINCIDENT · Independent visual culture</span><span>Editorial work saves privately · publishing requires approval</span></footer></div></div>${state.compared.length?`<div class="compare-tray"><span>${state.compared.length} images to compare</span><button class="button button-dark" data-action="open-comparison" ${state.compared.length<2?'disabled':''}>Compare images →</button><button class="text-button" data-action="clear-comparison">Clear</button></div>`:''}`;
   document.title = current.view === 'story' && storyById(current.id) ? `${storyById(current.id).title} — MILDINCIDENT` : `${viewTitle} — MILDINCIDENT`;
   if (focusMain) document.querySelector('#main-content').focus({ preventScroll: true });
   else if (focus) {
@@ -119,7 +116,7 @@ function editDraft(id, changes, { rerender = false, immediate = false } = {}) {
     control.innerHTML = proposalContent(story, control.dataset.proposalLabel, control.dataset.proposalClass);
   }
   clearTimeout(timers.get(id));
-  showSaveStatus('Saving locally…');
+  showSaveStatus('Saving…');
   if (rerender) render();
   if (immediate) flushDraft(id);
   else timers.set(id, setTimeout(() => flushDraft(id), 650));
@@ -145,7 +142,7 @@ async function flushDraft(id) {
   pending.delete(id); saving.add(id); inFlight.set(id, changes);
   let finish;
   savePromises.set(id, new Promise(resolve => { finish = resolve; }));
-  showSaveStatus('Saving locally…');
+  showSaveStatus('Saving…');
   let succeeded = false;
   try {
     const result = await api(`/api/stories/${encodeURIComponent(id)}/draft`, {
@@ -172,11 +169,11 @@ async function flushDraft(id) {
       if (checks && route().id === id) checks.innerHTML = views.captionChecks(current);
     }
     showSaveStatus(`${state.workspace?.hosted?'Saved to private Studio':'Saved locally'} · ${date(draft.updatedAt)}`);
-    announce('Local proposal saved. The n8n production record is unchanged.');
+    announce('Draft saved privately.');
     succeeded = true;
   } catch (error) {
     pending.set(id, { ...changes, ...(pending.get(id) || {}) });
-    showSaveStatus('Local save failed · changes are still in this browser', true);
+    showSaveStatus('Save failed · your changes remain in this browser', true);
     toast(`${error.message} Your production records are unchanged.`, { error: true, retryStory: id });
   } finally {
     saving.delete(id);
@@ -601,7 +598,7 @@ async function createResearchRequest(input) {
   if (!state.workspace.researchRequests.some(r=>r.id===result.request.id)) state.workspace.researchRequests.unshift(result.request);
   render();
   await loadWorkspace({quiet:true}).catch(()=>{});
-  toast(state.workspace.engine?.readOnly?'Saved locally for discovery review. A new generation needs separate cost approval.':state.workspace.engine?.configured?'Saved locally. Queue this request in the development engine below. Queueing does not start a paid generation.':'Saved locally. Open the n8n form and submit there to start research.');
+  toast('Direction saved. Research has not started.');
   document.querySelector(`[data-request-id="${result.request.id}"]`)?.scrollIntoView({block:'center'});
 }
 document.addEventListener('click', async event=>{
@@ -610,7 +607,7 @@ document.addEventListener('click', async event=>{
   try{
     const action=button.dataset.engineAction;
     await api(action==='refresh'?'/api/research/engine/refresh':`/api/research/requests/${button.dataset.request}/engine/${action}`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(action==='start'?{expectedVersion:Number(button.dataset.version)}:{})});
-    await loadWorkspace({quiet:true});toast(action==='queue'?'Queued in isolated n8n development storage. No AI run was started.':action==='evidence'?'Captured execution evidence inspected without a new provider call.':action==='start'?'Bounded generation dispatched once. Refresh results to reconcile its status.':'Development engine results refreshed.');
+    await loadWorkspace({quiet:true});toast(action==='queue'?'Queued in isolated n8n development storage. No AI run was started.':action==='evidence'?'Captured execution evidence inspected without a new provider call.':action==='start'?'Bounded generation dispatched once. Refresh results to reconcile its status.':'Research results checked.');
   }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
 });
 document.addEventListener('submit',async event=>{
@@ -626,7 +623,7 @@ document.addEventListener('click', event => {
 document.addEventListener('submit', async event => {
   const form=event.target.closest('[data-research-form],[data-research-link]');if(!form)return;
   event.preventDefault();const button=form.querySelector('button[type="submit"]');button.disabled=true;
-  const status=form.querySelector('[data-research-status]');status.textContent='Saving locally…';
+  const status=form.querySelector('[data-research-status]');status.textContent='Saving…';
   try {
     if(form.matches('[data-research-form]')) await createResearchRequest({kind:'brief',prompt:form.elements.prompt.value,sourceUrl:form.elements.sourceUrl.value});
     else {
@@ -685,7 +682,7 @@ document.addEventListener('keydown', event => {
   if (event.key === '/') { event.preventDefault(); document.querySelector('#global-search')?.focus(); return; }
   if (keyboardPrefix) {
     keyboardPrefix = false;
-    const target = { h: 'home', p: 'pipeline', l: 'library', b: 'publishing', a: 'archive' }[event.key.toLowerCase()];
+    const target = { h: 'today', p: 'stories', l: 'library', b: 'production', a: 'archive' }[event.key.toLowerCase()];
     if (target) { event.preventDefault(); location.hash = `#/${target}`; }
   } else if (event.key.toLowerCase() === 'g') { keyboardPrefix = true; setTimeout(() => { keyboardPrefix = false; }, 1000); }
 });
@@ -747,7 +744,7 @@ document.addEventListener('click',event=>{const button=event.target.closest('[da
 document.addEventListener('submit',async event=>{
  const form=event.target.closest('[data-founder-review]');if(!form)return;event.preventDefault();const decision=event.submitter?.value;if(!decision)return;for(const b of form.querySelectorAll('button'))b.disabled=true;
  try{const fields=new FormData(form);const result=await api('/api/editorial/reviews/'+encodeURIComponent(form.dataset.founderReview),{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({decision,basis:fields.get('basis'),reason:fields.get('reason')||'',dimensions:fields.getAll('dimension'),...(fields.get('basis')==='individual_photograph'?{assetId:form.dataset.asset,previewSha256:form.dataset.previewHash}:{}),expectedVersion:Number(form.dataset.version),sourceRevision:form.dataset.revision,workingVersion:Number(form.dataset.working)})});
-  await loadWorkspace({quiet:true});if(decision==='develop')location.hash='#/story/'+encodeURIComponent(form.dataset.founderReview)+'/direction';toast(result.followUp?'Review and follow-up brief saved. No AI execution was started.':'Editorial decision saved privately. Publication and rights remain unchanged.');
+  await loadWorkspace({quiet:true});if(decision==='develop')location.hash='#/story/'+encodeURIComponent(form.dataset.founderReview)+'/direction';toast(result.followUp?'Decision and research direction saved. Research has not started.':({save:'Saved to Discover → Saved / developing.',pass:'Passed. You can reconsider it in Discover → Passed.',develop:'Saved. Continue developing the angle.',reset:'Returned to the review queue.'}[decision]||'Editorial decision saved.'));
  }catch(error){toast(error.message,{error:true});}finally{for(const b of form.querySelectorAll('button'))b.disabled=false;}
 });
 

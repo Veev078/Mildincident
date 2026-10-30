@@ -36,10 +36,12 @@ await new Promise((resolve, reject) => { server.once('error', reject); server.li
 const origin = `http://127.0.0.1:${server.address().port}`;
 let browser;
 const checks = [];
+checks.push = (...items)=>{console.error('Browser step:',...items);return Array.prototype.push.apply(checks,items);};
 const errors = [];
 try {
   browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
+  page.setDefaultTimeout(15000);
   page.on('pageerror', error => errors.push(error.message));
   page.on('dialog', dialog => dialog.accept());
   await page.route('https://example.org/**', route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350"><rect width="1080" height="1350" fill="#e1dfd2"/><text x="70" y="600" font-size="64" fill="#42463b">SYNTHETIC UI TEST</text><text x="70" y="700" font-size="40" fill="#42463b">No archival photograph</text></svg>' }));
@@ -50,20 +52,21 @@ try {
 
 
   await page.goto(`${origin}/#/discovery`);
-  await page.getByRole('heading', {name:'Find the next extraordinary story.'}).waitFor();
+  await page.getByRole('heading', {name:'Discover',exact:true}).waitFor();
   await page.getByLabel('Creative direction', {exact:true}).fill('Find unusual connections between portrait photography and cinema');
   await page.getByLabel('Source link (optional)', {exact:true}).fill('https://example.org/photography');
-  await page.getByRole('button', {name:'Save brief for n8n',exact:true}).click();
-  await page.locator('[data-research-handoff]').waitFor();
+  await page.getByRole('button', {name:'Save research direction',exact:true}).click();
+  await page.locator('[data-research-handoff]').waitFor({state:'attached'});
   let href=await page.locator('[data-research-handoff]').getAttribute('href');
   assert.equal(new URL(href).pathname,'/form/submit-idea');
   assert.equal(new URL(href).searchParams.get('request'),'Find unusual connections between portrait photography and cinema');
   await page.reload();
-  await page.locator('[data-research-handoff]').waitFor();
+  await page.locator('[data-research-handoff]').waitFor({state:'attached'});
   const firstRequest=page.locator('[data-request-id]').first();
+  await firstRequest.locator('details.research-system > summary').click();
   await firstRequest.getByLabel('Link a resulting story').selectOption(snapshot.records.stories[0].concept_id);
   await firstRequest.getByRole('button',{name:'Link existing story',exact:true}).click();
-  await page.getByText('Existing story linked',{exact:true}).waitFor();
+  await page.getByText('Linked by you:',{exact:false}).waitFor();
   assert.equal(research.all()[0].linkedStoryId,snapshot.records.stories[0].concept_id);
   assert.equal(research.all()[0].executionConfirmed,false);
   checks.push('creative brief persists, targets existing authenticated n8n form and links an actual source story without claiming execution');
@@ -75,16 +78,16 @@ try {
     if(route.request().method()==='POST'&&discardResponse){discardResponse=false;await route.fetch();await route.abort();}
     else await route.continue();
   });
-  await page.getByRole('button',{name:'Save brief for n8n',exact:true}).click();
+  await page.getByRole('button',{name:'Save research direction',exact:true}).click();
   await page.locator('[data-research-status]').filter({hasText:'could not be reached'}).waitFor();
   assert.equal(research.all().length,originalBriefCount+1);
-  await page.getByRole('button',{name:'Save brief for n8n',exact:true}).click();
+  await page.getByRole('button',{name:'Save research direction',exact:true}).click();
   await page.waitForFunction(()=>document.querySelectorAll('[data-request-id]').length===2);
   assert.equal(research.all().length,originalBriefCount+1);
   await page.unroute('**/api/research/requests');
   checks.push('a lost local research-create response can be retried without creating a duplicate ticket');
   await page.getByLabel('Creative direction',{exact:true}).fill('Keep this unsaved creative direction while preparing discovery');
-  await page.getByRole('button',{name:'Prepare a discovery run',exact:true}).click();
+  await page.getByRole('button',{name:'Save discovery direction',exact:true}).click();
   await page.waitForFunction(()=>document.querySelectorAll('[data-request-id]').length===3);
   assert.equal(await page.getByLabel('Creative direction',{exact:true}).inputValue(),'Keep this unsaved creative direction while preparing discovery');
   const discoveryLink=await page.locator('[data-research-handoff]').first().getAttribute('href');
@@ -149,7 +152,7 @@ try {
   checks.push('global search filters existing story rows and has an honest empty state');
 
   await page.goto(`${origin}/#/story/${id}/overview`);
-  await page.getByRole('heading', { name: 'Existing n8n notes', exact: true }).waitFor();
+  await page.getByRole('heading', { name: 'Source notes', exact: true }).waitFor();
   assert.ok((await page.locator('.existing-source-notes').textContent()).includes('synthetic test fixture'));
   checks.push('existing n8n editorial notes stay visible and separate from local edits');
   await page.goto(`${origin}/#/story/${id}/caption`);
@@ -239,7 +242,7 @@ try {
   await page.goto(`${origin}/#/story/${id}/music`);
   await page.getByRole('textbox', { name: 'Track', exact: true }).fill('Fixture track');
   await page.getByRole('textbox', { name: 'Artist', exact: true }).fill('Fixture artist');
-  await page.getByRole('button', { name: 'Save local direction', exact: true }).click();
+  await page.getByRole('button', { name: 'Save sound direction', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));
   assert.equal(drafts.get(id).musicSelection.track, 'Fixture track');
   checks.push('manual soundtrack direction saves locally without availability claims');
@@ -251,7 +254,7 @@ try {
   await page.getByRole('button',{name:'Save sound brief',exact:true}).click();
   await page.getByText('The working brief calls for a silent post.',{exact:true}).waitFor();
   assert.equal(drafts.get(id).musicSelection.track,'Fixture track');
-  await page.getByRole('button',{name:'Clear local track selection',exact:true}).click();
+  await page.getByRole('button',{name:'Clear track selection',exact:true}).click();
   await page.getByRole('heading',{name:'A silent post',exact:true}).waitFor();
   await page.reload();await page.getByRole('heading',{name:'A silent post',exact:true}).waitFor();
   assert.equal(drafts.get(id).musicSelection,null);assert.equal(drafts.get(id).creativeBrief.musicIntent.eraApproach,'period_echo');
@@ -299,6 +302,7 @@ try {
   assert.equal(JSON.stringify({title:snapshot.records.stories[0].title,format:snapshot.records.stories[0].format,target:snapshot.records.packages[0].target_slide_count}),sourceIdentity);
   checks.push('working title/hook/format survive reload and export while source identity and selected assets remain intact');
 
+  await page.getByText('Story details & version history',{exact:true}).click();
   const downloadEvent = page.waitForEvent('download');
   await page.locator('.story-header-actions a').click();
   const download = await downloadEvent;
@@ -319,16 +323,16 @@ try {
   assert.ok(!drafts.proposal(originalView().stories[0]).stale);
   assert.ok(drafts.history(id).length >= 4);
   checks.push('stale source comparison and explicit local rebase preserve history');
-  await page.getByRole('button', { name: 'Local version history', exact: true }).click();
+  await page.getByText('Story details & version history',{exact:true}).click();await page.getByRole('button', { name: 'Version history', exact: true }).click();
   assert.ok((await page.getByRole('dialog').textContent()).includes('Local version history.'));
   await page.getByRole('button', { name: 'Close local version history' }).click();
   checks.push('saved local version history is inspectable');
 
   source.loadLive = () => { throw new Error('synthetic refresh failure'); };
-  await page.getByRole('button', { name: 'Refresh source ↻', exact: true }).click();
+  await page.getByText('Connection status',{exact:false}).first().click();await page.getByRole('button', { name: 'Check for updates ↻', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('#toast')?.textContent.includes('previous source snapshot is preserved'));
   assert.equal(drafts.get(id).caption, caption);
-  assert.ok(await page.getByRole('button', { name: 'Refresh source ↻', exact: true }).isEnabled());
+  assert.ok(await page.locator('[data-action=refresh]').isEnabled());
   source.loadLive = async () => snapshot;
   checks.push('failed read refresh reports failure, preserves edits/cache and remains retryable');
 
@@ -337,7 +341,7 @@ try {
   assert.equal(await page.locator('#global-search').evaluate(node => node === document.activeElement), true);
   await page.locator('#global-search').blur();
   await page.keyboard.press('g'); await page.keyboard.press('p');
-  await page.waitForURL('**/#/pipeline');
+  await page.waitForURL('**/#/stories');
   checks.push('keyboard shortcuts focus search and navigate without fake actions');
 
   const failurePage = await browser.newPage();
@@ -367,7 +371,8 @@ try {
   await page.screenshot({ path: path.join(artifactRoot, 'fixture-direction-desktop.png'), fullPage: true });
 
   await page.goto(`${origin}/#/discovery`);
-  await page.locator('[data-request-id]').first().getByRole('button',{name:'Queue development job',exact:true}).click();
+  await page.locator('[data-request-id]').first().locator('details.research-system > summary').click();await page.locator('[data-request-id]').first().getByRole('button',{name:'Queue development job',exact:true}).click();
+  await page.locator('[data-request-id]').first().locator('details.research-system > summary').click();
   await page.getByRole('button',{name:'Start bounded generation',exact:true}).waitFor();
   assert.ok(await page.getByRole('button',{name:'Start bounded generation',exact:true}).isDisabled());
   assert.equal(engineFixture.jobs.length,1);
@@ -386,9 +391,10 @@ try {
   Object.assign(fixtureCandidate.media[0],{creator_basis:'copyright_holder_only',copyright_holder:'Fixture owner',source_research_links:[{kind:'series',label:'Synthetic series trail',url:'https://example.org/project',verified:true}],capture_coverage:{referenceCount:55,retainedCount:40,referenceLimit:40,pageTruncated:true}});
   for(const name of ['drawing','trench'])fixtureCandidate.media.push({asset_id:'dev-'+name,thumb_url:'https://example.org/'+name+'.jpg',source_page_url:'https://example.org/source',source_caption:'Synthetic fixture costume document, 1967.',credit_at_source:'Fixture museum',source_years:[1967],source_relation:'subject_caption_match',material_kind:'design_documentation'});
   engineFixture.candidates.push({job_id:queued.job_id,candidate_id:fixtureCandidate.id,status:'ready_to_review',candidate_json:JSON.stringify(fixtureCandidate)});
-  await page.getByRole('button',{name:'Refresh engine results',exact:true}).first().click();
+  await page.getByRole('button',{name:'Check for new research',exact:true}).first().click();
+  await page.locator('[data-request-id]').first().locator('details.research-system > summary').click();
   await page.getByRole('link',{name:'Open candidate in Studio →',exact:true}).click();
-  await page.getByText('n8n development candidate',{exact:true}).waitFor();
+  await page.getByText('Story details & version history',{exact:true}).click();await page.getByText('Research proposal',{exact:true}).waitFor();
   const devStoryId='CON-DEV-'+queued.job_id;
   await page.goto(`${origin}/#/story/${devStoryId}/research`);
   await page.getByText('Read the recorded source excerpt',{exact:true}).click();
@@ -409,7 +415,7 @@ try {
   await page.getByText('Photographic research brief prepared. No AI or source request was started.',{exact:true}).waitFor();
   const photoRequest=research.all().find(r=>r.continuation);assert.ok(photoRequest);assert.equal(photoRequest.continuation.origin.assetId,'dev-photo-1');assert.equal(photoRequest.continuation.origin.storyId,devStoryId);assert.equal(photoRequest.continuation.routes[0].url,'https://example.org/project');assert.equal(photoRequest.handoffUrl,null);
   assert.equal(research.all().length,requestsBeforePhotoResearch+1);assert.equal(engineFixture.jobs.length,jobsBeforePhotoResearch);
-  await page.reload();const photoRequestCard=page.locator('[data-request-id="'+photoRequest.id+'"]');await photoRequestCard.getByText('Prepared photographic research directions',{exact:true}).click();
+  await page.reload();const photoRequestCard=page.locator('[data-request-id="'+photoRequest.id+'"]');await photoRequestCard.locator('details.research-system > summary').click();await photoRequestCard.getByText('Prepared photographic research directions',{exact:true}).click();
   await photoRequestCard.getByRole('link',{name:'Synthetic series trail',exact:false}).waitFor();assert.equal(await photoRequestCard.locator('[data-research-handoff]').count(),0);
   checks.push('exact-image research preparation retains series directions across reload without a model, queue or legacy-form transfer');
   await page.goto(`${origin}/#/story/${devStoryId}/research`);
@@ -430,7 +436,7 @@ try {
   assert.equal(snapshot.records.stories.length,1);
   await page.goto(`${origin}/#/story/${devStoryId}/carousel`);
   await page.getByText('The photograph and its supporting documents · 3 frames',{exact:true}).click();
-  await page.getByRole('button',{name:'Use 3-frame source plan locally',exact:true}).click();
+  await page.getByRole('button',{name:'Use 3-frame source plan',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));
   assert.equal(drafts.get(devStoryId).format,'carousel');assert.equal(drafts.get(devStoryId).targetSlideCount,3);
   assert.deepEqual(drafts.get(devStoryId).selectedAssetIds,['dev-photo-1','dev-drawing','dev-trench']);
@@ -440,11 +446,11 @@ try {
   checks.push('source-caption sequence proposal applies dated real-reference metadata locally with roles/history and no native candidate overwrite');
 
   await page.goto(`${origin}/#/discovery`);
-  const candidateReview=page.locator('[data-engine-review]');
-  await candidateReview.getByLabel('Development editorial decision').selectOption('approved');
+  await page.locator('[data-request-id="'+queued.job_id+'"]').locator('details.research-system > summary').click();const candidateReview=page.locator('[data-engine-review]');
+  await candidateReview.getByLabel('Research review decision').selectOption('approved');
   await candidateReview.getByLabel('Decision reason').fill('Promising fixture candidate for isolated development production review.');
-  await candidateReview.getByRole('button',{name:'Save development decision'}).click();
-  await page.getByText('Your development decision: approved',{exact:true}).waitFor();
+  await candidateReview.getByRole('button',{name:'Save research review'}).click();
+  await page.locator('[data-request-id="'+queued.job_id+'"]').locator('details.research-system > summary').click();await page.getByText('Your development decision: approved',{exact:true}).waitFor();
   assert.equal(research.engineJob(queued.job_id).reviewDecisions[fixtureCandidate.id].decision,'approved');
   await page.goto(`${origin}/#/story/${devStoryId}/images`);
   await page.locator('[data-action="inspect"]').first().click();
@@ -453,12 +459,12 @@ try {
   await page.getByRole('button',{name:'Close image details',exact:true}).click();
   const savedVersion=drafts.get(devStoryId).version;
   await page.goto(`${origin}/#/story/${devStoryId}/overview`);
-  const inlineReview=page.locator('[data-engine-review]');
+  await page.getByText('Earlier editorial assessment',{exact:true}).click();const inlineReview=page.locator('[data-engine-review]');
   await inlineReview.getByLabel('Development editorial decision').selectOption('needs_research');
   await inlineReview.getByLabel('Decision basis',{exact:true}).selectOption('editorial_taste');
   await inlineReview.getByLabel('Decision reason').fill('Keep the original research, refine the documented angle.');
   await inlineReview.getByRole('button',{name:'Save development decision'}).click();
-  await page.getByText('Keep the original research, refine the documented angle.',{exact:false}).first().waitFor();
+  await page.getByText('Earlier editorial assessment',{exact:true}).click();await page.getByText('Keep the original research, refine the documented angle.',{exact:false}).first().waitFor();
   await page.goto(`${origin}/#/story/${devStoryId}/caption`);
   assert.ok(!await page.getByLabel('Local caption draft').isDisabled());
   await page.getByLabel('Local caption draft').fill('Caption remains editable after the local editorial decision.');
@@ -469,14 +475,14 @@ try {
   checks.push('inline editorial feedback retains native research and local revisions without a false stale-source conflict');
 
   checks.push('correlated development results open and save in existing Studio tools with clear provenance and local approval, without inserting production records');
-  await page.goto(`${origin}/#/home`);const reviewBaseline=research.all().length;
+  await page.goto(`${origin}/#/discover`);const reviewBaseline=research.all().length;
   await page.getByRole('button',{name:'Existing stories',exact:true}).click();const reviewCard=page.locator('[data-review-card]').first();const reviewId=await reviewCard.getAttribute('data-review-card');await reviewCard.getByRole('button',{name:'Save',exact:true}).click();await page.locator('[data-review-card="'+reviewId+'"] .review-receipt').filter({hasText:'Saved'}).waitFor();await page.reload();await page.getByRole('button',{name:'Existing stories',exact:true}).click();await page.locator('[data-review-card="'+reviewId+'"] .review-receipt').filter({hasText:'Saved'}).waitFor();
-  const restoredCard=page.locator('[data-review-card="'+reviewId+'"]');await restoredCard.getByRole('button',{name:'Find alternatives',exact:true}).click();await page.getByText('Review and follow-up brief saved. No AI execution was started.',{exact:true}).waitFor();assert.equal(research.db.prepare('SELECT COUNT(*) n FROM founder_review_events WHERE target_id=?').get(reviewId).n,2);assert.equal(research.all().length,reviewBaseline+1);
-  const nativeJobCount=engineFixture.jobs.length;await page.getByRole('button',{name:'Sync research results',exact:true}).click();await page.getByText('Development engine results refreshed.',{exact:true}).waitFor();assert.equal(engineFixture.jobs.length,nativeJobCount);
+  const restoredCard=page.locator('[data-review-card="'+reviewId+'"]');await restoredCard.locator('form details > summary').click();await restoredCard.getByRole('button',{name:'Find alternatives',exact:true}).click();await page.getByText('Decision and research direction saved. Research has not started.',{exact:true}).waitFor();assert.equal(research.db.prepare('SELECT COUNT(*) n FROM founder_review_events WHERE target_id=?').get(reviewId).n,2);assert.equal(research.all().length,reviewBaseline+1);
+  const nativeJobCount=engineFixture.jobs.length;await page.getByRole('button',{name:'Check for new research',exact:true}).first().click();await page.getByText('Research results checked.',{exact:true}).waitFor();assert.equal(engineFixture.jobs.length,nativeJobCount);
   const frameCard=page.locator('[data-review-card="'+reviewId+'"]');
   const displayedAsset=await frameCard.locator('form').getAttribute('data-asset');
   assert.ok(displayedAsset);
-  await frameCard.locator('details summary').click();
+  await frameCard.locator('form details summary').click();
   await frameCard.getByLabel('What needs attention?').selectOption('individual_photograph');
   await frameCard.getByLabel('A note for future proposals').fill('Keep the subject, find a stronger photographic frame.');
   await frameCard.getByRole('button',{name:'Find alternatives',exact:true}).click();

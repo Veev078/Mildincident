@@ -74,7 +74,7 @@ ul,ol {
 }
 code {
   font-family:ui-monospace,SFMono-Regular,monospace;
-  font-size:11px;
+  font-size:13px;
   overflow-wrap:anywhere
 }
 a.button {
@@ -139,13 +139,13 @@ a:has(img) {
   display:block;
   letter-spacing:.055em;
   text-transform:uppercase;
-  font-size:8px;
+  font-size:11px;
   font-weight:500;
   margin-top:12px;
   line-height:1.6
 }
 .sidebar-label {
-  font-size:9px;
+  font-size:11px;
   color:var(--quiet);
   letter-spacing:.16em;
   text-transform:uppercase;
@@ -170,24 +170,24 @@ a:has(img) {
   border:1px solid transparent
 }
 .primary-nav a>span {
-  font-size:9px;
+  font-size:11px;
   color:var(--quiet);
   font-variant-numeric:tabular-nums
 }
 .primary-nav a>small {
   margin-left:auto;
-  font-size:10px;
+  font-size:12px;
   color:var(--quiet)
 }
 .primary-nav a:hover {
-  background:#e0e3d7
+  background:#e3ecfb
 }
 .primary-nav a[aria-current] {
   background:var(--ink);
   color:var(--white)
 }
 .primary-nav a[aria-current] span,.primary-nav a[aria-current] small {
-  color:#b4b8a6
+  color:#c4d4fb
 }
 .sidebar-foot {
   margin-top:auto;
@@ -197,22 +197,22 @@ a:has(img) {
   font-family:var(--serif);
   font-size:36px;
   letter-spacing:-3px;
-  color:#767c66
+  color:#516989
 }
 .sidebar-foot p {
-  font-size:10px;
+  font-size:12px;
   color:var(--quiet);
   margin:13px 0 25px;
   line-height:1.8
 }
 .sidebar-foot>a {
   display:block;
-  font-size:10px;
+  font-size:12px;
   margin-top:25px;
   color:var(--quiet)
 }
 .keyboard-hints {
-  font-size:9px;
+  font-size:11px;
   color:var(--quiet);
   line-height:2.4
 }
@@ -223,7 +223,7 @@ kbd {
   text-align:center;
   border:1px solid var(--line);
   border-radius:2px;
-  font-size:9px;
+  font-size:11px;
   line-height:16px;
   padding:0 3px;
   background:var(--surface)
@@ -238,20 +238,20 @@ kbd {
   height:76px;
   border-bottom:1px solid var(--line);
   padding:0 40px;
-  background:rgba(251,250,246,.7)
+  background:rgba(255,255,255,.9)
 }
 .breadcrumb {
   display:flex;
   gap:12px;
   align-items:center;
-  font-size:10px;
+  font-size:12px;
   color:var(--quiet);
   white-space:nowrap
 }
 .breadcrumb>span:first-child {
   font-weight:600;
   letter-spacing:.05em;
-  font-size:9px
+  font-size:11px
 }
 .breadcrumb strong {
   font-weight:500;
@@ -271,18 +271,18 @@ kbd {
   border:0;
   min-width:0;
   width:180px;
-  font-size:11px;
+  font-size:13px;
   padding:10px 3px
 }
 .global-search input:focus-visible {
   outline-offset:0
 }
 .global-search kbd {
-  font-size:10px
+  font-size:12px
 }
 .private-label {
   letter-spacing:.12em;
-  font-size:8px;
+  font-size:11px;
   white-space:nowrap;
   border-left:1px solid var(--line);
   padding-left:22px;
@@ -295,7 +295,7 @@ kbd {
   align-items:center;
   gap:20px;
   border-bottom:1px solid var(--soft-line);
-  font-size:10px;
+  font-size:12px;
   color:var(--quiet)
 }
 .source-bar>span {
@@ -305,11 +305,11 @@ kbd {
   flex-wrap:wrap
 }
 .source-bar small {
-  font-size:9px;
-  color:#89897e
+  font-size:11px;
+  color:#596a82
 }
 .source-bar .text-button {
-  font-size:10px;
+  font-size:12px;
   white-space:nowrap
 }
 .status-dot {
@@ -327,7 +327,7 @@ kbd {
   margin:0 40px;
   padding:14px 0;
   border-bottom:1px solid var(--line);
-  font-size:11px;
+  font-size:13px;
   color:var(--rust)
 }
 .source-warnings summary {
@@ -345,7 +345,7 @@ kbd {
   gap:15px;
   justify-content:space-between;
   color:var(--quiet);
-  font-size:9px
+  font-size:11px
 }
 main {
   padding:44px 40px 20px;
@@ -359,7 +359,7 @@ main:focus {
 .eyebrow {
   text-transform:uppercase;
   letter-spacing:.13em;
-  font-size:9px;
+  font-size:11px;
   line-height:1.8;
   color:var(--quiet);
   font-weight:550;
@@ -369,18 +369,18 @@ main:focus {
   color:var(--quiet)
 }
 .small {
-  font-size:11px;
+  font-size:13px;
   line-height:1.8
 }
 .text-link {
-  font-size:11px;
+  font-size:13px;
   text-underline-offset:.35em
 }
 .text-button {
   border:0;
   padding:5px 0;
   background:none;
-  font-size:11px;
+  font-size:13px;
   text-decoration:underline;
   text-underline-offset:.3em;
   width:fit-content
@@ -392,7 +392,7 @@ main:focus {
   gap:24px;
   min-height:43px;
   padding:13px 18px;
-  font-size:10px;
+  font-size:12px;
   font-weight:550;
   letter-spacing:.01em;
   border:1px solid var(--ink);
@@ -405,7 +405,7 @@ main:focus {
   color:var(--white)
 }
 .button-dark:hover {
-  background:#424738
+  background:#254fba
 }
 .button-light {
   background:transparent;
@@ -420,14 +420,14 @@ main:focus {
   justify-content:center;
   border:1px solid var(--line);
   background:var(--surface);
-  font-size:10px;
+  font-size:12px;
   min-height:34px;
   padding:8px 12px;
   white-space:nowrap
 }
 .small-button:hover,.small-button.is-selected {
   background:var(--accent-soft);
-  border-color:#b8c1a8
+  border-color:#96b4ee
 }
 .icon-button {
   border:1px solid var(--line);
@@ -446,20 +446,20 @@ main:focus {
 .badge {
   display:inline-block;
   width:fit-content;
-  font-size:8px;
+  font-size:11px;
   line-height:1.5;
   letter-spacing:.025em;
-  background:#ecebe4;
-  border:1px solid #d9d9ce;
-  color:#63665b;
+  background:#edf2f9;
+  border:1px solid #cbd6e5;
+  color:#596a82;
   padding:4px 7px;
   font-weight:500;
   white-space:normal
 }
 .badge.good {
   background:var(--accent-soft);
-  border-color:#d1d9c4;
-  color:#4d5d37
+  border-color:#b9ccef;
+  color:#244b9d
 }
 .badge.warn {
   background:var(--warn-soft);
@@ -486,7 +486,7 @@ main:focus {
   line-height:1.4
 }
 .section-heading p {
-  font-size:11px;
+  font-size:13px;
   line-height:1.7;
   color:var(--quiet);
   margin:7px 0 0;
@@ -534,7 +534,7 @@ main:focus {
 .issue-mark small {
   display:block;
   margin:18px 0;
-  font-size:8px;
+  font-size:11px;
   letter-spacing:.13em;
   color:var(--quiet)
 }
@@ -575,7 +575,7 @@ main:focus {
   letter-spacing:-.05em
 }
 .stats-row span {
-  font-size:10px;
+  font-size:12px;
   color:var(--quiet);
   line-height:1.6
 }
@@ -629,7 +629,7 @@ main:focus {
   align-items:center;
   gap:13px;
   margin:5px 0 24px;
-  font-size:10px;
+  font-size:12px;
   color:var(--quiet);
   flex-wrap:wrap
 }
@@ -638,7 +638,7 @@ main:focus {
 }
 .photo {
   position:relative;
-  background:#e1e2d7;
+  background:#edf2f9;
   overflow:hidden;
   aspect-ratio:4/5;
   display:flex;
@@ -650,11 +650,11 @@ main:focus {
   width:100%;
   height:100%;
   object-fit:cover;
-  filter:saturate(.8);
+  filter:none;
   transition:filter .25s,transform .5s
 }
 .photo:hover img {
-  filter:saturate(1)
+  filter:none
 }
 .photo-placeholder {
   display:flex;
@@ -662,7 +662,7 @@ main:focus {
   align-items:center;
   gap:12px;
   text-align:center;
-  color:#818772;
+  color:#596a82;
   padding:20px
 }
 .photo-placeholder>span {
@@ -670,13 +670,13 @@ main:focus {
   font-weight:200
 }
 .photo-placeholder small {
-  font-size:9px;
+  font-size:11px;
   line-height:1.7;
   letter-spacing:.025em;
   max-width:120px
 }
 .photo.preview-failed {
-  background:#e8e7de
+  background:#edf2f9
 }
 .photo.preview-failed img {
   position:absolute;
@@ -686,7 +686,7 @@ main:focus {
 }
 .photo.preview-failed::after {
   content:'Preview unavailable — open source record';
-  font-size:10px;
+  font-size:12px;
   color:var(--quiet);
   padding:30px;
   text-align:center;
@@ -701,7 +701,7 @@ main:focus {
   color:var(--ink);
   background:rgba(251,250,246,.94);
   padding:6px 8px;
-  font-size:9px;
+  font-size:11px;
   font-variant-numeric:tabular-nums
 }
 .photo-expand {
@@ -744,7 +744,7 @@ main:focus {
   align-items:center;
   justify-content:space-between;
   gap:12px;
-  font-size:8px;
+  font-size:11px;
   text-transform:uppercase;
   letter-spacing:.08em;
   color:var(--quiet);
@@ -765,7 +765,7 @@ main:focus {
   text-decoration:none
 }
 .story-card-copy>p {
-  font-size:11px;
+  font-size:13px;
   color:var(--quiet);
   line-height:1.8;
   display:-webkit-box;
@@ -781,11 +781,11 @@ main:focus {
   margin-top:24px;
   border-top:1px solid var(--soft-line);
   padding-top:17px;
-  font-size:9px;
+  font-size:11px;
   color:var(--quiet)
 }
 .card-foot a {
-  font-size:10px;
+  font-size:12px;
   color:var(--ink);
   text-decoration:none
 }
@@ -837,7 +837,7 @@ main:focus {
 }
 .attention-list span {
   display:block;
-  font-size:10px;
+  font-size:12px;
   color:var(--rust);
   margin-top:9px;
   line-height:1.7
@@ -861,7 +861,7 @@ main:focus {
   margin-top:6px
 }
 .activity-list a,.activity-list strong {
-  font-size:11px;
+  font-size:13px;
   font-weight:400;
   text-decoration:none;
   line-height:1.6;
@@ -869,7 +869,7 @@ main:focus {
 }
 .activity-list small {
   display:block;
-  font-size:9px;
+  font-size:11px;
   color:var(--quiet);
   line-height:1.7;
   margin-top:5px
@@ -913,7 +913,7 @@ main:focus {
 .filter-chip {
   padding:8px 11px;
   min-height:33px;
-  font-size:10px;
+  font-size:12px;
   display:flex;
   gap:10px;
   align-items:center;
@@ -922,7 +922,7 @@ main:focus {
   color:var(--quiet)
 }
 .filter-chip span {
-  font-size:9px
+  font-size:11px
 }
 .filter-chip.active {
   color:var(--ink);
@@ -941,7 +941,7 @@ main:focus {
   border-bottom:1px solid var(--line)
 }
 .row-number {
-  font-size:9px;
+  font-size:11px;
   color:var(--quiet)
 }
 .pipeline-thumb .photo {
@@ -957,10 +957,10 @@ main:focus {
   font-size:20px
 }
 .pipeline-thumb .photo-placeholder small {
-  font-size:7px
+  font-size:11px
 }
 .pipeline-title .eyebrow {
-  font-size:8px;
+  font-size:11px;
   margin-bottom:8px
 }
 .pipeline-title h2 {
@@ -974,7 +974,7 @@ main:focus {
   text-decoration:none
 }
 .pipeline-title>small {
-  font-size:8px;
+  font-size:11px;
   color:var(--quiet);
   overflow-wrap:anywhere
 }
@@ -982,11 +982,11 @@ main:focus {
   display:flex;
   flex-direction:column;
   gap:10px;
-  font-size:9px;
+  font-size:11px;
   color:var(--quiet)
 }
 .row-action {
-  font-size:10px;
+  font-size:12px;
   line-height:1.7;
   text-decoration:none;
   color:var(--accent)
@@ -1046,14 +1046,14 @@ main:focus {
   line-height:1.8
 }
 .notice p {
-  font-size:11px;
+  font-size:13px;
   margin:6px 0 0;
   color:var(--quiet);
   line-height:1.8
 }
 .notice strong {
   font-weight:550;
-  font-size:11px
+  font-size:13px
 }
 .notice.warning {
   border-color:#dbc9b5;
@@ -1066,11 +1066,11 @@ main:focus {
 }
 .notice ul {
   margin-bottom:0;
-  font-size:11px;
+  font-size:13px;
   line-height:1.8
 }
 .back-link {
-  font-size:10px;
+  font-size:12px;
   color:var(--quiet);
   display:inline-block;
   margin-bottom:25px;
@@ -1094,7 +1094,7 @@ main:focus {
 .story-heading>.button {
   white-space:nowrap;
   flex-shrink:0;
-  font-size:9px;
+  font-size:11px;
   gap:12px
 }
 .story-meta {
@@ -1103,7 +1103,7 @@ main:focus {
   align-items:center;
   flex-wrap:wrap;
   color:var(--quiet);
-  font-size:10px
+  font-size:12px
 }
 .local-notice {
   display:flex;
@@ -1111,12 +1111,12 @@ main:focus {
   gap:8px;
   padding:12px 0;
   border-top:1px solid var(--line);
-  font-size:10px;
+  font-size:12px;
   color:var(--quiet)
 }
 .local-notice>small {
   margin-left:auto;
-  font-size:9px;
+  font-size:11px;
   color:var(--accent)
 }
 .story-tabs {
@@ -1132,13 +1132,13 @@ main:focus {
   padding:17px 0 15px;
   text-decoration:none;
   color:var(--quiet);
-  font-size:11px;
+  font-size:13px;
   display:flex;
   gap:7px;
   border-bottom:2px solid transparent
 }
 .story-tabs a small {
-  font-size:8px;
+  font-size:11px;
   color:#8b8f7f
 }
 .story-tabs a[aria-current] {
@@ -1171,7 +1171,7 @@ main:focus {
   letter-spacing:-.02em
 }
 .workspace-aside p {
-  font-size:11px;
+  font-size:13px;
   line-height:1.9;
   color:var(--quiet)
 }
@@ -1206,7 +1206,7 @@ main:focus {
 .blocker-list {
   padding:0;
   list-style:none;
-  font-size:10px;
+  font-size:12px;
   line-height:1.8;
   color:var(--quiet);
   margin:0
@@ -1230,7 +1230,7 @@ main:focus {
   white-space:pre-line;
   font-size:13px;
   line-height:1.9;
-  color:#626559
+  color:#596a82
 }
 .contact-strip {
   display:grid;
@@ -1242,7 +1242,7 @@ main:focus {
   aspect-ratio:4/5
 }
 .field-label {
-  font-size:10px;
+  font-size:12px;
   letter-spacing:.04em;
   display:block;
   margin:10px 0 12px
@@ -1272,14 +1272,14 @@ textarea {
   display:flex;
   justify-content:space-between;
   gap:15px;
-  font-size:10px;
+  font-size:12px;
   color:var(--quiet);
   border-bottom:1px solid var(--line);
   padding:13px 0 22px;
   margin-bottom:25px
 }
 .inline-warning {
-  font-size:11px;
+  font-size:13px;
   color:var(--rust);
   line-height:1.8;
   padding:13px 0
@@ -1292,7 +1292,7 @@ textarea {
 }
 .source-caption summary {
   cursor:pointer;
-  font-size:11px;
+  font-size:13px;
   color:var(--quiet)
 }
 .source-caption p {
@@ -1302,7 +1302,7 @@ textarea {
 }
 .numbered-notes {
   padding-left:18px;
-  font-size:11px;
+  font-size:13px;
   line-height:1.9;
   color:var(--quiet)
 }
@@ -1314,7 +1314,7 @@ textarea {
   list-style:none;
   padding:0;
   margin:22px 0;
-  font-size:11px;
+  font-size:13px;
   color:var(--quiet)
 }
 .editorial-checks li {
@@ -1338,7 +1338,7 @@ textarea {
 }
 .claim-number {
   color:var(--quiet);
-  font-size:9px;
+  font-size:11px;
   padding-top:7px
 }
 .research-claim p {
@@ -1355,7 +1355,7 @@ textarea {
   align-items:center
 }
 .research-meta>a {
-  font-size:10px;
+  font-size:12px;
   color:var(--accent)
 }
 .asset-grid {
@@ -1384,7 +1384,7 @@ textarea {
   flex:1
 }
 .asset-copy .eyebrow {
-  font-size:8px;
+  font-size:11px;
   margin-bottom:8px
 }
 .asset-copy h3 {
@@ -1412,7 +1412,7 @@ textarea {
   flex-direction:column;
   gap:9px;
   margin-top:auto;
-  font-size:9px;
+  font-size:11px;
   color:var(--quiet)
 }
 .asset-actions {
@@ -1426,11 +1426,11 @@ textarea {
   flex-wrap:wrap
 }
 .asset-actions .small-button {
-  font-size:8px;
+  font-size:11px;
   padding:8px
 }
 .asset-actions .text-button {
-  font-size:9px
+  font-size:11px
 }
 .library-tools {
   display:flex;
@@ -1460,7 +1460,7 @@ textarea {
   color:var(--quiet)
 }
 .search-field input {
-  font-size:11px;
+  font-size:13px;
   border:0;
   background:none;
   width:100%;
@@ -1468,7 +1468,7 @@ textarea {
   min-width:0
 }
 .select-field {
-  font-size:9px;
+  font-size:11px;
   color:var(--quiet);
   display:flex;
   align-items:center;
@@ -1477,7 +1477,7 @@ textarea {
 }
 .select-field select {
   padding:12px 30px 12px 12px;
-  font-size:10px;
+  font-size:12px;
   background:var(--surface)
 }
 .archive-directory {
@@ -1506,12 +1506,12 @@ textarea {
   text-decoration:none
 }
 .source-card p {
-  font-size:10px;
+  font-size:12px;
   color:var(--quiet);
   line-height:1.9
 }
 .source-card small {
-  font-size:8px;
+  font-size:11px;
   overflow-wrap:anywhere;
   color:var(--accent)
 }
@@ -1550,11 +1550,11 @@ textarea {
   margin:0 0 10px
 }
 .slide-copy .eyebrow {
-  font-size:8px;
+  font-size:11px;
   margin-bottom:8px
 }
 .slide-copy>p:not(.eyebrow) {
-  font-size:10px;
+  font-size:12px;
   color:var(--quiet);
   margin:0 0 12px
 }
@@ -1572,7 +1572,7 @@ textarea {
 .check-list {
   padding:0;
   list-style:none;
-  font-size:10px;
+  font-size:12px;
   line-height:1.9;
   color:var(--quiet)
 }
@@ -1618,7 +1618,7 @@ textarea {
   margin-bottom:35px
 }
 .track-index {
-  font-size:9px;
+  font-size:11px;
   color:var(--quiet)
 }
 .track>div {
@@ -1632,18 +1632,18 @@ textarea {
   margin:0 0 8px
 }
 .track p {
-  font-size:11px;
+  font-size:13px;
   color:var(--quiet);
   margin:0 0 12px
 }
 .track small {
-  font-size:10px;
+  font-size:12px;
   line-height:1.8;
   color:var(--quiet);
   display:block
 }
 .track .small-button {
-  font-size:9px
+  font-size:11px
 }
 .field-pair {
   display:grid;
@@ -1652,7 +1652,7 @@ textarea {
   margin:23px 0
 }
 .field-pair label {
-  font-size:10px;
+  font-size:12px;
   line-height:1.5
 }
 .field-pair input {
@@ -1678,7 +1678,7 @@ textarea {
   border:0
 }
 .publishing-summary small {
-  font-size:9px;
+  font-size:11px;
   display:block;
   color:var(--quiet);
   line-height:1.6;
@@ -1705,7 +1705,7 @@ textarea {
   padding:15px 0
 }
 .reference-list span {
-  font-size:9px;
+  font-size:11px;
   color:var(--quiet)
 }
 .inline-gap {
@@ -1735,7 +1735,7 @@ textarea {
   text-decoration:none
 }
 .publishing-row .eyebrow {
-  font-size:8px;
+  font-size:11px;
   margin-bottom:10px
 }
 .publishing-facts {
@@ -1743,11 +1743,11 @@ textarea {
   gap:13px;
   align-items:center;
   flex-wrap:wrap;
-  font-size:9px;
+  font-size:11px;
   color:var(--quiet)
 }
 .publishing-row p:not(.eyebrow) {
-  font-size:10px;
+  font-size:12px;
   color:var(--quiet);
   line-height:1.7;
   margin:13px 0 0
@@ -1760,7 +1760,7 @@ textarea {
   padding:22px 0;
   margin-bottom:30px;
   color:var(--quiet);
-  font-size:11px
+  font-size:13px
 }
 .archive-summary strong {
   font-family:var(--serif);
@@ -1790,12 +1790,12 @@ textarea {
   letter-spacing:-.03em
 }
 .metric-card p:not(.eyebrow) {
-  font-size:10px;
+  font-size:12px;
   color:var(--quiet);
   margin:12px 0
 }
 .metric-card small {
-  font-size:9px;
+  font-size:11px;
   color:var(--quiet);
   line-height:1.7
 }
@@ -1803,7 +1803,7 @@ textarea {
   display:flex;
   align-items:center;
   gap:13px;
-  font-size:10px;
+  font-size:12px;
   padding:11px 0
 }
 .history-row>span {
@@ -1811,7 +1811,7 @@ textarea {
   color:var(--quiet)
 }
 .history-row strong {
-  font-size:10px;
+  font-size:12px;
   font-weight:400;
   width:20px;
   text-align:right
@@ -1848,13 +1848,13 @@ textarea {
   gap:25px
 }
 .bottleneck-list strong {
-  font-size:11px;
+  font-size:13px;
   font-weight:500;
   line-height:1.7
 }
 .bottleneck-list small {
   display:block;
-  font-size:9px;
+  font-size:11px;
   color:var(--quiet);
   line-height:1.7;
   margin-top:5px
@@ -1913,17 +1913,17 @@ textarea {
   max-width:calc(100vw - 270px)
 }
 .compare-tray>span {
-  font-size:11px;
+  font-size:13px;
   line-height:1.6
 }
 .compare-tray .button {
-  font-size:9px;
+  font-size:11px;
   min-height:35px;
   padding:9px 12px;
   white-space:nowrap
 }
 .compare-tray .text-button {
-  font-size:9px;
+  font-size:11px;
   white-space:nowrap
 }
 dialog {
@@ -1958,7 +1958,7 @@ dialog::backdrop {
   margin-bottom:0
 }
 .dialog-heading .eyebrow {
-  font-size:8px;
+  font-size:11px;
   margin-bottom:10px
 }
 .asset-detail {
@@ -1984,7 +1984,7 @@ dialog::backdrop {
   padding:12px 0
 }
 .provenance-list dt {
-  font-size:9px;
+  font-size:11px;
   color:var(--quiet);
   margin-bottom:8px
 }
@@ -2010,7 +2010,7 @@ dialog::backdrop {
   margin:18px 0 12px
 }
 .comparison-grid p {
-  font-size:11px;
+  font-size:13px;
   color:var(--quiet);
   line-height:1.7
 }
@@ -2025,7 +2025,7 @@ dialog::backdrop {
   color:var(--surface);
   padding:18px 45px 18px 20px;
   max-width:470px;
-  font-size:11px;
+  font-size:13px;
   line-height:1.8;
   box-shadow:0 3px 20px #0002;
   z-index:30;
@@ -2049,7 +2049,7 @@ dialog::backdrop {
   display:block;
   color:inherit;
   margin-top:10px;
-  font-size:10px
+  font-size:12px
 }
 @keyframes loading {
   from {
@@ -2167,7 +2167,7 @@ dialog::backdrop {
     margin-left:0
   }
   .select-field {
-    font-size:8px
+    font-size:11px
   }
   .source-grid {
     grid-template-columns:repeat(2,minmax(0,1fr))
@@ -2212,7 +2212,7 @@ dialog::backdrop {
     padding:23px 27px 0;
     border-right:0;
     border-bottom:1px solid var(--line);
-    background:#e8eadd;
+    background:#edf3fb;
     display:block
   }
   .masthead {
@@ -2223,7 +2223,7 @@ dialog::backdrop {
     gap:20px
   }
   .masthead span {
-    font-size:8px;
+    font-size:11px;
     letter-spacing:.08em;
     margin:0
   }
@@ -2238,7 +2238,7 @@ dialog::backdrop {
     padding:0 17px
   }
   .primary-nav a {
-    font-size:10px;
+    font-size:12px;
     gap:9px;
     white-space:nowrap;
     min-height:44px;
@@ -2246,7 +2246,7 @@ dialog::backdrop {
     padding:12px 11px
   }
   .primary-nav a>span {
-    font-size:8px
+    font-size:11px
   }
   .primary-nav a[aria-current] {
     background:transparent;
@@ -2258,7 +2258,7 @@ dialog::backdrop {
     color:var(--quiet)
   }
   .primary-nav a small {
-    font-size:8px
+    font-size:11px
   }
   .topbar {
     height:60px
@@ -2300,7 +2300,7 @@ dialog::backdrop {
   }
   .masthead span {
     margin-top:10px;
-    font-size:7px
+    font-size:11px
   }
   .primary-nav {
     margin:0 -20px;
@@ -2308,7 +2308,7 @@ dialog::backdrop {
     gap:0
   }
   .primary-nav a {
-    font-size:9px;
+    font-size:11px;
     padding:11px 10px;
     gap:6px
   }
@@ -2324,7 +2324,7 @@ dialog::backdrop {
     height:56px
   }
   .breadcrumb {
-    font-size:9px;
+    font-size:11px;
     gap:8px
   }
   .breadcrumb>span:first-child {
@@ -2336,7 +2336,7 @@ dialog::backdrop {
   }
   .global-search input {
     width:140px;
-    font-size:10px
+    font-size:12px
   }
   .global-search kbd {
     display:none
@@ -2345,23 +2345,23 @@ dialog::backdrop {
     padding:12px 20px;
     align-items:flex-start;
     gap:12px;
-    font-size:9px
+    font-size:11px
   }
   .source-bar>span {
     gap:6px
   }
   .source-bar small {
     width:100%;
-    font-size:8px;
+    font-size:11px;
     margin-left:11px;
     line-height:1.7
   }
   .source-bar .text-button {
-    font-size:9px
+    font-size:11px
   }
   .source-warnings {
     margin:0 20px;
-    font-size:10px
+    font-size:12px
   }
   main {
     padding:30px 20px 10px
@@ -2370,7 +2370,7 @@ dialog::backdrop {
     margin:35px 20px 0;
     flex-direction:column;
     gap:9px;
-    font-size:8px;
+    font-size:11px;
     padding:20px 0 25px
   }
   .home-intro {
@@ -2395,11 +2395,11 @@ dialog::backdrop {
     display:none
   }
   .home-intro .eyebrow {
-    font-size:8px;
+    font-size:11px;
     max-width:220px
   }
   .intro-deck {
-    font-size:11px
+    font-size:13px
   }
   .stats-row {
     grid-template-columns:repeat(2,minmax(0,1fr));
@@ -2421,7 +2421,7 @@ dialog::backdrop {
     font-size:30px
   }
   .stats-row span {
-    font-size:9px
+    font-size:11px
   }
   .feature-story {
     grid-template-columns:1fr;
@@ -2441,10 +2441,10 @@ dialog::backdrop {
     line-height:1.1
   }
   .feature-copy .eyebrow {
-    font-size:8px
+    font-size:11px
   }
   .feature-copy>p:not(.eyebrow) {
-    font-size:11px
+    font-size:13px
   }
   .story-grid {
     gap:20px;
@@ -2471,10 +2471,10 @@ dialog::backdrop {
     font-size:17px
   }
   .section-heading p {
-    font-size:10px
+    font-size:12px
   }
   .section-heading>.text-link {
-    font-size:10px;
+    font-size:12px;
     max-width:95px;
     white-space:normal;
     text-align:right;
@@ -2495,10 +2495,10 @@ dialog::backdrop {
     margin-bottom:17px
   }
   .page-heading .eyebrow {
-    font-size:8px
+    font-size:11px
   }
   .page-description {
-    font-size:11px
+    font-size:13px
   }
   .filter-bar {
     align-items:flex-start;
@@ -2510,15 +2510,15 @@ dialog::backdrop {
     gap:4px
   }
   .filter-chip {
-    font-size:9px;
+    font-size:11px;
     padding:8px;
     gap:7px
   }
   .filter-chip span {
-    font-size:8px
+    font-size:11px
   }
   .filter-bar>.small {
-    font-size:9px
+    font-size:11px
   }
   .pipeline-row {
     grid-template-columns:60px minmax(0,1fr);
@@ -2537,7 +2537,7 @@ dialog::backdrop {
     height:80px
   }
   .pipeline-title .eyebrow {
-    font-size:7px;
+    font-size:11px;
     margin-bottom:5px
   }
   .pipeline-title h2 {
@@ -2545,7 +2545,7 @@ dialog::backdrop {
     margin-bottom:9px
   }
   .pipeline-title small {
-    font-size:7px
+    font-size:11px
   }
   .pipeline-status {
     grid-column:2;
@@ -2553,7 +2553,7 @@ dialog::backdrop {
     flex-direction:row;
     align-items:center;
     flex-wrap:wrap;
-    font-size:8px
+    font-size:11px
   }
   .pipeline-status>span:last-child {
     display:none
@@ -2561,7 +2561,7 @@ dialog::backdrop {
   .pipeline-row>.row-action {
     grid-column:2;
     margin-top:0;
-    font-size:9px
+    font-size:11px
   }
   .story-heading h1 {
     font-size:35px;
@@ -2569,7 +2569,7 @@ dialog::backdrop {
     margin-bottom:20px
   }
   .story-heading .eyebrow {
-    font-size:7px;
+    font-size:11px;
     overflow-wrap:anywhere
   }
   .story-heading {
@@ -2578,14 +2578,14 @@ dialog::backdrop {
   .story-heading>.button {
     padding:10px 13px;
     min-height:35px;
-    font-size:8px
+    font-size:11px
   }
   .story-meta {
     gap:10px;
-    font-size:9px
+    font-size:11px
   }
   .local-notice {
-    font-size:9px;
+    font-size:11px;
     gap:7px;
     align-items:flex-start;
     flex-wrap:wrap;
@@ -2595,14 +2595,14 @@ dialog::backdrop {
     margin-top:6px
   }
   .local-notice>small {
-    font-size:8px
+    font-size:11px
   }
   .story-tabs {
     gap:23px;
     margin-bottom:26px
   }
   .story-tabs a {
-    font-size:10px;
+    font-size:12px;
     padding:15px 0
   }
   .story-workspace {
@@ -2639,7 +2639,7 @@ dialog::backdrop {
   }
   .blocker-list li {
     margin:6px 0;
-    font-size:9px
+    font-size:11px
   }
   .body-copy {
     font-size:12px;
@@ -2655,7 +2655,7 @@ dialog::backdrop {
     gap:9px
   }
   .contact-strip .photo-number {
-    font-size:8px;
+    font-size:11px;
     left:6px;
     top:6px;
     padding:4px 6px
@@ -2670,13 +2670,13 @@ dialog::backdrop {
   .notice {
     padding:18px 20px;
     margin:18px 0 24px;
-    font-size:11px
+    font-size:13px
   }
   .notice p {
-    font-size:10px
+    font-size:12px
   }
   .notice strong {
-    font-size:10px
+    font-size:12px
   }
   .asset-grid {
     grid-template-columns:repeat(2,minmax(0,1fr));
@@ -2686,7 +2686,7 @@ dialog::backdrop {
     padding:13px
   }
   .asset-copy .eyebrow {
-    font-size:7px;
+    font-size:11px;
     letter-spacing:.07em
   }
   .asset-copy h3 {
@@ -2694,11 +2694,11 @@ dialog::backdrop {
     margin-bottom:12px
   }
   .asset-meta {
-    font-size:8px;
+    font-size:11px;
     gap:8px
   }
   .asset-meta .badge {
-    font-size:7px;
+    font-size:11px;
     padding:4px 6px
   }
   .asset-actions {
@@ -2707,14 +2707,14 @@ dialog::backdrop {
     gap:8px
   }
   .asset-actions .small-button {
-    font-size:8px;
+    font-size:11px;
     min-height:31px;
     padding:7px 8px;
     white-space:normal;
     text-align:left
   }
   .asset-actions .text-button {
-    font-size:8px
+    font-size:11px
   }
   .library-tools {
     gap:14px;
@@ -2726,19 +2726,19 @@ dialog::backdrop {
     padding:0 12px
   }
   .search-field input {
-    font-size:10px;
+    font-size:12px;
     height:39px
   }
   .select-field {
-    font-size:9px
+    font-size:11px
   }
   .select-field select {
-    font-size:9px;
+    font-size:11px;
     padding:10px
   }
   .library-tools>.small {
     margin-left:auto;
-    font-size:9px
+    font-size:11px
   }
   .source-grid {
     grid-template-columns:repeat(2,minmax(0,1fr));
@@ -2751,7 +2751,7 @@ dialog::backdrop {
     font-size:20px
   }
   .source-card p {
-    font-size:9px
+    font-size:11px
   }
   .archive-directory {
     margin-top:40px
@@ -2767,14 +2767,14 @@ dialog::backdrop {
     font-size:19px
   }
   .slide-copy .eyebrow {
-    font-size:7px
+    font-size:11px
   }
   .slide-copy>p:not(.eyebrow) {
-    font-size:8px;
+    font-size:11px;
     margin-bottom:8px
   }
   .slide-copy .badge {
-    font-size:7px;
+    font-size:11px;
     padding:4px
   }
   .slide-controls {
@@ -2795,7 +2795,7 @@ dialog::backdrop {
     line-height:1.75
   }
   .caption-toolbar {
-    font-size:9px
+    font-size:11px
   }
   .research-claim {
     gap:15px;
@@ -2808,16 +2808,16 @@ dialog::backdrop {
     gap:10px
   }
   .research-meta>a {
-    font-size:9px
+    font-size:11px
   }
   .research-meta .badge {
-    font-size:7px
+    font-size:11px
   }
   .field-pair {
     gap:12px
   }
   .field-pair input {
-    font-size:11px
+    font-size:13px
   }
   .selected-track {
     padding:22px;
@@ -2839,13 +2839,13 @@ dialog::backdrop {
   .track>.small-button {
     margin-left:29px;
     min-height:32px;
-    font-size:9px
+    font-size:11px
   }
   .track h3 {
     font-size:24px
   }
   .track small {
-    font-size:9px
+    font-size:11px
   }
   .publishing-row {
     grid-template-columns:70px minmax(0,1fr);
@@ -2853,7 +2853,7 @@ dialog::backdrop {
   }
   .publishing-row>.row-action {
     grid-column:2;
-    font-size:10px;
+    font-size:12px;
     margin-top:-5px
   }
   .publishing-row h2 {
@@ -2861,18 +2861,18 @@ dialog::backdrop {
     line-height:1.15
   }
   .publishing-row .eyebrow {
-    font-size:7px;
+    font-size:11px;
     overflow-wrap:anywhere
   }
   .publishing-facts {
-    font-size:8px;
+    font-size:11px;
     gap:10px
   }
   .publishing-facts .badge {
-    font-size:7px
+    font-size:11px
   }
   .publishing-row p:not(.eyebrow) {
-    font-size:9px
+    font-size:11px
   }
   .publishing-summary {
     grid-template-columns:1fr
@@ -2889,7 +2889,7 @@ dialog::backdrop {
     gap:18px;
     align-items:flex-start;
     flex-direction:column;
-    font-size:10px;
+    font-size:12px;
     padding:18px 0
   }
   .archive-summary strong {
@@ -2906,13 +2906,13 @@ dialog::backdrop {
     font-size:25px
   }
   .metric-card .eyebrow {
-    font-size:8px
+    font-size:11px
   }
   .metric-card small {
-    font-size:8px
+    font-size:11px
   }
   .history-row {
-    font-size:9px;
+    font-size:11px;
     gap:10px
   }
   .history-row>span {
@@ -2928,14 +2928,14 @@ dialog::backdrop {
     width:calc(100vw - 30px)
   }
   .compare-tray>span {
-    font-size:10px;
+    font-size:12px;
     flex:1
   }
   .compare-tray .text-button {
-    font-size:8px
+    font-size:11px
   }
   .compare-tray .button {
-    font-size:8px;
+    font-size:11px;
     padding:9px 11px
   }
   .toast {
@@ -2943,7 +2943,7 @@ dialog::backdrop {
     right:15px;
     left:15px;
     max-width:none;
-    font-size:10px;
+    font-size:12px;
     padding:17px 40px 17px 18px
   }
   dialog {
@@ -2973,10 +2973,10 @@ dialog::backdrop {
     gap:0 20px
   }
   .provenance-list dd {
-    font-size:11px
+    font-size:13px
   }
   .provenance-list dt {
-    font-size:8px
+    font-size:11px
   }
   .comparison-grid {
     grid-template-columns:repeat(2,minmax(0,1fr));
@@ -2986,7 +2986,7 @@ dialog::backdrop {
     font-size:21px
   }
   .comparison-grid p {
-    font-size:10px
+    font-size:12px
   }
   .comparison-grid article:last-child:nth-child(odd) {
     grid-column:1/-1;
@@ -3005,7 +3005,7 @@ dialog::backdrop {
     font-size:25px
   }
   .empty-state p {
-    font-size:11px
+    font-size:13px
   }
 }
 @media(max-width:380px) {
@@ -3028,7 +3028,7 @@ dialog::backdrop {
     font-size:17px
   }
   .asset-actions .small-button {
-    font-size:7px;
+    font-size:11px;
     padding:6px
   }
   .carousel-slide {
@@ -3067,11 +3067,11 @@ dialog::backdrop {
   flex-shrink:0
 }
 .story-header-actions>.button {
-  font-size:9px;
+  font-size:11px;
   white-space:nowrap
 }
 .story-header-actions>.text-button {
-  font-size:9px;
+  font-size:11px;
   color:var(--quiet)
 }
 .draft-comparison {
@@ -3097,7 +3097,7 @@ dialog::backdrop {
   overflow-wrap:anywhere
 }
 .draft-comparison details {
-  font-size:11px
+  font-size:13px
 }
 .dialog-actions {
   display:flex;
@@ -3106,7 +3106,7 @@ dialog::backdrop {
   margin:25px 0 18px
 }
 .dialog-actions .button {
-  font-size:10px;
+  font-size:12px;
   max-width:100%
 }
 .draft-history>details {
@@ -3125,7 +3125,7 @@ dialog::backdrop {
   font-size:13px
 }
 .draft-history>details>summary>span {
-  font-size:10px;
+  font-size:12px;
   color:var(--quiet)
 }
 .draft-history .body-copy {
@@ -3136,7 +3136,7 @@ dialog::backdrop {
   margin-top:15px
 }
 .draft-history details details {
-  font-size:10px
+  font-size:12px
 }
 .notice>.small-button {
   margin-top:16px
@@ -3207,7 +3207,7 @@ dialog::backdrop {
   max-width:100%
 }
 .proposal-hint {
-  font-size:8px;
+  font-size:11px;
   line-height:1.7;
   color:var(--quiet);
   max-width:220px
@@ -3227,17 +3227,17 @@ dialog::backdrop {
   border-bottom:1px solid var(--line)
 }
 .unmapped-list code {
-  font-size:10px
+  font-size:12px
 }
 .unmapped-list .publishing-facts {
   margin-top:12px
 }
 .unmapped-list p {
   margin:0;
-  font-size:10px
+  font-size:12px
 }
 .unmapped-list a {
-  font-size:10px
+  font-size:12px
 }
 .unmapped-list>article:last-child {
   border-bottom:0
@@ -3253,13 +3253,13 @@ dialog::backdrop {
     gap:13px
   }
   .unmapped-list .publishing-facts {
-    font-size:8px
+    font-size:11px
   }
   .unmapped-list code {
-    font-size:9px
+    font-size:11px
   }
   .unmapped-list p,.unmapped-list a {
-    font-size:9px
+    font-size:11px
   }
 }
 /* Archive titles can be long original filenames; preserve them without widening cards. */
@@ -3281,7 +3281,7 @@ dialog::backdrop {
   margin-top:15px
 }
 .existing-source-notes summary {
-  font-size:10px;
+  font-size:12px;
   cursor:pointer;
   color:var(--accent);
   line-height:1.7
@@ -3289,7 +3289,7 @@ dialog::backdrop {
 .existing-source-notes details>p {
   white-space:pre-wrap;
   overflow-wrap:anywhere;
-  font-size:11px;
+  font-size:13px;
   color:var(--quiet);
   line-height:1.9;
   margin:12px 0 3px
@@ -3302,7 +3302,7 @@ dialog::backdrop {
 }
 .direction-intro summary {
   cursor: pointer;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--quiet);
 }
 .direction-hook-options {
@@ -3349,13 +3349,13 @@ dialog::backdrop {
   line-height: 1.25;
 }
 .direction-hook small {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--quiet);
   line-height: 1.8;
 }
 .direction-hook em {
   font-style: normal;
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.8;
   color: var(--accent);
 }
@@ -3381,12 +3381,12 @@ dialog::backdrop {
   width: 100%;
   background: var(--white);
   padding: 11px 13px;
-  font-size: 11px;
+  font-size: 13px;
   min-height: 42px;
   border: 1px solid var(--line);
 }
 .direction-guidance {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--quiet);
   line-height: 1.9;
   padding-left: 18px;
@@ -3425,12 +3425,12 @@ dialog::backdrop {
   margin-bottom: 10px;
 }
 .direction-sequence .eyebrow {
-  font-size: 8px;
+  font-size: 11px;
   margin-bottom: 9px;
 }
 .direction-sequence textarea {
   min-height: 80px;
-  font-size: 11px;
+  font-size: 13px;
   padding: 12px;
 }
 .direction-source-grid {
@@ -3466,24 +3466,24 @@ dialog::backdrop {
   line-height: 1.2;
 }
 .direction-source-grid p {
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.9;
   color: var(--quiet);
   margin: 15px 0;
 }
 .direction-source-grid .direction-query {
   font-family: ui-monospace, monospace;
-  font-size: 9px;
+  font-size: 11px;
   padding: 10px;
   border: 1px solid var(--line);
   background: var(--surface);
 }
 .direction-source-grid a {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--accent);
 }
 .direction-source-grid small {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--quiet);
   line-height: 1.8;
   display: block;
@@ -3506,7 +3506,7 @@ dialog::backdrop {
   letter-spacing: -.025em;
 }
 .direction-rating-grid span {
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.8;
   color: var(--quiet);
   margin: 12px 0 16px;
@@ -3523,7 +3523,7 @@ dialog::backdrop {
 }
 .direction-review-score small {
   font-family: var(--sans);
-  font-size: 11px;
+  font-size: 13px;
   color: var(--quiet);
   letter-spacing: 0;
 }
@@ -3542,25 +3542,25 @@ dialog::backdrop {
   border-bottom: 1px solid var(--line);
 }
 .direction-brief-summary dt {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--quiet);
   margin-bottom: 7px;
 }
 .direction-brief-summary dd {
   margin: 0;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.8;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .direction-brief-summary ul {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--quiet);
   line-height: 1.8;
 }
 .direction-brief-summary li > p {
   margin: 6px 0 12px;
-  font-size: 10px;
+  font-size: 12px;
   white-space: pre-wrap;
 }
 @media (max-width: 1200px) {
@@ -3581,13 +3581,13 @@ dialog::backdrop {
     font-size: 21px;
   }
   .direction-hook small {
-    font-size: 10px;
+    font-size: 12px;
   }
   .direction-hook em {
-    font-size: 9px;
+    font-size: 11px;
   }
   .direction-hook-options legend {
-    font-size: 10px;
+    font-size: 12px;
   }
   .direction-sequence > li {
     grid-template-columns: 70px minmax(0, 1fr);
@@ -3610,7 +3610,7 @@ dialog::backdrop {
     margin: 8px 0 12px;
   }
   .direction-guidance {
-    font-size: 10px;
+    font-size: 12px;
   }
   .direction-review-score {
     font-size: 39px;
@@ -3621,7 +3621,7 @@ dialog::backdrop {
   margin-top: 13px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
-  font-size: 8px;
+  font-size: 11px;
   line-height: 1.8;
   overflow-wrap: anywhere;
 }
@@ -3635,13 +3635,13 @@ dialog::backdrop {
   margin: 8px 0;
 }
 .direction-source-examples a {
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .story-direction-links { display:flex; flex-wrap:wrap; gap:16px; margin-top:18px; }
 
 /* Browser-observed preview state; never an automated judgment of the photograph. */
-.preview-status { position:absolute; inset:auto 12px 12px; font-size:11px; color:var(--ink); background:var(--surface); padding:6px; pointer-events:none; }
+.preview-status { position:absolute; inset:auto 12px 12px; font-size:13px; color:var(--ink); background:var(--surface); padding:6px; pointer-events:none; }
 .preview-status:empty { display:none; }
 .photo.preview-failed::after { content:none; }
 .photo.preview-failed { background:var(--accent-soft); flex-direction:column; }
@@ -3694,7 +3694,7 @@ dialog::backdrop {
 [data-form="editorial-setup"] input,
 [data-form="editorial-setup"] select,
 [data-form="music-intent"] select { display: block; width: 100%; padding: 12px 14px; margin-top: 8px; font-size: 12px; line-height: 1.5; }
-[data-form="music-intent"] label { display: block; font-size: 11px; }
+[data-form="music-intent"] label { display: block; font-size: 13px; }
 [data-form="music-intent"] textarea { margin-top: 8px; }
 [data-form="music-intent"] button[type="submit"] { margin-top: 16px; }
 
@@ -3753,3 +3753,244 @@ dialog::backdrop {
 .source-lead-grid .photo { aspect-ratio: 4/5; }
 .source-lead-grid .photo img { object-fit: contain; }
 @media(max-width:800px){.source-feed-list,.source-lead-grid { grid-template-columns:1fr; }}
+
+/* The founder's desk: compact editorial hierarchy, with operations kept secondary. */
+.sidebar { padding-top:28px; overflow-y:auto; }
+.masthead { padding-bottom:26px; }
+.sidebar-label { padding-top:18px; margin-bottom:12px; }
+.primary-nav a { min-height:46px; font-size:14px; gap:10px; }
+.primary-nav a[aria-current] { background:var(--accent); border-color:var(--accent); }
+.sidebar-tools { margin-top:auto; padding-top:24px; color:var(--quiet); }
+.sidebar-tools>summary { padding:10px 0; cursor:pointer; font-size:13px; }
+.sidebar-tools[open]>summary { margin-bottom:10px; color:var(--ink); }
+.sidebar-tools .sidebar-foot { margin:0; padding:0; }
+.sidebar-tools :is(p,a,button) { font-size:12px; line-height:1.65; }
+.sidebar-tools a { display:block; margin:12px 0; }
+.sidebar-tools .edition-mark,.sidebar-tools .keyboard-hints { display:none; }
+.topbar { height:64px; background:var(--surface); gap:18px; }
+.topbar,.source-bar { padding-left:30px; padding-right:30px; }
+.breadcrumb { font-size:13px; }
+.global-search input { font-size:13px; }
+.private-label { font-size:11px; padding-left:16px; }
+main { padding:28px 30px 20px; }
+.workspace-footer { margin:34px 30px 0; padding:20px 0; font-size:12px; }
+.connection-details { font-size:12px; color:var(--quiet); border-bottom:1px solid var(--soft-line); }
+.connection-details>summary { cursor:pointer; padding:10px 30px; }
+.connection-details .source-bar { border:0; padding-top:4px; padding-bottom:12px; }
+.connection-details .source-warnings { margin:0 30px; }
+.connection-details summary:hover,.sidebar-tools>summary:hover { color:var(--accent); }
+.library-sections { display:flex; gap:6px; flex-wrap:wrap; border-bottom:1px solid var(--line); padding:0 0 16px; margin:0 0 24px; }
+.library-sections a { padding:8px 12px; font-size:13px; text-decoration:none; border:1px solid transparent; }
+.library-sections a[aria-current] { border-color:var(--line); background:var(--surface); color:var(--accent); }
+.library-sections a:hover { background:var(--accent-soft); }
+.today-intro { display:flex; align-items:end; justify-content:space-between; gap:20px; margin:0 0 24px; }
+.today-intro h1 { font:clamp(38px,4vw,56px)/1.05 var(--serif); letter-spacing:-.045em; margin:6px 0 12px; }
+.today-intro .eyebrow { margin-bottom:6px; }
+.today-intro p { font-size:14px; margin-bottom:0; color:var(--quiet); max-width:620px; }
+.today-intro h1 em { color:var(--accent); font-weight:400; }
+.today-new-count { font-size:13px; color:var(--quiet); }
+.today-priority { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(260px,1fr); gap:24px; align-items:start; }
+.today-priority>* { min-width:0; }
+.today-section { margin-bottom:28px; }
+.today-section>.section-heading { margin-bottom:16px; }
+.today-story-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+.today-story-grid .story-card { min-width:0; }
+.today-story-grid .story-card-copy { padding:17px; }
+.today-story-grid .story-card h3 { font-size:25px; line-height:1.15; }
+.today-story-grid .story-card p { font-size:14px; }
+.today-story-grid .story-image-link .photo { aspect-ratio:4/3; }
+.today-story-grid .story-image-link img { object-fit:contain; }
+.today-story-grid .card-foot { flex-wrap:wrap; gap:10px; }
+.today-attention-list { list-style:none; padding:0; margin:0; }
+.today-attention-list li { border-bottom:1px solid var(--soft-line); }
+.today-attention-list a { display:block; padding:14px 0; text-decoration:none; }
+.today-attention-list strong { display:block; font:21px/1.25 var(--serif); margin-bottom:7px; }
+.today-attention-list span { font-size:13px; color:var(--quiet); }
+.today-attention-list a:hover strong { color:var(--accent); }
+.today-section .empty-state { padding:24px; min-height:0; text-align:left; border:1px solid var(--line); background:var(--surface); }
+.today-section .empty-state>span { display:none; }
+.today-section .empty-state h3 { font:24px/1.2 var(--serif); margin:0 0 10px; }
+.today-section .empty-state p { font-size:14px; margin-bottom:12px; max-width:600px; }
+.page-header { margin-bottom:26px; }
+.page-header h1 { font-size:clamp(34px,3.4vw,48px); }
+.page-header>p,.page-header p:not(.eyebrow) { font-size:14px; line-height:1.65; }
+.founder-inbox { margin:24px 0; }
+.founder-inbox .filter-chips { gap:7px; margin:16px 0; }
+.founder-inbox>.empty-state { min-height:0; padding:26px; border:1px solid var(--line); background:var(--surface); }
+.proposal-grid { gap:20px; }
+.proposal-image .photo { aspect-ratio:4/3; max-height:340px; background:#edf2f9; }
+.proposal-image .photo img { object-fit:contain; }
+.proposal-copy { padding:20px; }
+.proposal-copy h3 { font-size:29px; margin:8px 0 12px; }
+.proposal-copy p { font-size:14px; margin-bottom:12px; }
+.proposal-copy p.small { font-size:12px; }
+.proposal-copy .eyebrow { font-size:11px; }
+.proposal-copy details { margin-top:12px; }
+.proposal-copy details>summary { cursor:pointer; font-size:13px; color:var(--quiet); padding:6px 0; }
+.proposal-copy details[open]>summary { color:var(--accent); }
+.proposal-copy form { margin-top:16px; }
+.review-actions { gap:7px; margin:12px 0; }
+.review-actions .button,.review-actions .small-button { padding:10px 13px; min-height:40px; font-size:13px; }
+.review-receipt { font-size:13px!important; background:var(--accent-soft); padding:10px 12px; line-height:1.5!important; }
+.research-layout { gap:20px; margin:20px 0; }
+.research-layout .paper-panel { padding:22px; }
+.research-layout :is(p,label) { font-size:14px; }
+.research-layout textarea { min-height:110px; }
+.story-heading { margin-bottom:16px; gap:20px; }
+.story-heading h1 { margin-bottom:12px; font-size:clamp(30px,3.1vw,45px); }
+.story-premise { max-width:850px; font-size:15px; line-height:1.65; color:var(--quiet); margin:0 0 18px; }
+.story-premise p { margin:0; }
+.story-stages { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); border-top:1px solid var(--line); border-bottom:1px solid var(--line); gap:0; margin:18px 0 0; }
+.story-stages a { display:flex; align-items:center; gap:9px; padding:15px 12px; text-decoration:none; font-size:14px; border-bottom:2px solid transparent; color:var(--quiet); min-width:0; }
+.story-stages a small { font-size:11px; color:var(--quiet); }
+.story-stages a:hover { background:var(--accent-soft); }
+.story-stages a[aria-current] { background:var(--surface); color:var(--accent); border-bottom-color:var(--accent); }
+.story-stage-tools { border:0; margin:0 0 22px; gap:22px; padding:0 12px; }
+.story-stage-tools a { font-size:13px; padding:11px 0; }
+.story-record-details { margin:12px 0; color:var(--quiet); font-size:13px; border-bottom:1px solid var(--soft-line); padding-bottom:12px; }
+.story-record-details>summary { cursor:pointer; width:fit-content; }
+.story-record-details[open]>summary { margin-bottom:16px; }
+.story-record-details .notice { margin:16px 0; }
+.story-record-details .story-header-actions { margin:14px 0; flex-wrap:wrap; }
+.story-contact-sheet { margin:0 0 24px; }
+.story-contact-sheet .contact-strip { margin-bottom:16px; }
+.story-contact-sheet .photo img { object-fit:contain; }
+.story-workspace { gap:26px; grid-template-columns:minmax(0,1fr) 225px; }
+.workspace-aside { padding-left:22px; }
+.workspace-aside p,.blocker-list { font-size:13px; line-height:1.65; }
+.editorial-panel { padding:24px; }
+.editorial-panel :is(p,li) { font-size:14px; line-height:1.7; }
+.editorial-panel .small { font-size:13px; }
+.next-action { margin-bottom:20px; padding-bottom:20px; }
+.next-action h2 { font-size:26px; }
+.local-notice { font-size:12px; padding:10px 0; gap:8px; flex-wrap:wrap; }
+.local-notice>small { font-size:11px; }
+.paper-panel p { font-size:14px; }
+.source-inputs { padding:18px 20px; }
+summary { cursor:pointer; }
+summary:focus-visible { border-radius:0; }
+@media(min-width:961px) {
+  .app-shell { grid-template-columns:214px minmax(0,1fr); }
+  .sidebar { padding-left:18px; padding-right:18px; }
+  .masthead { font-size:23px; }
+}
+@media(max-width:1100px) {
+  .today-story-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .story-workspace { grid-template-columns:minmax(0,1fr) 205px; gap:20px; }
+  .story-stages a { padding:14px 9px; gap:6px; font-size:13px; }
+}
+@media(max-width:960px) {
+  .sidebar { padding:20px 24px 0; overflow:visible; }
+  .masthead { padding-bottom:16px; }
+  .primary-nav { width:calc(100% + 48px); margin:0 -24px; padding:0 14px; }
+  .primary-nav a { min-height:45px; font-size:14px; padding:11px 13px; }
+  .primary-nav a[aria-current] { background:transparent; border:0; border-bottom:2px solid var(--accent); color:var(--accent); }
+  .sidebar-tools { padding:0 0 14px; margin:12px 0 0; }
+  .sidebar-tools>summary { padding:5px 0; }
+  .sidebar-tools .sidebar-foot { display:block; }
+  .sidebar-tools .sidebar-foot a { margin-top:10px; }
+  .sidebar-tools .sidebar-foot p { margin:8px 0; }
+  .connection-details>summary { padding-left:24px; padding-right:24px; }
+  .connection-details .source-warnings { margin:0 24px; }
+  .topbar,.source-bar { padding-left:24px; padding-right:24px; }
+  main { padding:24px; }
+  .today-priority { grid-template-columns:1fr; }
+}
+@media(max-width:700px) {
+  .sidebar { padding:18px 18px 0; }
+  .masthead { font-size:24px; display:block; }
+  .masthead span { font-size:11px; margin-top:9px; }
+  .primary-nav { width:calc(100% + 36px); margin:0 -18px; padding:0 9px; }
+  .primary-nav a { font-size:13px; padding:11px 10px; }
+  .sidebar-tools { margin-top:10px; padding-bottom:10px; }
+  .topbar { padding:0 18px; height:auto; min-height:58px; gap:12px; flex-wrap:wrap; }
+  .global-search { margin-left:auto; max-width:155px; }
+  .global-search input { width:125px; }
+  .connection-details>summary { padding:10px 18px; }
+  .connection-details .source-bar { padding-left:18px; padding-right:18px; flex-wrap:wrap; }
+  main { padding:22px 18px 12px; }
+  .today-intro { align-items:start; flex-direction:column; gap:12px; margin-bottom:22px; }
+  .today-intro h1 { font-size:40px; }
+  .today-story-grid { grid-template-columns:minmax(0,1fr); gap:18px; }
+  .today-story-grid .story-image-link .photo { aspect-ratio:4/3; }
+  .today-section>.section-heading { align-items:start; flex-wrap:wrap; gap:8px; }
+  .today-section>.section-heading>.text-link { white-space:normal; }
+  .story-workspace { grid-template-columns:minmax(0,1fr); gap:20px; }
+  .story-stages { display:flex; overflow-x:auto; }
+  .story-stages a { flex:0 0 auto; min-height:46px; padding:12px 11px; font-size:13px; }
+  .story-stages a small { display:none; }
+  .story-stage-tools { padding:0; gap:18px; }
+  .story-record-details .story-header-actions { align-items:start; }
+  .story-premise { font-size:14px; }
+  .editorial-panel { padding:20px; }
+  .proposal-image .photo { max-height:390px; }
+  .review-actions .button,.review-actions .small-button { padding:10px 12px; }
+  .research-layout .paper-panel { padding:20px; }
+  .workspace-footer { margin:28px 18px 0; }
+  .library-sections { gap:3px; }
+  .library-sections a { padding:8px 9px; }
+}
+.discovery-intro { margin-bottom:20px; }
+.discovery-intro h1 { font:clamp(36px,3.6vw,50px)/1.1 var(--serif); letter-spacing:-.045em; margin:6px 0 12px; }
+.discovery-intro>p { color:var(--quiet); font-size:14px; max-width:660px; margin-bottom:0; }
+.discovery-research { border:1px solid var(--line); background:var(--surface); padding:22px; margin:24px 0; min-width:0; }
+.discovery-research>summary { font:23px/1.3 var(--serif); color:var(--ink); }
+.discovery-research[open]>summary { margin-bottom:16px; }
+.discovery-research form { max-width:780px; }
+.discovery-research textarea { min-height:110px; }
+.discovery-research .field { display:block; font-size:14px; margin-bottom:14px; }
+.discovery-research :is(input:not([type="checkbox"]),select,textarea) { width:100%; padding:11px 12px; }
+.discovery-research .carousel-actions { flex-wrap:wrap; gap:14px; }
+.research-system { margin:16px 0; border-top:1px solid var(--soft-line); padding-top:12px; color:var(--quiet); font-size:13px; }
+.research-system>summary { padding:4px 0; }
+.research-system[open]>summary { margin-bottom:12px; }
+.research-system :is(p,li,button) { font-size:13px; }
+.request-summary { display:flex; align-items:baseline; justify-content:space-between; gap:18px; flex-wrap:wrap; }
+.request-summary h3 { font:23px/1.25 var(--serif); margin:0; }
+.request-summary p { margin:6px 0; font-size:13px; }
+.research-request-list { display:grid; gap:14px; }
+.research-request-list>article { padding:18px 20px; background:var(--surface); border:1px solid var(--line); min-width:0; }
+.research-request-list :is(p,li) { overflow-wrap:anywhere; }
+.proposal-premise { font-size:15px!important; line-height:1.6!important; }
+.proposal-source { font-size:12px!important; color:var(--quiet); display:flex; align-items:baseline; flex-wrap:wrap; gap:5px 12px; }
+.proposal-source a { color:var(--accent); }
+.review-decision-next { font-size:13px; line-height:1.65; margin:10px 0; }
+.proposal-evidence-note { font-size:12px!important; color:var(--quiet); margin-top:12px; }
+.compact-empty { text-align:left; padding:24px; min-height:0; }
+.compact-empty h3 { font:25px/1.2 var(--serif); margin:0 0 12px; }
+.compact-empty p { font-size:14px; max-width:630px; margin-bottom:12px; }
+@media(min-width:1200px) {
+  .proposal-grid { grid-template-columns:minmax(0,1fr); }
+  .proposal-card { display:grid; grid-template-columns:minmax(260px,.85fr) minmax(0,1.15fr); }
+  .proposal-image .photo { height:100%; max-height:440px; min-height:340px; aspect-ratio:auto; }
+  .proposal-copy { padding:24px; }
+}
+@media(max-width:700px) {
+  .discovery-intro h1 { font-size:38px; }
+  .discovery-research { padding:20px; }
+  .request-summary { display:block; }
+}
+
+/* Keep the empty daily queue compact so real story titles remain above the fold. */
+.today-empty { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 20px; padding:12px 0; }
+.today-empty p { margin:0; font-size:14px; }
+.today-story-grid .story-image-link .photo { max-height:180px; }
+.today-story-grid .story-card h3 { font-size:23px; }
+.library-sections { padding:16px 30px; margin:0; }
+@media(max-width:700px) { .library-sections { padding:12px 18px; } }
+
+.today-story-grid .story-image-link .photo { width:100%; height:180px; aspect-ratio:auto; }
+.founder-inbox .empty-state { min-height:0; padding:18px 22px; }
+.founder-inbox .empty-state h3 { margin:0; font-size:24px; }
+.founder-inbox .empty-state p { margin:8px 0 12px; }
+
+.connection-details { position:relative; flex-shrink:0; }
+.connection-details>summary { padding:10px 12px; }
+.connection-panel { position:absolute; top:calc(100% + 8px); right:0; z-index:30; width:min(420px,calc(100vw - 36px)); max-height:65vh; overflow:auto; background:var(--surface); border:1px solid var(--line); box-shadow:0 12px 28px #162e6020; }
+.connection-panel .source-bar { flex-wrap:wrap; gap:12px; padding:18px; }
+.connection-panel .source-warnings { padding:0 20px 18px; margin:0; list-style-position:inside; overflow-wrap:anywhere; }
+@media(max-width:960px) {
+ .sidebar-foot { display:block; margin-top:0; padding-top:0; }
+ .sidebar-foot>.edition-mark { display:none; }
+ .sidebar-foot .sidebar-tools { margin:8px 0; padding:0; }
+}

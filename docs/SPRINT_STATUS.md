@@ -1,3 +1,11 @@
+# Editorial Studio UX milestone — October 30, 2026 (America/New_York)
+
+Five primary destinations now consolidate Today, Discover, Stories, Production and Library, with legacy hash URLs and all eight story deep links retained. Today surfaces real existing/saved work and separates genuinely new proposals from recovered history. Discover has photo-led decisions, one research-direction form, concise saved/not-started states and secondary system records. Stories use Understand → Images → Angle → Edit → Check, with original sources, rights checks, private revisions and history preserved. Library holds archive/insights as secondary sections; unavailable audience values collapse into one honest state. Backup/tools remain accessible on mobile; connection diagnostics are secondary.
+
+Verified:288 automated UX/base tests;42 existing browser workflows;11 HTTPS hosted workflows;7 new UX/browser checks including old/new routes, decision/draft persistence, no-dispatch direction saves and laptop/mobile overflow. Also4 focused new offline source-intake tests pass (next increment). Captured and visually inspected before/after Today/Discover/story using18 real cached native stories at1366×768 and1440×900. Artifacts are private/ignored `.local/ux-transformation/`; external photos were blocked, no real photograph pixels were inspected or fabricated. Synthetic browser images remain labeled fixtures. No private stores were overwritten. No deployment, credential, n8n or Buffer write/model call. Continue improving source-intake context and scoped feedback after this checkpoint; hosting manual deployment stays separately authorized.
+
+---
+
 # Hosted login CSRF repair — October 30, 2026 (America/New_York)
 
 Founder reports the existing Render login fails. Reproduced the code defect locally: anonymous favicon GET redirects to `/login`, whose GET always replaces the login cookie, invalidating an already rendered form. Fixed favicon GET/HEAD to return empty204 without redirect or cookie; login forms reuse a valid existing64-hex nonce without resetting its ten-minute cookie lifetime. Missing/malformed nonce still gets a fresh random token; successful login clears it. Exact Host/Origin, double-submit validation, HTTPS, SameSite, sessions and rate limiting remain enforced.

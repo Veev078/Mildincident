@@ -41,7 +41,7 @@ export function stateLabel(story) {
 }
 export function nextAction(story) {
   if (story.localDraft?.stale) return { label: 'Review source changes', tab: 'overview', reason: 'The source revision has changed since this local draft.' };
-  if (story.publishing?.multipleHandoffs || story.publishing?.requiresReview) return { label: 'Review publishing evidence', tab: 'publishing', reason: 'Resolve the existing handoff before preparing another.' };
+  if (story.publishing?.multipleHandoffs || story.publishing?.requiresReview) return { label: 'Finish required checks', tab: 'publishing', reason: 'Check the existing draft or send before preparing another.' };
   if (['buffer_sent', 'instagram_posted_verified', 'buffer_scheduled'].includes(story.publishing?.observed)) return { label: 'Review publication history', tab: 'publishing', reason: 'This story already has provider activity.' };
   if (story.publishing?.observed === 'buffer_unscheduled_draft') return { label: 'Review existing Buffer draft', tab: 'publishing', reason: 'Continue the existing draft; image rights remain a separate decision.' };
   if (!story.packageVersion) return { label: 'Review research', tab: 'research', reason: 'An existing production package has not been recorded.' };
@@ -75,7 +75,7 @@ export function blockers(story) {
 }
 export function draftNotice(story) {
   if (story.localDraft?.stale) return `<div class="notice warning"><strong>Source revision changed</strong><p>This local draft was based on an earlier package. Editing is paused so it cannot silently replace newer work. Compare it with the current source before deciding which local edits to retain.</p><button class="small-button" data-action="review-stale" data-story="${esc(story.id)}">Compare source and local draft →</button></div>`;
-  return `<div class="local-notice"><span class="status-dot" aria-hidden="true"></span><span data-save-status>${story.localDraft ? `${story.storageMode==='hosted'?'Saved to private Studio':'Saved locally'} · ${esc(date(story.localDraft.updatedAt))}` : 'Edits save privately in this development workspace'}</span><small>Not synced to n8n</small></div>`;
+  return `<div class="local-notice"><span class="status-dot" aria-hidden="true"></span><span data-save-status>${story.localDraft ? `${story.storageMode==='hosted'?'Saved to private Studio':'Saved locally'} · ${esc(date(story.localDraft.updatedAt))}` : 'Edits save privately in your Studio'}</span><small>Private working copy</small></div>`;
 }
 export function fieldDisabled(story) { return story.localDraft?.stale ? 'disabled' : ''; }
 export function proposalContent(story, label = 'Download local proposal ↗', className = 'button button-light') {
