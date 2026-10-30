@@ -16,7 +16,7 @@ Paths without a prefix above are in `src/` or `src/workspace/` as appropriate; t
 
 | Workflow / native records | Identity | Last verified role/state |
 | --- | --- | --- |
-| Development editorial worker | `6CkqfYc4Pyd4k8vi` | Inactive saved version `7273a017-55b8-41ff-a576-dea13e476189` (Oct30 readback). Source-aware prompt/capture changes staged, unexecuted. |
+| Development editorial worker | `6CkqfYc4Pyd4k8vi` | Inactive saved version `b1ee4086-4fe4-44a9-b9ee-fe0c5b7b6d5a` (Oct30 readback). Scoped feedback/source-aware prompt and photographic credit/series changes staged, unexecuted. |
 | Development jobs / candidates | `z22YLsWc4lO1yCG4` / `W40NQ6jFBZWbpB3U` | Studio read-only correlation/import. Two historical results recovered; one incomplete unmatched job left untouched. |
 | Free photo research proof | `7Ju5AhcNJ9qkATwo` | Inactive, never executed; offline packet/receipt proof only. |
 | Editorial research / media sourcing | `75BYc3JkTnA2eQVc` / `Zouc5I3MQwRJhfXG` | Existing active production sources, unchanged. Brave images node observed historically. |
