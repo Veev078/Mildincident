@@ -26,6 +26,8 @@
 ## Development
 
 - Node 24.19.0, `npm ci`, `npm run check`, `npm test`.
+- Hosted mode is opt-in via `STUDIO_MODE=hosted`, exact HTTPS `STUDIO_PUBLIC_ORIGIN`, persistent `STUDIO_DATA_DIR` and `STUDIO_PASSWORD_HASH`. Keep authentication/session/origin boundaries and hosted native read-only mode. Hosted preparation is not deployment authorization.
+- `npm run test:hosted` tests an isolated HTTPS fixture workflow, never production or paid providers.
 - `npm run workspace` starts the product-wide frontend/BFF on loopback port 4174, refreshes fixed read-only APIs, and retains local proposals under `.local/workspace/`. Never expose it publicly without authentication, authorization and explicit deployment approval. `npm run studio` remains the old historical launch brief on port 4173.
 - `npm run test:browser` uses system Chromium and labeled fixtures. Keep fixture write tests off the actual private user draft store. No mock stories may replace failed live source loads in the product.
 - Raw snapshots/credentials/founder tokens stay server-side. Static realpath containment, strict source-route allowlists and browser field sanitization must remain. No server-side arbitrary image download/proxy route.

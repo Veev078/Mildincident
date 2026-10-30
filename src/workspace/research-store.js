@@ -12,6 +12,7 @@ export class LocalResearchStore {
     this.db=new DatabaseSync(filename);this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA synchronous=FULL;
       CREATE TABLE IF NOT EXISTS research_requests(id TEXT PRIMARY KEY,kind TEXT NOT NULL,prompt TEXT NOT NULL,source_url TEXT NOT NULL,baseline_json TEXT NOT NULL,created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS research_request_events(request_id TEXT NOT NULL,version INTEGER NOT NULL,event TEXT NOT NULL,story_id TEXT,created_at TEXT NOT NULL,PRIMARY KEY(request_id,version));
+      CREATE TABLE IF NOT EXISTS research_delivery_state(id INTEGER PRIMARY KEY CHECK(id=1),data_json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS research_continuations(request_id TEXT PRIMARY KEY,context_json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS research_engine_jobs(request_id TEXT PRIMARY KEY,request_hash TEXT NOT NULL,state TEXT NOT NULL,version INTEGER NOT NULL,data_json TEXT NOT NULL,updated_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS research_engine_events(request_id TEXT NOT NULL,version INTEGER NOT NULL,state TEXT NOT NULL,data_json TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(request_id,version));`);
@@ -80,5 +81,7 @@ export class LocalResearchStore {
     }
     return [...byCandidate.values()].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,6);
   }
+  deliveryState(){return JSON.parse(this.db.prepare('SELECT data_json FROM research_delivery_state WHERE id=1').get()?.data_json||'null');}
+  saveDeliveryState(state){this.db.prepare('INSERT INTO research_delivery_state VALUES(1,?) ON CONFLICT(id) DO UPDATE SET data_json=excluded.data_json').run(JSON.stringify(state));return state;}
   close(){this.db.close();}
 }

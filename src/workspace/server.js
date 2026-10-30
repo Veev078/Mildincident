@@ -1,3 +1,4 @@
+import {pipeline} from 'node:stream/promises';
 import {buildWorkspace,WORKSPACE_TABLES} from './model.js';
 import {possibleVariants} from '../photography/fingerprint.js';
 import {PhotographyService} from '../photography/service.js';
@@ -56,10 +57,11 @@ async function imageBody(request) {
   return Buffer.concat(chunks);
 }
 
-export function createWorkspaceServer({ source, drafts, previews, research, engine, photography=research?new PhotographyService(research):null, founderReviews=research?new FounderReviewStore(research):null, feeds=research?new PublicationFeeds(research):null, webRoot = WEB_ROOT }) {
+export function createWorkspaceServer({ source, drafts, previews, research, engine, photography=research?new PhotographyService(research):null, founderReviews=research?new FounderReviewStore(research):null, feeds=research?new PublicationFeeds(research):null, access=null,backups=null,serverFactory=http.createServer, webRoot = WEB_ROOT }) {
   const view = () => {
     const workspace = source.snapshot?source.view(drafts.all()):buildWorkspace({records:Object.fromEntries(Object.keys(WORKSPACE_TABLES).map(k=>[k,[]])),buffer:{posts:[],complete:false,observedAt:null},observedAt:new Date().toISOString(),warnings:[]});
     if(!source.snapshot)workspace.source={...workspace.source,kind:'disconnected',observedAt:null,bufferObservedAt:null,stale:true,unavailable:true,warnings:['No authoritative production snapshot is available. Private photographic research remains usable; connect n8n/Buffer or restore your private backup to inspect existing stories.'],refreshError:{code:'SOURCE_UNAVAILABLE',message:'Production observations unavailable; no example stories were substituted.'}};
+    workspace.hosted=Boolean(access);workspace.backupStatus=backups?.status()||null;
     workspace.researchRequests = research?.all() || [];
     workspace.engine = engine?.status() || {configured:false,generationAvailable:false,generationApproved:false,workerActive:false};
     for (const request of workspace.researchRequests) for (const candidate of request.engineJob?.candidates || []) {
@@ -78,26 +80,31 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     workspace.researchHandoffAvailable = Boolean(research);
     return workspace;
   };
-  return http.createServer(async (request, response) => {
+  let previewUploads=0;
+  return serverFactory(async (request, response) => {
     response.setHeader('Cache-Control', 'no-store');
     response.setHeader('X-Content-Type-Options', 'nosniff');
-    response.setHeader('Referrer-Policy', 'no-referrer');
+    response.setHeader('Referrer-Policy',access?'same-origin':'no-referrer');
     response.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
-    response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'");
+    response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'".replace("form-action 'none'",access?"form-action 'self'":"form-action 'none'"));
     try {
-      // A loopback listener plus Host/Origin checks protects local draft APIs from DNS rebinding/CSRF.
-      const expectedHost = `127.0.0.1:${request.socket.localPort}`;
-      requireThat(request.headers.host === expectedHost || request.headers.host === `localhost:${request.socket.localPort}`, 'INVALID_HOST', 'This workspace accepts only its local origin.');
-      const origin = `http://${request.headers.host}`;
-      if (request.headers.origin) requireThat(request.headers.origin === origin, 'INVALID_ORIGIN', 'Cross-origin access is not permitted.');
-      const url = new URL(request.url, origin);
+      if(access&&request.url==='/healthz'&&request.method==='GET'){json(response,200,{status:'ok'});return;}
+      const expectedHost=`127.0.0.1:${request.socket.localPort}`;
+      if(!access)requireThat(request.headers.host===expectedHost||request.headers.host===`localhost:${request.socket.localPort}`,'INVALID_HOST','This workspace accepts only its local origin.');
+      const origin=access?access.originFor(request):`http://${request.headers.host}`;
+      if(request.headers.origin)requireThat(request.headers.origin===origin,'INVALID_ORIGIN','Cross-origin access is not permitted.');
+      const url=new URL(request.url,origin);requireThat(url.origin===origin,'INVALID_HOST','Use this Studio origin.');
+      if(access&&await access.handle(request,response,url))return;
       if (['POST', 'PATCH'].includes(request.method)) {
         requireThat(request.headers['x-mildincident-intent'] === 'local-edit', 'INTENT_REQUIRED', 'An explicit local-edit intent is required.');
       }
       if (url.pathname === '/api/health' && request.method === 'GET') {
-        json(response, 200, { status: 'ok', mode: 'local_editorial_workspace', productionMutationsEnabled: false, sourceAvailable: Boolean(source.snapshot), refreshing: Boolean(source.inflight) }); return;
+        json(response, 200, { status: 'ok', mode:access?'private_hosted_studio':'local_editorial_workspace', productionMutationsEnabled: false, sourceAvailable: Boolean(source.snapshot), refreshing: Boolean(source.inflight) }); return;
       }
       if(url.pathname==='/api/discovery/sources/refresh'&&request.method==='POST'){requireThat(feeds,'RESEARCH_UNAVAILABLE','Publication intake is unavailable.');requireThat(Object.keys(await body(request)).length===0,'INVALID_SOURCE_REQUEST','Only configured publication feeds may be read.');await feeds.refresh();json(response,200,{sourceInputs:{publications:feeds.status(),leads:feeds.list()},paidCalls:0,productionApplied:false});return;}
+      if(url.pathname==='/api/backups'&&request.method==='POST'){requireThat(access&&backups,'BACKUP_UNAVAILABLE','Hosted backups are unavailable.');requireThat(Object.keys(await body(request)).length===0,'INVALID_BACKUP','Back up the configured private workspace only.');json(response,201,{backup:await backups.create()});return;}
+      const backupRoute=url.pathname.match(/^\/api\/backups\/([^/]+)\/archive$/);
+      if(backupRoute&&request.method==='GET'){requireThat(access&&backups,'BACKUP_UNAVAILABLE','Hosted backups are unavailable.');const stream=await backups.archive(backupRoute[1]);response.writeHead(200,{'Content-Type':'application/gzip','Content-Disposition':'attachment; filename="mildincident-private-backup-'+backupRoute[1]+'.tar.gz"'});await pipeline(stream,response);return;}
       const continuationRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/photo-research$/);
       if(continuationRoute&&request.method==='POST'){requireThat(research,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request),workspace=view(),story=workspace.stories.find(s=>s.id===decodeURIComponent(continuationRoute[1]));const saved=research.createPhotoContinuation(story,input,workspace.stories);json(response,201,{request:saved,scope:'private_research_only',networkRequests:0,paidCalls:0,productionApplied:false});return;}
       const founderRoute=url.pathname.match(/^\/api\/editorial\/reviews\/([^/]+)$/);
@@ -168,6 +175,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
         }
         if (request.method === 'POST') {
           requireThat(request.headers['x-mildincident-preview-declaration'] === 'private_review_only', 'PREVIEW_DECLARATION_REQUIRED', 'Confirm private review only; an upload does not prove provenance or rights.');
+          requireThat(!access||previewUploads<1,'PREVIEW_BUSY','Another photograph is being processed. Retry after it finishes.');previewUploads++;try{
           const bytes = await imageBody(request);
           findAsset(); // Source may have refreshed while the file was uploaded.
           let originalName;
@@ -176,6 +184,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
           const preview = await previews.save({ storyId, assetId, bytes, originalName,
             contentType: String(request.headers['content-type'] || '').split(';')[0], declaration: request.headers['x-mildincident-preview-declaration'] });
           json(response, 200, { assetId, preview, scope: 'local_only', rightsGranted: false, productionApplied: false }); return;
+          }finally{previewUploads--;}
         }
       }
       const match = url.pathname.match(/^\/api\/stories\/(CON-[A-Za-z0-9_-]{1,120})(?:\/(draft|proposal|production-packet(?:\/check)?|draft\/history|draft\/rebase))?$/);
@@ -228,7 +237,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     } catch (error) {
       const code = error instanceof HandoffError ? error.code : 'LOCAL_ERROR';
       const message = error instanceof HandoffError ? error.message : 'The local operation did not complete. No production changes were made.';
-      const status = ['INVALID_HOST', 'INVALID_ORIGIN', 'INTENT_REQUIRED'].includes(code) ? 403 :
+      const status = code==='PREVIEW_BUSY'?429:['INVALID_HOST', 'INVALID_ORIGIN', 'INTENT_REQUIRED'].includes(code) ? 403 :
         ['STALE_SOURCE', 'STALE_LOCAL_DRAFT', 'EDIT_CONFLICT', 'GENERATION_NOT_APPROVED', 'ENGINE_ALREADY_DISPATCHED'].includes(code) ? 409 :
           ['STORY_NOT_FOUND', 'DRAFT_NOT_FOUND', 'FILE_NOT_FOUND', 'PREVIEW_NOT_FOUND', 'RESEARCH_REQUEST_NOT_FOUND'].includes(code) ? 404 : ['SOURCE_UNAVAILABLE','ENGINE_NOT_CONFIGURED','ENGINE_NETWORK_UNCERTAIN'].includes(code) ? 503 : 400;
       if (!response.headersSent) json(response, status, { error: { code, message } });
@@ -238,19 +247,6 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const source = new WorkspaceSource();
-  await source.initialize();
-  const drafts = new LocalDraftStore('.local/workspace/drafts.sqlite');
-  const previews = new LocalPreviewStore('.local/workspace/previews');
-  const research = new LocalResearchStore('.local/workspace/research.sqlite');
-  const feeds=new PublicationFeeds(research);
-  let engine=null;
-  try { const client=await loadEditorialEngineClient(); if(client){engine=new EditorialEngineService({research,client,imageFeedback:()=>previews.tasteFeedback(),sourceLeads:()=>feeds.context(),prepareSources:()=>feeds.refresh()});engine.refresh().catch(error=>console.error(`Read-only engine refresh unavailable: ${error.code||'LOCAL_ERROR'}`));} } catch(error) { console.error(`Development engine unavailable: ${error.code || 'CONFIGURATION_ERROR'}`); }
-  const server = createWorkspaceServer({ source, drafts, previews, research, engine, feeds });
-  const port = Number(process.env.PORT || 4174);
-  requireThat(Number.isSafeInteger(port) && port > 0 && port <= 65535, 'INVALID_PORT', 'PORT must be from 1 to 65535.');
-  server.on('error', error => { console.error(`Workspace startup failed: ${error.code || 'LOCAL_ERROR'}`); process.exitCode = 1; drafts.close(); });
-  server.listen(port, '127.0.0.1', () => console.log(`Editorial workspace listening on loopback port ${port}. Production writes are disabled.`));
-  source.refresh().then(snapshot => console.log(`Read-only workspace refreshed: ${snapshot.records.stories.length} stories, ${snapshot.buffer.posts.length} Buffer records.`))
-    .catch(error => console.error(`Read-only refresh unavailable: ${error.code}; existing cache preserved.`));
+  const {startWorkspace}=await import('./runtime.js');
+  await startWorkspace({createServer:createWorkspaceServer});
 }

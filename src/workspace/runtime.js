@@ -1,0 +1,21 @@
+import sharp from 'sharp';import {HostedBackups} from './hosted-backups.js';
+import fs from 'node:fs/promises';import path from 'node:path';import {WorkspaceSource,fetchWorkspaceSnapshot} from './data-source.js';import {n8nReader} from '../audit.js';import {BufferReader} from '../buffer-reader.js';import {LocalDraftStore} from './store.js';import {LocalPreviewStore} from './previews.js';import {LocalResearchStore} from './research-store.js';import {PublicationFeeds} from '../discovery/publication-feeds.js';import {EditorialEngineClient,loadEditorialEngineClient} from './editorial-engine-client.js';import {EditorialEngineService} from './editorial-engine-service.js';import {ResearchDelivery} from './research-delivery.js';import {PrivateAccess} from './private-access.js';import {hostingConfig} from './hosting-config.js';
+export async function startWorkspace({createServer,env=process.env,installSignals=true,loadSnapshot=null,createEngineClient=options=>new EditorialEngineClient(options)}={}){
+ const config=hostingConfig(env);if(config.hosted){sharp.concurrency(1);sharp.cache({memory:16,files:0,items:10});}await fs.mkdir(config.dataRoot,{recursive:true,mode:0o700});
+ const access=config.hosted?new PrivateAccess({origin:config.origin,filename:path.join(config.dataRoot,'auth.sqlite'),passwordHash:config.passwordHash}):null;
+ const source=new WorkspaceSource({root:config.workspace,auditRoot:path.join(config.dataRoot,'audits'),loadLive:loadSnapshot||(()=>fetchWorkspaceSnapshot({read:n8nReader(env.N8N_API_KEY),bufferReader:env.BUFFER_ACCESS_TOKEN?new BufferReader({token:env.BUFFER_ACCESS_TOKEN}):null}))});await source.initialize();
+ const drafts=new LocalDraftStore(path.join(config.workspace,'drafts.sqlite')),previews=new LocalPreviewStore(path.join(config.workspace,'previews')),research=new LocalResearchStore(path.join(config.workspace,'research.sqlite')),feeds=new PublicationFeeds(research);
+ let engine=null,delivery=null;
+ try{const client=config.hosted?(env.N8N_API_KEY?createEngineClient({apiKey:env.N8N_API_KEY,connection:{mode:'read_only',generationEnabled:false,jobsTableId:'z22YLsWc4lO1yCG4',candidatesTableId:'W40NQ6jFBZWbpB3U',editorialWorkerId:'6CkqfYc4Pyd4k8vi',historyJobIds:['41949fff-2af7-47e3-a207-15390f1a64b6','99de2099-d762-40d5-85d9-222ba3c241db','0de9954f-aa84-4cc7-84fc-adec0fc5afeb']}}):null):await loadEditorialEngineClient({apiKey:env.N8N_API_KEY});
+ if(client){engine=new EditorialEngineService({research,client,imageFeedback:()=>previews.tasteFeedback(),sourceLeads:()=>feeds.context(),prepareSources:()=>feeds.refresh()});if(client.readOnly)delivery=new ResearchDelivery(engine,{intervalMs:config.intervalMs});}
+ }catch(error){console.error('Research connection unavailable: '+(error.code||'CONFIGURATION_ERROR'));}
+ const backups=config.hosted?await new HostedBackups({workspace:config.workspace,destinationRoot:config.backups,stateFile:path.join(config.dataRoot,'backup-state.json')}).initialize():null;
+ const server=createServer({source,drafts,previews,research,engine,feeds,access,backups});
+ let closing=false;const close=async()=>{if(closing)return;closing=true;await delivery?.stop();await backups?.stop();await new Promise(r=>{server.close(r);server.closeIdleConnections?.();});if(source.inflight)await source.inflight.catch(()=>{});drafts.close();previews.close();research.close();access?.close();};
+ try{await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(config.port,config.host,resolve);});}catch(error){drafts.close();previews.close();research.close();access?.close();throw error;}
+ console.log('MILDINCIDENT '+(config.hosted?'private hosted':'local')+' Studio listening on port '+config.port+'. Production writes disabled.');
+ delivery?.start();backups?.start();if(engine&&!delivery)engine.refresh().catch(error=>console.error('Research read unavailable: '+(error.code||'READ_FAILED')));
+ source.refresh().catch(error=>console.error('Source refresh unavailable: '+(error.code||'READ_FAILED')+'; cached work preserved.'));
+ if(installSignals)for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>{close().then(()=>{process.exitCode=0;}).catch(()=>{process.exitCode=1;});});
+ return {server,config,source,research,drafts,previews,engine,delivery,access,backups,close};
+}

@@ -19,7 +19,7 @@ async function atomicJson(filename, value) {
 }
 
 function validateSnapshot(snapshot) {
-  requireThat(snapshot && Number.isFinite(Date.parse(snapshot.observedAt)) && snapshot.buffer?.complete === true && Array.isArray(snapshot.buffer.posts), 'INVALID_SNAPSHOT', 'The snapshot is incomplete.');
+  requireThat(snapshot && Number.isFinite(Date.parse(snapshot.observedAt)) && (snapshot.buffer?.complete===true||snapshot.buffer?.complete===false&&snapshot.coverage?.buffer==='not_configured') && Array.isArray(snapshot.buffer.posts), 'INVALID_SNAPSHOT', 'The snapshot is incomplete.');
   for (const name of Object.keys(WORKSPACE_TABLES)) requireThat(Array.isArray(snapshot.records?.[name]), 'INVALID_SNAPSHOT', 'A required n8n table is missing.');
   return snapshot;
 }
@@ -101,6 +101,7 @@ export async function fetchWorkspaceSnapshot({ read = n8nReader(process.env.N8N_
     }));
   }
   const contextWarnings=[];for(const [name,id] of Object.entries(PRODUCTION_CONTEXT_TABLES)){try{records[name]=await readAllPages(read,`/api/v1/data-tables/${id}/rows`);}catch{contextWarnings.push(`${name} production context unavailable; relationships remain unverified.`);}}
+  if(!bufferReader)return {records,buffer:{posts:[],complete:false,observedAt:null},coverage:{buffer:'not_configured'},observedAt:new Date().toISOString(),warnings:[...contextWarnings,'Buffer is not connected. Provider status and performance are unknown.']};
   const account = await bufferReader.account();
   const channels = [];
   for (const org of account.organizations) channels.push(...(await bufferReader.channels(org.id))
