@@ -6,3 +6,7 @@ test('frame feedback binds the displayed selected hero rather than the first unr
  const s=make('frame-review',{selectedAssetIds:['chosen-frame'],media:[{id:'first-frame'},{id:'chosen-frame',title:'Selected frame',localPreview:{sha256:'a'.repeat(64)}}]});const html=founderQueue({workspace:{stories:[s]}});
  assert.match(html,/data-asset="chosen-frame"/);assert.match(html,new RegExp('data-preview-hash="'+'a'.repeat(64)+'"'));assert.ok(html.includes('Source or attribution problem'));assert.ok(html.includes('Interface problem'));
 });
+test('generated photographic continuations remain labeled and linked to their parent instead of implying a new subject discovery',()=>{
+ const html=founderQueue({workspace:{stories:[make('follow-up',{continuationOf:{storyId:'CON-parent',assetId:'exact-frame'}})]}});
+ assert.ok(html.includes('Further photographic research · existing story'));assert.ok(html.includes('#/story/CON-parent/images'));assert.ok(html.includes('exact earlier frame exact-frame'));
+});

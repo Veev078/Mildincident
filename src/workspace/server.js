@@ -63,7 +63,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     workspace.researchRequests = research?.all() || [];
     workspace.engine = engine?.status() || {configured:false,generationAvailable:false,generationApproved:false,workerActive:false};
     for (const request of workspace.researchRequests) for (const candidate of request.engineJob?.candidates || []) {
-      const story = developmentCandidateStory(candidate,{soundtrack:source.snapshot?.records?.soundtrack || [],drafts:drafts.all(),decision:request.engineJob.reviewDecisions?.[candidate.id]||null,evidence:request.engineJob.evidence?.[candidate.id]||null});
+      const story = developmentCandidateStory(candidate,{soundtrack:source.snapshot?.records?.soundtrack || [],drafts:drafts.all(),continuation:request.continuation||request.engineJob.editorialContext?.continuation||null,decision:request.engineJob.reviewDecisions?.[candidate.id]||null,evidence:request.engineJob.evidence?.[candidate.id]||null});
       requireThat(!workspace.stories.some(s=>s.id===story.id),'AMBIGUOUS_ENGINE_RESULT','Development story identity collides with an existing record.');
       story.engineReviewVersion=request.engineJob.version;
       story.recoveredHistory=request.engineJob.recoveredHistory===true;
@@ -98,6 +98,8 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
         json(response, 200, { status: 'ok', mode: 'local_editorial_workspace', productionMutationsEnabled: false, sourceAvailable: Boolean(source.snapshot), refreshing: Boolean(source.inflight) }); return;
       }
       if(url.pathname==='/api/discovery/sources/refresh'&&request.method==='POST'){requireThat(feeds,'RESEARCH_UNAVAILABLE','Publication intake is unavailable.');requireThat(Object.keys(await body(request)).length===0,'INVALID_SOURCE_REQUEST','Only configured publication feeds may be read.');await feeds.refresh();json(response,200,{sourceInputs:{publications:feeds.status(),leads:feeds.list()},paidCalls:0,productionApplied:false});return;}
+      const continuationRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/photo-research$/);
+      if(continuationRoute&&request.method==='POST'){requireThat(research,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request),workspace=view(),story=workspace.stories.find(s=>s.id===decodeURIComponent(continuationRoute[1]));const saved=research.createPhotoContinuation(story,input,workspace.stories);json(response,201,{request:saved,scope:'private_research_only',networkRequests:0,paidCalls:0,productionApplied:false});return;}
       const founderRoute=url.pathname.match(/^\/api\/editorial\/reviews\/([^/]+)$/);
       if(founderRoute&&request.method==='POST'){requireThat(founderReviews,'RESEARCH_UNAVAILABLE','Private review is unavailable.');const workspace=view(),story=workspace.stories.find(s=>s.id===decodeURIComponent(founderRoute[1]));let followUp=null;const review=founderReviews.record(story,await body(request),{afterSave:value=>{const direction=founderFollowUp(story,value);if(direction)followUp=research.create(direction,workspace.stories);}});json(response,200,{review,followUp,productionApplied:false,publicationApproved:false});return;}
       if(url.pathname==='/api/photography/hunts'&&request.method==='POST'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request);photography.indexNative(source.snapshot);const hunt=photography.create(input);json(response,201,{hunt,productionApplied:false});return;}

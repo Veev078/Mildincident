@@ -753,3 +753,12 @@ document.addEventListener('submit',async event=>{
 document.addEventListener('toggle',event=>{if(event.target.matches?.('[data-photo-desk]')){state.photoDeskOpen=event.target.open;sessionStorage.setItem('mi-photo-desk-open',String(event.target.open));}},true);
 
 document.addEventListener('click',async event=>{const button=event.target.closest('[data-source-intake]');if(!button)return;button.disabled=true;try{const result=await api('/api/discovery/sources/refresh',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:'{}'});state.workspace.sourceInputs=result.sourceInputs;render();toast('Publication intake updated. Source leads are not generated stories.');}catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}});
+
+// Image-bound research preparation saves context only; dispatch remains a separate approved action.
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-photo-continuation]');if(!button)return;button.disabled=true;
+ button.dataset.requestKey ||= crypto.randomUUID();
+ try{if(!await flushAllDrafts())throw new Error('Save pending edits before preparing image research.');const result=await api('/api/stories/'+encodeURIComponent(button.dataset.story)+'/photo-research',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({intent:button.dataset.photoContinuation,assetId:button.dataset.asset,sourceRevision:button.dataset.revision,workingVersion:Number(button.dataset.working),previewSha256:button.dataset.previewHash,idempotencyKey:button.dataset.requestKey})});
+ document.querySelector('#asset-dialog').close();location.hash='#/discovery';await loadWorkspace({quiet:true});toast('Photographic research brief prepared. No AI or source request was started.');document.querySelector('[data-request-id="'+result.request.id+'"]')?.scrollIntoView({block:'center'});
+ }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
+});

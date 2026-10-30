@@ -1,3 +1,13 @@
+# Image-bound research continuation — 2026-10-30 (America/New_York)
+
+Continued clean `9f2dcb5` under the reaffirmed full constitution; hosting remains a founder-usability milestone, not the product endpoint. Added **Investigate this photograph / Find stronger alternatives** to the existing image dialog. Server derives exact owned asset, source/preview/source revision, working version and reported series/photographer trails. Preparation saves an immutable private brief/context only: zero network/model/native-queue calls. Missing/ambiguous credits remain research unknowns; copyright owners do not become photographers.
+
+Existing research SQLite stores the context; no second automation queue/database. Stale material, foreign assets, caller URLs/approval fields and conflicting request identities fail. Restart/idempotent retry preserve context. Next native queue hashes/freezes the original context, skips unrelated feed intake and preserves the existing budget. Generic legacy form links are omitted for these briefs because they cannot transfer the context. Native routing exempts only the exact requested parent subject/title from coverage avoidance; other exclusions and proactive novelty remain. Returned development research is labeled and links to its original story/frame, without overwriting that story or acquiring a production package.
+
+Validation:264 automated tests /41 fixture browser workflows /syntax pass; no errors/production writes. Browser proof: inspect frame → prepare research → reload directions/series link; no new native job. Native routing/finalization tests remain offline, not paid execution or proof of better taste. Remote worker still at prior inactive versionb1ee4086-4fe4-44a9-b9ee-fe0c5b7b6d5a until a separately checked inactive staging update. No paid calls, production/Buffer mutations, hosting or environment changes. Next: check image-dialog taste feedback reaches subsequent research context, then stage the tested native changes inactive. Existing live-source/pricing and founder-device acceptance blockers remain.
+
+---
+
 # Photographic provenance and credential-free Studio proof — 2026-10-30 (America/New_York)
 
 Continued pushed `b350ea7`. Native/offline image extraction now requires explicit photograph-credit wording before reporting a creator, keeps copyright holders/courtesy separate, and retains explicitly caption-linked photographer/series URLs. An article byline or shared multi-image caption cannot establish a frame’s photographer. These remain source assertions, not verified attribution/rights. Studio provenance shows the distinction, research trails and scan coverage. Native finalization/sanitization preserve the fields.

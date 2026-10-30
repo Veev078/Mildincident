@@ -400,6 +400,18 @@ try {
   await page.getByRole('button',{name:'Close image details',exact:true}).click();
   await page.goto(`${origin}/#/story/${devStoryId}/research`);
   checks.push('source photograph inspection distinguishes copyright, explicit series trails and incomplete page coverage');
+  await page.goto(`${origin}/#/story/${devStoryId}/images`);
+  await page.locator('[data-action="inspect"]').first().click();
+  const requestsBeforePhotoResearch=research.all().length,jobsBeforePhotoResearch=engineFixture.jobs.length;
+  await page.getByRole('button',{name:'Investigate this photograph',exact:true}).click();
+  await page.getByText('Photographic research brief prepared. No AI or source request was started.',{exact:true}).waitFor();
+  const photoRequest=research.all().find(r=>r.continuation);assert.ok(photoRequest);assert.equal(photoRequest.continuation.origin.assetId,'dev-photo-1');assert.equal(photoRequest.continuation.origin.storyId,devStoryId);assert.equal(photoRequest.continuation.routes[0].url,'https://example.org/project');assert.equal(photoRequest.handoffUrl,null);
+  assert.equal(research.all().length,requestsBeforePhotoResearch+1);assert.equal(engineFixture.jobs.length,jobsBeforePhotoResearch);
+  await page.reload();const photoRequestCard=page.locator('[data-request-id="'+photoRequest.id+'"]');await photoRequestCard.getByText('Prepared photographic research directions',{exact:true}).click();
+  await photoRequestCard.getByRole('link',{name:'Synthetic series trail',exact:false}).waitFor();assert.equal(await photoRequestCard.locator('[data-research-handoff]').count(),0);
+  checks.push('exact-image research preparation retains series directions across reload without a model, queue or legacy-form transfer');
+  await page.goto(`${origin}/#/story/${devStoryId}/research`);
+
 
   await page.getByRole('heading',{name:'Editorial selection reasoning',exact:true}).waitFor();
   await page.getByText('Research leads compared · 2',{exact:true}).click();

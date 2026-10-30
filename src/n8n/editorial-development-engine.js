@@ -31,7 +31,8 @@ return [{json:{...row,claimed:true}}];`));
   const prompt=find('Build Research Prompt');
   // Replace the inherited exemplar, rather than appending contradictory field instructions.
   prompt.parameters.jsCode=prompt.parameters.jsCode.replace(/const shape='[^\n]*';/, 'const shape='+JSON.stringify(JSON.stringify(editorialResearchShape()))+';');
-  prompt.parameters.jsCode=`const requests=(function(){${prompt.parameters.jsCode}\n})();
+  prompt.parameters.jsCode=`const safePhotoReference=${safePhotoReference.toString()};
+const requests=(function(){${prompt.parameters.jsCode}\n})();
 const history=$('Read Development Candidate History').all().map(i=>{try{return JSON.parse(i.json.candidate_json||'{}');}catch{return null;}}).filter(Boolean);
 const job=$('Verify Development Claim').first().json;
 const plan=${planDevelopmentResearch.toString()};let planned;

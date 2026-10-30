@@ -1,3 +1,4 @@
+import {preparePhotoContinuation} from '../photography/continuation.js';
 import {DatabaseSync} from 'node:sqlite';
 import {mkdirSync,openSync,closeSync,chmodSync} from 'node:fs';
 import path from 'node:path';
@@ -11,6 +12,7 @@ export class LocalResearchStore {
     this.db=new DatabaseSync(filename);this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA synchronous=FULL;
       CREATE TABLE IF NOT EXISTS research_requests(id TEXT PRIMARY KEY,kind TEXT NOT NULL,prompt TEXT NOT NULL,source_url TEXT NOT NULL,baseline_json TEXT NOT NULL,created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS research_request_events(request_id TEXT NOT NULL,version INTEGER NOT NULL,event TEXT NOT NULL,story_id TEXT,created_at TEXT NOT NULL,PRIMARY KEY(request_id,version));
+      CREATE TABLE IF NOT EXISTS research_continuations(request_id TEXT PRIMARY KEY,context_json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS research_engine_jobs(request_id TEXT PRIMARY KEY,request_hash TEXT NOT NULL,state TEXT NOT NULL,version INTEGER NOT NULL,data_json TEXT NOT NULL,updated_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS research_engine_events(request_id TEXT NOT NULL,version INTEGER NOT NULL,state TEXT NOT NULL,data_json TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(request_id,version));`);
   }
@@ -20,8 +22,8 @@ export class LocalResearchStore {
     if(row.kind==='brief'){url.searchParams.set('request',row.prompt);if(row.source_url)url.searchParams.set('url',row.source_url);}
     return {id:row.id,kind:row.kind,prompt:row.prompt,sourceUrl:row.source_url,createdAt:row.created_at,baselineIds:JSON.parse(row.baseline_json),
       version:events.at(-1)?.version||0,events:events.map(e=>({version:e.version,event:e.event,storyId:e.story_id,createdAt:e.created_at})),
-      linkedStoryId:events.filter(e=>e.event==='story_linked').at(-1)?.story_id||null,handoffUrl:url.href,
-      engineJob:this.engineJob(row.id),executionConfirmed:false,productionApplied:false};
+      linkedStoryId:events.filter(e=>e.event==='story_linked').at(-1)?.story_id||null,handoffUrl:this.db.prepare('SELECT request_id FROM research_continuations WHERE request_id=?').get(row.id)?null:url.href,
+      continuation:JSON.parse(this.db.prepare('SELECT context_json FROM research_continuations WHERE request_id=?').get(row.id)?.context_json||'null'),engineJob:this.engineJob(row.id),executionConfirmed:false,productionApplied:false};
   }
   all(){return this.db.prepare('SELECT id FROM research_requests ORDER BY rowid DESC LIMIT 100').all().map(row=>this.get(row.id));}
   create(input,stories){requireThat(input&&Object.keys(input).every(k=>['kind','prompt','sourceUrl','idempotencyKey'].includes(k)),'INVALID_RESEARCH_REQUEST','Unsupported research request fields.');
@@ -34,6 +36,15 @@ export class LocalResearchStore {
     const result=this.get(id);
     requireThat(result.kind===input.kind && result.prompt===prompt && result.sourceUrl===sourceUrl, 'EDIT_CONFLICT', 'This request identity belongs to a different brief. Preserve it and create a new request.');
     return result;
+  }
+  createPhotoContinuation(story,input,stories){
+    const {request,continuation}=preparePhotoContinuation(story,input),encoded=JSON.stringify(continuation);
+    this.db.exec('SAVEPOINT prepare_photo_continuation');try{
+      const existing=request.idempotencyKey?this.get(request.idempotencyKey):null;
+      requireThat(!existing||existing.continuation&&JSON.stringify(existing.continuation)===encoded,'EDIT_CONFLICT','This request identity belongs to different research context.');
+      const saved=this.create(request,stories);this.db.prepare('INSERT OR IGNORE INTO research_continuations VALUES(?,?)').run(saved.id,encoded);
+      this.db.exec('RELEASE prepare_photo_continuation');return this.get(saved.id);
+    }catch(error){this.db.exec('ROLLBACK TO prepare_photo_continuation');this.db.exec('RELEASE prepare_photo_continuation');throw error;}
   }
   event(id,input,stories){const request=this.get(id);requireThat(request,'RESEARCH_REQUEST_NOT_FOUND','Research request is unavailable.');
     requireThat(Object.keys(input).every(k=>['event','storyId','expectedVersion'].includes(k))&&['handoff_requested','story_linked'].includes(input.event),'INVALID_RESEARCH_REQUEST','Unsupported request action.');

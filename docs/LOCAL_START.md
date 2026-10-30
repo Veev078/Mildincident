@@ -36,9 +36,10 @@ Home opens the founder review queue. **New proposals** contains actual newly obs
 
 1. On Home choose **Existing stories** to see the18cached native stories, or **Recovered history** for the2older native development results. An empty **New proposals** view is expected until an authorized new generation actually arrives.
 2. Open a story’s **Images** tab. Inspect its source links and credits. If a preview fails, use the original source or save an authorized private preview file; missing images are not replaced with fake photographs.
-3. Use **Carousel**, **Caption** and **Direction** to inspect/edit working material. “Saved locally” means a private revision, not an n8n/Buffer change. Reload to see the saved version.
-4. Return Home to Save, Pass, Explore or Develop. Under optional context, distinguish a particular photograph from the subject. “Find alternatives” prepares a private brief; it does not run AI.
-5. Keep backups with `npm run workspace:backup`. **Publishing** is inspection/preparation only; approval and rights remain separate.
+3. In image details, **Investigate this photograph** or **Find stronger alternatives** prepares an image-bound research brief with its reported series/source trails. It does not fetch sources or run AI; the existing development engine needs separate execution approval.
+4. Use **Carousel**, **Caption** and **Direction** to inspect/edit working material. “Saved locally” means a private revision, not an n8n/Buffer change. Reload to see the saved version.
+5. Return Home to Save, Pass, Explore or Develop. Under optional context, distinguish a particular photograph from the subject. “Find alternatives” prepares a private brief; it does not run AI.
+6. Keep backups with `npm run workspace:backup`. **Publishing** is inspection/preparation only; approval and rights remain separate.
 
 Verified here: the actual server opens all8story tabs from a restored20-story cached workspace with API keys absent. Preview URLs still need source access. Windows-device acceptance and fresh live photographic discovery remain unverified.
 
