@@ -12,21 +12,28 @@ export class PrivateAccess {
  }
  originFor(request){requireThat(request.headers.host===new URL(this.origin).host,'INVALID_HOST','This private Studio accepts only its configured host.');if(request.headers.origin)requireThat(request.headers.origin===this.origin,'INVALID_ORIGIN','Cross-origin access is not permitted.');return this.origin;}
  session(request){const token=cookies(request)[cookieName];if(!/^[a-f0-9]{64}$/.test(token||''))return null;return this.db.prepare('SELECT token_hash FROM private_sessions WHERE token_hash=? AND credential_version=? AND expires_at>?').get(hash(token),this.credentialVersion,this.now())||null;}
- form(response,status,error=''){const nonce=randomBytes(32).toString('hex');response.writeHead(status,{'Content-Type':'text/html; charset=utf-8','Set-Cookie':setCookie(csrfName,nonce,600)});response.end(loginPage(nonce,error));}
+ form(request,response,status,error=''){
+  // A favicon redirect, refresh or second tab must not invalidate an already rendered form.
+  // Reuse only a well-formed nonce; do not extend the existing cookie's ten-minute lifetime.
+  const existing=cookies(request)[csrfName],reuse=/^[a-f0-9]{64}$/.test(existing||''),nonce=reuse?existing:randomBytes(32).toString('hex');
+  response.writeHead(status,{'Content-Type':'text/html; charset=utf-8',...(!reuse?{'Set-Cookie':setCookie(csrfName,nonce,600)}:{})});response.end(loginPage(nonce,error));
+ }
  async handle(request,response,url){
   response.setHeader('Vary','Cookie');response.setHeader('Strict-Transport-Security','max-age=31536000');
   // Render terminates TLS at its private ingress. No forwarded host/identity header is trusted.
   if(!request.socket.encrypted&&request.headers['x-forwarded-proto']!=='https'){response.writeHead(308,{Location:this.origin+url.pathname+url.search});response.end();return true;}
+  // Browsers request this independently of the sign-in document. It is public and empty.
+  if(url.pathname==='/favicon.ico'&&['GET','HEAD'].includes(request.method)){response.writeHead(204);response.end();return true;}
   if(url.pathname==='/auth.css'&&request.method==='GET'){response.writeHead(200,{'Content-Type':'text/css'});response.end('body{background:#f6f8ff;color:#142c63;font:16px system-ui;margin:0}main{max-width:420px;margin:12vh auto;padding:28px}h1{font:42px Georgia}label,input,button{display:block;width:100%;box-sizing:border-box}input,button{padding:14px;margin-top:12px;border:1px solid #c4cee5}button{background:#173c89;color:white;cursor:pointer}input{margin-bottom:20px}');return true;}
-  if(url.pathname==='/login'&&request.method==='GET'){if(this.session(request)){response.writeHead(303,{Location:'/'});response.end();}else this.form(response,200);return true;}
+  if(url.pathname==='/login'&&request.method==='GET'){if(this.session(request)){response.writeHead(303,{Location:'/'});response.end();}else this.form(request,response,200);return true;}
   if(url.pathname==='/auth/login'&&request.method==='POST'){
    requireThat(request.headers.origin===this.origin&&String(request.headers['content-type']||'').startsWith('application/x-www-form-urlencoded'),'INVALID_ORIGIN','Submit the private sign-in form from this Studio.');
    let size=0,chunks=[];for await(const chunk of request){size+=chunk.length;requireThat(size<=4096,'BODY_TOO_LARGE','Sign-in form is too large.');chunks.push(chunk);}const form=new URLSearchParams(Buffer.concat(chunks).toString('utf8')),csrf=form.get('csrf'),expected=cookies(request)[csrfName];requireThat(/^[a-f0-9]{64}$/.test(csrf||'')&&csrf===expected,'INVALID_ORIGIN','Reload the private sign-in form.');
    const address=hash(request.socket.remoteAddress||'single-proxy'),now=this.now();let attempt=this.db.prepare('SELECT * FROM login_attempts WHERE address_hash=?').get(address);if(!attempt||now-attempt.window_start>60000)attempt={window_start:now,failures:0};
-   if(attempt.failures>=5||this.pending>=2){response.setHeader('Retry-After','60');this.form(response,429,'Too many sign-in attempts. Wait a minute and retry.');return true;}
+   if(attempt.failures>=5||this.pending>=2){response.setHeader('Retry-After','60');this.form(request,response,429,'Too many sign-in attempts. Wait a minute and retry.');return true;}
    this.db.prepare('INSERT INTO login_attempts VALUES(?,?,?) ON CONFLICT(address_hash) DO UPDATE SET window_start=excluded.window_start,failures=excluded.failures').run(address,attempt.window_start,attempt.failures+1);
    const password=form.get('password')||'';this.pending++;let matches=false;try{if(password.length<=256){const key=await scrypt(password,this.password.salt,32,{N:32768,r:8,p:1,maxmem:64*1024*1024});matches=timingSafeEqual(key,this.password.key);}}finally{this.pending--;}
-   if(!matches){this.form(response,401,'Sign-in failed.');return true;}
+   if(!matches){this.form(request,response,401,'Sign-in failed.');return true;}
    this.db.prepare('DELETE FROM private_sessions WHERE expires_at<=? OR credential_version<>?').run(now,this.credentialVersion);this.db.prepare('DELETE FROM login_attempts WHERE address_hash=?').run(address);
    const token=randomBytes(32).toString('hex');this.db.prepare('INSERT INTO private_sessions VALUES(?,?,?)').run(hash(token),this.credentialVersion,now+12*3600000);
    response.writeHead(303,{Location:'/','Set-Cookie':[setCookie(cookieName,token,43200),setCookie(csrfName,'',0)]});response.end();return true;

@@ -1,3 +1,16 @@
+# Existing Render service: login patch deployment
+
+The founder now reports a running Render service with a login CSRF failure. The section below preserves the earlier pre-deployment assessment as historical context. This patch has been verified with isolated fixtures, not deployed by Codex.
+
+1. Open Render Dashboard → the **existing MILDINCIDENT Web Service**. Confirm its GitHub branch is `development/photography-review-20261029` and keep automatic deployment disabled. Preserve existing environment variables, credentials, disk and data directory.
+2. Select **Manual Deploy → Deploy a specific commit** and paste the tested fix SHA provided with the release response. If that option is unavailable, verify the fix is still the branch's latest commit before choosing **Deploy latest commit**. No Blueprint/service recreation, cache clearing or credential rotation is required. The commit includes `[skip render]` to prevent automatic deployment.
+3. Wait for the deployment to show **Live**, then open the existing HTTPS `/login` in a fresh tab. `/favicon.ico` must return204 with no `Location` or `Set-Cookie`. Repeated `/login` GETs with the existing login cookie must preserve its nonce.
+4. Sign in with the existing password; the original form should now submit successfully even after favicon requests or opening another sign-in tab. Check the Studio opens and unauthenticated `/api/workspace` still returns401 in a separate private browser window.
+
+No deployment was triggered as part of preparing this patch. No n8n activation or production write is needed.
+
+---
+
 # Private Studio deployment readiness
 
 Prepared October 30, 2026 (America/New_York), continuing the full [product constitution](PRODUCT_CONSTITUTION.md). No hosting has been deployed. Current assessment: **NOT READY for a live deployment until provider price/schema checks, account configuration and owner approval are complete.** The application implementation passes private-hosting fixtures; that is not provider validation.

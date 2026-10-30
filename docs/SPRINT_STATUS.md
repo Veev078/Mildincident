@@ -1,3 +1,11 @@
+# Hosted login CSRF repair — October 30, 2026 (America/New_York)
+
+Founder reports the existing Render login fails. Reproduced the code defect locally: anonymous favicon GET redirects to `/login`, whose GET always replaces the login cookie, invalidating an already rendered form. Fixed favicon GET/HEAD to return empty204 without redirect or cookie; login forms reuse a valid existing64-hex nonce without resetting its ten-minute cookie lifetime. Missing/malformed nonce still gets a fresh random token; successful login clears it. Exact Host/Origin, double-submit validation, HTTPS, SameSite, sessions and rate limiting remain enforced.
+
+Validation:279 full automated tests,6 focused authentication tests,11 HTTPS hosted fixture workflows and syntax checks pass. Regressions exercise favicon before/after login-page load, second-page GET, original-form submission, malformed/missing/mismatched tokens and hostile Origin. No live Render verification/deployment, credentials, n8n workflows or production data changed. Fix commit uses `[skip render]`; deployment is manual on the existing service. See PRIVATE_HOSTING.md for patch deployment instructions. Earlier hosting-readiness assessments below are dated checkpoints, not a claim that the founder's current service is undeployed.
+
+---
+
 # Hosting candidate prepared; external approval/verification pending — 2026-10-30 (America/New_York)
 
 Secure delivery/hosting checkpoint `54d7b2b` verified on GitHub. Added review-only `render.yaml`, non-secret `.env.hosted.example`, production-only build/start proof and `docs/PRIVATE_HOSTING.md` with exact deployment/rollback/backup steps. Target: one paid Node service, one10GB persistent disk, auto-deploy disabled, same development branch. NO provider resources were created or deployed. Current provider pricing/schema could not be verified because render.com is excluded by the enforced outbound policy (public pricing GET403). Assessment: NOT READY for a live URL until provider checks, account/secret settings and explicit paid-deployment approval are complete. Budget is a provisional$10–$20/month allowance, not a verified quote; API generation remains disabled.

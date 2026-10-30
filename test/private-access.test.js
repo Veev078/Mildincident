@@ -1,7 +1,7 @@
 import http from 'node:http';import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import path from 'node:path';import os from 'node:os';
 import {PrivateAccess,passwordHash} from '../src/workspace/private-access.js';import {hostingConfig} from '../src/workspace/hosting-config.js';import {createWorkspaceServer} from '../src/workspace/server.js';import {LocalResearchStore} from '../src/workspace/research-store.js';import {LocalDraftStore} from '../src/workspace/store.js';
 const password='Synthetic-only-private-password-42';let encoded;const verifier=async()=>encoded??=await passwordHash(password);
-async function fixture(t){const root=await fs.mkdtemp(path.join(os.tmpdir(),'mi-private-')),research=new LocalResearchStore(path.join(root,'workspace/research.sqlite')),drafts=new LocalDraftStore(path.join(root,'workspace/drafts.sqlite'));let now=Date.now();const filename=path.join(root,'auth.sqlite'),access=new PrivateAccess({origin:'https://studio.example',filename,passwordHash:await verifier(),now:()=>now});const server=createWorkspaceServer({source:{snapshot:null},research,drafts,access});await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(async()=>{await new Promise(r=>server.close(r));access.close();research.close();drafts.close();await fs.rm(root,{recursive:true,force:true});});const base='http://127.0.0.1:'+server.address().port,jar=new Map();const request=async(url,options={})=>{const response=await new Promise((resolve,reject)=>{const req=http.request(base+url,{method:options.method||'GET',headers:{Host:'studio.example','X-Forwarded-Proto':'https',...(jar.size?{Cookie:[...jar].map(([k,v])=>k+'='+v).join('; ')}:{}),...options.headers}},res=>{const chunks=[];res.on('data',c=>chunks.push(c));res.on('end',()=>{const headers=new Headers();for(const [key,value] of Object.entries(res.headers))for(const v of Array.isArray(value)?value:[value])if(v!==undefined)headers.append(key,v);resolve(new Response(Buffer.concat(chunks),{status:res.statusCode,headers}));});});req.on('error',reject);req.end(options.body?.toString());});for(const cookie of response.headers.getSetCookie()){const [pair]=cookie.split(';'),[k,v]=pair.split('=');if(v)jar.set(k,v);else jar.delete(k);}return response;};const login=async(value=password)=>{const page=await request('/login'),html=await page.text(),csrf=html.match(/name="csrf" value="([a-f0-9]+)"/)[1];return request('/auth/login',{method:'POST',headers:{Origin:'https://studio.example','Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({csrf,password:value})});};return {root,filename,access,request,login,jar,advance:ms=>{now+=ms;}};}
+async function fixture(t){const root=await fs.mkdtemp(path.join(os.tmpdir(),'mi-private-')),research=new LocalResearchStore(path.join(root,'workspace/research.sqlite')),drafts=new LocalDraftStore(path.join(root,'workspace/drafts.sqlite'));let now=Date.now();const filename=path.join(root,'auth.sqlite'),access=new PrivateAccess({origin:'https://studio.example',filename,passwordHash:await verifier(),now:()=>now});const server=createWorkspaceServer({source:{snapshot:null},research,drafts,access});await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(async()=>{await new Promise(r=>server.close(r));access.close();research.close();drafts.close();await fs.rm(root,{recursive:true,force:true});});const base='http://127.0.0.1:'+server.address().port,jar=new Map();const request=async(url,options={})=>{const response=await new Promise((resolve,reject)=>{const req=http.request(base+url,{method:options.method||'GET',headers:{Host:'studio.example','X-Forwarded-Proto':'https',...(jar.size?{Cookie:[...jar].map(([k,v])=>k+'='+v).join('; ')}:{}),...options.headers}},res=>{const chunks=[];res.on('data',c=>chunks.push(c));res.on('end',()=>{const headers=new Headers();for(const [key,value] of Object.entries(res.headers))for(const v of Array.isArray(value)?value:[value])if(v!==undefined)headers.append(key,v);resolve(new Response(res.statusCode===204?null:Buffer.concat(chunks),{status:res.statusCode,headers}));});});req.on('error',reject);req.end(options.body?.toString());});for(const cookie of response.headers.getSetCookie()){const [pair]=cookie.split(';'),[k,v]=pair.split('=');if(v)jar.set(k,v);else jar.delete(k);}return response;};const login=async(value=password)=>{const page=await request('/login'),html=await page.text(),csrf=html.match(/name="csrf" value="([a-f0-9]+)"/)[1];return request('/auth/login',{method:'POST',headers:{Origin:'https://studio.example','Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({csrf,password:value})});};return {root,filename,access,request,login,jar,advance:ms=>{now+=ms;}};}
 test('hosted configuration fails closed without HTTPS, persistent path and generated password verifier',async()=>{
  assert.equal(hostingConfig({}).host,'127.0.0.1');for(const env of [{STUDIO_MODE:'other'},{STUDIO_MODE:'hosted'},{STUDIO_MODE:'hosted',STUDIO_PUBLIC_ORIGIN:'http://example.org',STUDIO_DATA_DIR:'/var/data',STUDIO_PASSWORD_HASH:'bad'}])assert.throws(()=>hostingConfig(env));const c=hostingConfig({STUDIO_MODE:'hosted',STUDIO_PUBLIC_ORIGIN:'https://studio.example',STUDIO_DATA_DIR:'/var/data',STUDIO_PASSWORD_HASH:await verifier(),PORT:'10000'});assert.equal(c.host,'0.0.0.0');assert.equal(c.workspace,'/var/data/workspace');assert.equal(c.port,10000);
 });
@@ -13,4 +13,33 @@ test('secure opaque sessions survive restart, expire and revoke on sign-out with
 });
 test('failed sign-ins are bounded and rate limited without echoing a supplied password',async t=>{
  const {request,login}=await fixture(t);for(let i=0;i<5;i++)assert.equal((await login('wrong-synthetic-password')).status,401);const limited=await login();assert.equal(limited.status,429);assert.equal(limited.headers.get('Retry-After'),'60');assert.ok(!(await limited.text()).includes(password));assert.equal((await request('/api/workspace')).status,401);
+});
+test('favicon and repeated login GETs preserve the original form token until successful submission',async t=>{
+ const {request,jar}=await fixture(t),name='__Host-mildincident_login';
+ const page=await request('/login'),html=await page.text(),csrf=html.match(/name="csrf" value="([a-f0-9]+)"/)[1];
+ assert.equal(jar.get(name),csrf);
+ for(const flag of ['HttpOnly','Secure','SameSite=Strict','Path=/','Max-Age=600'])assert.ok(page.headers.getSetCookie().join(';').includes(flag));
+ for(const method of ['GET','HEAD']){
+  const favicon=await request('/favicon.ico',{method});
+  assert.equal(favicon.status,204);assert.equal(favicon.headers.get('location'),null);
+  assert.deepEqual(favicon.headers.getSetCookie(),[]);assert.equal(await favicon.text(),'');
+  assert.equal(jar.get(name),csrf);
+ }
+ const repeated=await request('/login');assert.equal(repeated.status,200);
+ assert.ok((await repeated.text()).includes('name="csrf" value="'+csrf+'"'));
+ assert.deepEqual(repeated.headers.getSetCookie(),[]);assert.equal(jar.get(name),csrf);
+ const submit=body=>request('/auth/login',{method:'POST',headers:{Origin:'https://studio.example','Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({csrf:body,password})});
+ assert.equal((await request('/auth/login',{method:'POST',headers:{Origin:'https://evil.example','Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({csrf,password})})).status,403);
+ assert.equal((await submit('0'.repeat(64))).status,403);
+ jar.delete(name);assert.equal((await submit(csrf)).status,403);jar.set(name,csrf);
+ assert.equal((await submit(csrf)).status,303);assert.ok(jar.has('__Host-mildincident_session'));
+ assert.ok(!jar.has(name));assert.equal((await request('/api/workspace')).status,200);
+});
+test('favicon before sign-in neither redirects nor creates a login cookie; malformed nonce is replaced',async t=>{
+ const {request,jar}=await fixture(t),name='__Host-mildincident_login';
+ const favicon=await request('/favicon.ico');assert.equal(favicon.status,204);
+ assert.equal(favicon.headers.get('location'),null);assert.deepEqual(favicon.headers.getSetCookie(),[]);
+ assert.equal(jar.size,0);jar.set(name,'malformed');
+ const page=await request('/login'),html=await page.text();
+ assert.match(jar.get(name),/^[a-f0-9]{64}$/);assert.ok(html.includes('name="csrf" value="'+jar.get(name)+'"'));
 });
