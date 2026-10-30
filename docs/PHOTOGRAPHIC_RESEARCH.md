@@ -10,6 +10,8 @@ Use the existing Studio **Discovery desk → Follow the photograph**. No new ser
 - **Keep / Maybe / Reject** records a reason for that specific photograph. Reconsidering it preserves earlier decisions. This feedback informs future local development-job context and does not blacklist a subject or update an active n8n worker.
 - **Develop an editorial angle** prepares the existing creative brief with recorded source metadata, uncertainty and the latest frame-specific feedback. Edit and save it normally. This action makes no AI call and does not queue or execute a worker.
 
+For the new inactive n8n research handoff and private result import, see [Studio / n8n photographic research](N8N_PHOTOGRAPHIC_RESEARCH.md).
+
 ## When an archive cannot be reached
 
 Open one of the catalogue searches in your own browser. Use **Save a source reference** for a promising original record. Only title and a public HTTPS source URL are required; preview, credit, photograph date and context are optional. Missing metadata and unknown rights are welcome. Metadata stays founder-supplied and unverified. The server fetches neither the page nor the image; an optional preview loads directly in the browser. References remain local research, not production assets or rights approvals.

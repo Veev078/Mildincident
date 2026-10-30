@@ -32,7 +32,16 @@ return [{json:{...row,claimed:true}}];`));
   prompt.parameters.jsCode=prompt.parameters.jsCode.replace(/const shape='[^\n]*';/, 'const shape='+JSON.stringify(JSON.stringify(editorialResearchShape()))+';');
   prompt.parameters.jsCode=`const requests=(function(){${prompt.parameters.jsCode}\n})();
 const history=$('Read Development Candidate History').all().map(i=>{try{return JSON.parse(i.json.candidate_json||'{}');}catch{return null;}}).filter(Boolean);
-const plan=${planDevelopmentResearch.toString()};const planned=plan(requests,history,$('Verify Development Claim').first().json);
+const job=$('Verify Development Claim').first().json;
+const plan=${planDevelopmentResearch.toString()};let planned;
+try{planned=plan(requests,history,job);}catch(error){
+ if(error.message!=='NO_UNTESTED_DEVELOPMENT_DISCOVERY_LEAD'||job.kind!=='discovery')throw error;
+ // Run the SAME native preset/territory builder against the SAME captured reads, with only its exhausted seed bank empty.
+ const seedFreeReader=name=>name==='Read Editorial Idea Bank For Research'?{all:()=>[],first:()=>({json:{}})}:$(name);
+ const fallback=(function($){${prompt.parameters.jsCode}\n})(seedFreeReader);
+ const capturedPreset=requests.length?(requests[0].json.diversity?.selected_seed_preset||'original_mildincident'):String($('Read Current Seed For Research').all().map(i=>i.json).find(r=>r.selection_key==='current')?.preset_key||'original_mildincident');
+ planned=plan(requests,history,job,fallback,capturedPreset);
+}
 for(const item of planned)if(item.json.userPrompt.length+String(item.json.instructions||'').length>30000)throw new Error('RESEARCH_INPUT_BUDGET_EXCEEDED');return planned;`;
   for(const name of ['Research Candidates','Draft Editorial Concept']){const n=find(name);n.retryOnFail=false;n.onError='continueRegularOutput';n.parameters.simplify=false;n.parameters.options={...n.parameters.options,maxTokens:name==='Research Candidates'?3500:1800};if(name==='Research Candidates'){n.parameters.options.maxToolCalls=2;n.parameters.options.maxToolsIterations=2;}else{delete n.parameters.builtInTools;delete n.parameters.options.maxToolCalls;delete n.parameters.options.maxToolsIterations;}}
   const draftNode=find('Draft Editorial Concept');

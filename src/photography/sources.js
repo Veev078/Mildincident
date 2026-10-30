@@ -31,7 +31,7 @@ export function normalizePhotos(source,data,query){
  });
 }
 export async function fetchPhotoPage(source,query,page,{fetchImpl=fetch}={}){
- const response=await fetchImpl(photoQueryURL(source,query,page),{redirect:'error',signal:AbortSignal.timeout(12000)});
+ const response=await fetchImpl(photoQueryURL(source,query,page),{headers:{Accept:'application/json','User-Agent':'MILDINCIDENT/2.0 (https://github.com/Veev078/Mildincident; private editorial research)'},redirect:'error',signal:AbortSignal.timeout(12000)});
  if(!response.ok)throw new Error('ARCHIVE_HTTP_'+response.status);
  let size=0,chunks=[];for await(const c of response.body){size+=c.byteLength;if(size>2*1024*1024)throw new Error('ARCHIVE_RESPONSE_TOO_LARGE');chunks.push(c);}
  const raw=JSON.parse(Buffer.concat(chunks).toString('utf8'));

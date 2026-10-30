@@ -19,7 +19,8 @@
     "audit:production": "node --use-env-proxy --use-system-ca src/production-audit.js",
     "audit:buffer": "node --use-env-proxy --use-system-ca src/buffer-audit.js",
     "workspace:local": "node --env-file-if-exists=.env.local --use-env-proxy --use-system-ca src/workspace/server.js",
-    "workspace:backup": "node scripts/backup-workspace.mjs"
+    "workspace:backup": "node scripts/backup-workspace.mjs",
+    "research:live-check": "node --use-env-proxy --use-system-ca scripts/verify-archive-source.mjs"
   },
   "dependencies": {
     "sharp": "0.35.5"

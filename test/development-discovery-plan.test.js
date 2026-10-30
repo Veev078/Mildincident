@@ -14,3 +14,16 @@ test('one discovery branch respects current preset, avoids recent development re
  assert.equal(planDevelopmentResearch(seedRequests,tested,{kind:'discovery',prompt:'Current preset'})[0].json.seed_idea_key,'TEST-SEED-2');
  assert.throws(()=>planDevelopmentResearch(seedRequests.slice(0,1),tested,{kind:'discovery',prompt:'Current preset'}),/NO_UNTESTED_DEVELOPMENT_DISCOVERY_LEAD/);
 });
+
+test('exhausted seed discovery continues only through seed-free branches carrying the same native preset',()=>{
+ const seeded={json:{territory:'music_scene',seed_idea_key:'used-seed',userPrompt:'Specific already-tested seed',instructions:'Native research rules',brandText:'Native foundation',diversity:{selected_seed_preset:'native-visual'}}};
+ const history=[{story:{subject:'Previously tested project'},discoveryPlan:{seedIdeaKey:'used-seed'}}];const fresh={json:{territory:'photography',userPrompt:'Native preset routes without the idea bank',instructions:'Native research rules',brandText:'Native foundation',diversity:{selected_seed_preset:'native-visual'},discovery_approach:'visual_first'}};
+ const before=JSON.stringify([seeded,history,fresh]);const [result]=planDevelopmentResearch([seeded],history,{kind:'discovery',prompt:'Follow new cultural routes'},[fresh]);assert.equal(result.json.discoveryPlan.seedPoolExhausted,true);assert.equal(result.json.discoveryPlan.preset,'native-visual');assert.equal(result.json.discoveryPlan.territory,'photography');assert.equal(result.json.discoveryPlan.seedIdeaKey,'');assert.equal(result.json.discoveryPlan.freshBranchPreparedCount,1);assert.ok(result.json.userPrompt.includes('not a recommended subject list'));assert.ok(!result.json.userPrompt.includes('Specific already-tested seed'));assert.equal(result.json.brandText,'Native foundation');assert.equal(JSON.stringify([seeded,history,fresh]),before);
+ assert.throws(()=>planDevelopmentResearch([seeded],history,{kind:'discovery',prompt:'Fresh routes'},[{json:{...fresh.json,diversity:{selected_seed_preset:'invented-preset'}}}]),/DISCOVERY_FALLBACK_PROVENANCE_CHANGED/);
+ assert.throws(()=>planDevelopmentResearch([seeded],history,{kind:'brief',prompt:'Retain this exact brief'},[fresh]),/NO_UNTESTED_DEVELOPMENT_DISCOVERY_LEAD/);
+});
+
+test('when native production history exhausted the bank before preparing any branches, fallback still requires captured preset identity',()=>{
+ const fresh={json:{territory:'scene',userPrompt:'Native seed-free branch',instructions:'Native foundation',diversity:{selected_seed_preset:'selected-native'}}};const job={kind:'discovery',prompt:'Explore new work'};
+ assert.throws(()=>planDevelopmentResearch([],[],job,[fresh]),/DISCOVERY_FALLBACK_PROVENANCE_CHANGED/);const [out]=planDevelopmentResearch([],[],job,[fresh],'selected-native');assert.equal(out.json.discoveryPlan.preset,'selected-native');assert.equal(out.json.discoveryPlan.preparedBranchCount,0);assert.equal(out.json.discoveryPlan.seedPoolExhausted,true);
+});
