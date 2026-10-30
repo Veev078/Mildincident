@@ -10,6 +10,10 @@ Targeted source evidence: active sourcing uses `@brave/n8n-nodes-brave-search.br
 
 Verification: **237 automated tests / 38 browser workflows / syntax pass**, zero browser errors or production writes. Tests cover optional one-click feedback, append history, stale/concurrent reviews, atomic rollback, scoped taste context, honest new/history queues, read-only inbox recovery and write rejection. Private backup before recovery: `.local/backups/2026-10-30T14-25-04-247Z-0642fa7f`. Read-only recovery and recorded source evidence stay ignored in `.local/founder-workflow/`; connection metadata stays private under `.local/engine-build/`.
 
+Broader source increment: RSS/Atom publication intake now uses pinned `rss-parser` 3.13.0, fixed proposed Booooooom / It’s Nice That feed endpoints, bounded/DTD-rejecting reads, exact source identities, append-only observations and 15-minute success cache. Source leads are NOT generated proposals; bylines and publication dates are not photo credits/dates. Fresh source context freezes into the existing native editorial job hash, alongside scoped founder feedback, and is quoted as untrusted evidence in the native prompt. No new publisher API key or paid call. Actual local preflight for both hosts returned network_blocked with ZERO requests/leads. These sources remain fixture-tested, not live coverage.
+
+The source strategy now prioritizes broad/native Brave discovery and independent contemporary publications over archive convenience. `docs/DISCOVERY_SOURCE_STRATEGY.md` supersedes the earlier archive-first network proposal, distinguishes actual historical Brave success from unverified current pricing/entitlement, records unsupported access and the minimal later performance contract. No network settings were changed. Verification: **242 automated tests / 38 browser workflows / syntax pass** after this increment; feeds are synthetic labeled fixtures only in tests.
+
 ---
 
 # Native photographic research integration — 2026-10-30 (America/New_York)

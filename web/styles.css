@@ -3746,3 +3746,10 @@ dialog::backdrop {
 @media(max-width:800px) { .proposal-grid { grid-template-columns: 1fr; } .proposal-copy { padding: 18px; } }
 .photo-desk-toggle, .existing-research-material { margin: 24px 0; }
 .photo-desk-toggle > summary, .existing-research-material > summary { color: var(--accent); padding: 16px 0; cursor: pointer; font-weight: 700; }
+.source-inputs { margin: 24px 0; background: var(--surface); border: 1px solid var(--line); padding: 20px; }
+.source-inputs > summary { color: var(--accent); cursor: pointer; font-weight: 700; }
+.source-feed-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
+.source-lead-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; margin-top: 20px; }
+.source-lead-grid .photo { aspect-ratio: 4/5; }
+.source-lead-grid .photo img { object-fit: contain; }
+@media(max-width:800px){.source-feed-list,.source-lead-grid { grid-template-columns:1fr; }}

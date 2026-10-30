@@ -751,3 +751,5 @@ document.addEventListener('submit',async event=>{
 });
 
 document.addEventListener('toggle',event=>{if(event.target.matches?.('[data-photo-desk]')){state.photoDeskOpen=event.target.open;sessionStorage.setItem('mi-photo-desk-open',String(event.target.open));}},true);
+
+document.addEventListener('click',async event=>{const button=event.target.closest('[data-source-intake]');if(!button)return;button.disabled=true;try{const result=await api('/api/discovery/sources/refresh',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:'{}'});state.workspace.sourceInputs=result.sourceInputs;render();toast('Publication intake updated. Source leads are not generated stories.');}catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}});
