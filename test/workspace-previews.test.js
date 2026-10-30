@@ -114,6 +114,11 @@ test('HTTP preview upload requires existing scoped asset, intent and declaration
   const reviewed=await(await fetch(`${origin}/api/workspace`)).json();
   assert.equal(reviewed.stories[0].media[0].localReview.decision,'reject');
   assert.equal(reviewed.stories[0].revision,before.stories[0].revision);
+  const scoped={decision:'hold',reason:'Reassess this exact preview before choosing the opening image',expectedVersion:1,sourceRevision:reviewed.stories[0].revision,workingVersion:0,previewSha256:reviewed.stories[0].media[0].localPreview.sha256};
+  for(const change of [{sourceRevision:'old'},{workingVersion:99},{previewSha256:'b'.repeat(64)}])assert.equal((await fetch(reviewUrl,{method:'POST',headers:reviewHeaders,body:JSON.stringify({...scoped,...change})})).status,409);
+  assert.equal(store.review(input.storyId,input.assetId).version,1);
+  const scopedResult=await(await fetch(reviewUrl,{method:'POST',headers:reviewHeaders,body:JSON.stringify(scoped)})).json();assert.equal(scopedResult.review.context.previewSha256,scoped.previewSha256);assert.equal(store.tasteFeedback()[0].sourceRevision,scoped.sourceRevision);
+
 
 });
 
@@ -136,4 +141,16 @@ test('private source copies retain recorded inspection provenance without granti
  assert.equal(record.sourceInspection.basis,'recorded_source_copy');assert.equal(record.identityVerified,false);assert.equal(record.rightsGranted,false);
  const workspace=buildWorkspace(workspaceSnapshot());attachLocalPreviews(workspace,store);assert.equal(workspace.stories[0].media[0].previewOrigin,'source_cache');
  assert.throws(()=>store.recordSourceInspection(input.storyId,input.assetId,preview.sha256,{sourceUrl:'http://archive.example.org/page',imageUrl:'https://archive.example.org/a.jpg',executionId:'2500'}),{code:'INVALID_PREVIEW_SOURCE'});
+});
+
+test('image taste feedback carries recorded source/preview scope and never reassigns earlier decisions to replacement pixels',async t=>{
+ const {store,input}=await fixture(t);const preview=await store.save(input),context={subject:'Synthetic photographic project',sourceRevision:'recorded-source',workingVersion:3,sourceUrl:'https://example.org/project',previewSha256:preview.sha256};
+ store.saveReview(input.storyId,input.assetId,{decision:'reject',reason:'The chosen crop weakens this particular photographic frame',expectedVersion:0},{context});
+ let feedback=store.tasteFeedback()[0];assert.equal(feedback.origin,'image_dialog');assert.equal(feedback.scope,'specific_photograph_selection');assert.equal(feedback.photograph.previewSha256,preview.sha256);assert.equal(feedback.sourceRevision,'recorded-source');assert.equal(feedback.workingVersion,3);assert.equal(feedback.decision,'rejected');
+ const replacement=await sharp({create:{width:900,height:1200,channels:3,background:'#b34a78'}}).jpeg().toBuffer();await store.save({...input,bytes:replacement});feedback=store.tasteFeedback()[0];assert.equal(feedback.photograph.previewSha256,preview.sha256);assert.notEqual(store.get(input.storyId,input.assetId).sha256,preview.sha256);assert.equal(store.review(input.storyId,input.assetId).context.previewSha256,preview.sha256);
+ const {editorialSelectionTools}=await import('../src/editorial-selection.js');assert.ok(!editorialSelectionTools().assess({subject:context.subject},{feedback:[feedback]}).reasons.some(r=>r.code==='FOUNDER_TASTE_PASS'));
+});
+test('legacy image feedback preserves unknown preview versions and latest reconsideration without a fabricated source revision',async t=>{
+ const {store,input}=await fixture(t);store.saveReview(input.storyId,input.assetId,{decision:'reject',reason:'A weak frame for this particular story',expectedVersion:0});let feedback=store.tasteFeedback()[0];assert.equal(feedback.photograph.previewVersionRecorded,false);assert.equal(feedback.photograph.previewSha256,null);assert.equal(feedback.sourceRevision,null);
+ store.saveReview(input.storyId,input.assetId,{decision:'shortlist',reason:'Reconsidered for a different sequence context',expectedVersion:1});feedback=store.tasteFeedback()[0];assert.equal(feedback.decision,'approved');assert.equal(feedback.reviewVersion,2);assert.equal(store.review(input.storyId,input.assetId).history.length,2);
 });

@@ -30,7 +30,7 @@ const previews = new LocalPreviewStore(path.join(root, 'previews'));
 const research = new LocalResearchStore(path.join(root, 'research.sqlite'));
 const engineFixture={jobs:[],candidates:[]};
 const engineClient={connection:{jobsTableId:'fixture-jobs',candidatesTableId:'fixture-candidates'},inspect:async()=>({configured:true,workerActive:false,generationApproved:false,generationAvailable:false}),queue:async request=>{const row={id:engineFixture.jobs.length+1,job_id:request.id,request_hash:requestFingerprint(request),status:'queued',execution_id:''};engineFixture.jobs.push(row);return row;},rows:async table=>table==='fixture-jobs'?engineFixture.jobs:engineFixture.candidates};
-const engine=new EditorialEngineService({research,client:engineClient});await engine.inspect();
+const engine=new EditorialEngineService({research,client:engineClient,imageFeedback:()=>previews.tasteFeedback()});await engine.inspect();
 const server = createWorkspaceServer({ source, drafts, previews, research, engine });
 await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
 const origin = `http://127.0.0.1:${server.address().port}`;
@@ -209,6 +209,8 @@ try {
   await reviewForm.getByLabel('Editorial decision').selectOption('reject');
   await reviewForm.getByLabel('Why this image?').fill('This image has less narrative presence than the other opening choice.');
   await reviewForm.getByRole('button',{name:'Save editorial review'}).click();
+  await page.waitForFunction(()=>document.querySelector('[data-image-review]')?.dataset.version==='1');const imageFeedback=engine.editorialContext().feedback.find(f=>f.origin==='image_dialog');assert.ok(imageFeedback);assert.equal(imageFeedback.scope,'specific_photograph_selection');assert.equal(imageFeedback.photograph.assetId,source.snapshot.records.media[0].asset_id);assert.equal(imageFeedback.photograph.previewVersionRecorded,true);assert.ok(imageFeedback.photograph.previewSha256);
+  checks.push('image-dialog taste reaches subsequent native context with the exact reviewed preview and source revision');
   await page.getByText('This rejected image is still in the carousel.',{exact:false}).waitFor();
   assert.deepEqual(drafts.get(id).selectedAssetIds,['asset-2','asset-1']);
   await page.reload();await page.locator('[data-action="inspect"]').first().click();

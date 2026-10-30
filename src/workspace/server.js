@@ -148,13 +148,16 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
         try { assetId = decodeURIComponent(previewMatch[2]); } catch { throw new HandoffError('INVALID_PREVIEW_SCOPE', 'Invalid image reference.'); }
         const findAsset = () => {
           const story = view().stories.find(s => s.id === storyId);
-          requireThat(story && story.media.filter(m => m.id === assetId).length === 1, 'STORY_NOT_FOUND', 'An exact existing story/image record is required.');
+          requireThat(story && story.media.filter(m => m.id === assetId).length === 1, 'STORY_NOT_FOUND', 'An exact existing story/image record is required.');return {story,asset:story.media.find(m=>m.id===assetId)};
         };
         findAsset();
         if (previewMatch[3] === 'review') {
           requireThat(request.method === 'POST', 'METHOD_NOT_ALLOWED', 'Use the local review action.');
-          const input = await body(request); findAsset();
-          json(response, 200, { review: previews.saveReview(storyId, assetId, input), scope: 'local_only', rightsGranted: false, productionApplied: false }); return;
+          const input=await body(request),{story,asset}=findAsset();let context=null;
+          const scoped=['sourceRevision','workingVersion','previewSha256'].some(k=>Object.hasOwn(input,k));
+          if(scoped){requireThat(input.sourceRevision===story.revision&&input.workingVersion===(story.localDraft?.version||0)&&input.previewSha256===(asset.localPreview?.sha256||''),'EDIT_CONFLICT','This story or preview changed. Reopen the image before reviewing.');context={subject:story.subject||story.title,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,sourceUrl:asset.sourceUrl||'',previewSha256:asset.localPreview?.sha256||null};}
+          const reviewInput={...input};for(const k of ['sourceRevision','workingVersion','previewSha256'])delete reviewInput[k];
+          json(response, 200, { review: previews.saveReview(storyId, assetId, reviewInput,{context}), scope: 'local_only', rightsGranted: false, productionApplied: false }); return;
         }
         if (request.method === 'GET') {
           const result = await previews.readPreview(storyId, assetId, url.searchParams.get('hash') ?? undefined);
@@ -242,7 +245,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const research = new LocalResearchStore('.local/workspace/research.sqlite');
   const feeds=new PublicationFeeds(research);
   let engine=null;
-  try { const client=await loadEditorialEngineClient(); if(client){engine=new EditorialEngineService({research,client,sourceLeads:()=>feeds.context(),prepareSources:()=>feeds.refresh()});engine.refresh().catch(error=>console.error(`Read-only engine refresh unavailable: ${error.code||'LOCAL_ERROR'}`));} } catch(error) { console.error(`Development engine unavailable: ${error.code || 'CONFIGURATION_ERROR'}`); }
+  try { const client=await loadEditorialEngineClient(); if(client){engine=new EditorialEngineService({research,client,imageFeedback:()=>previews.tasteFeedback(),sourceLeads:()=>feeds.context(),prepareSources:()=>feeds.refresh()});engine.refresh().catch(error=>console.error(`Read-only engine refresh unavailable: ${error.code||'LOCAL_ERROR'}`));} } catch(error) { console.error(`Development engine unavailable: ${error.code || 'CONFIGURATION_ERROR'}`); }
   const server = createWorkspaceServer({ source, drafts, previews, research, engine, feeds });
   const port = Number(process.env.PORT || 4174);
   requireThat(Number.isSafeInteger(port) && port > 0 && port <= 65535, 'INVALID_PORT', 'PORT must be from 1 to 65535.');

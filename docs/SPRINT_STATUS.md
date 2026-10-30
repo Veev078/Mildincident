@@ -1,3 +1,13 @@
+# Image-dialog taste now reaches research — 2026-10-30 (America/New_York)
+
+Continued pushed `c2a6383`. Closed an actual learning gap: existing image-dialog Shortlist/Hold/Reject judgments now join the next native editorial request’s bounded scoped feedback. Reads stay in the existing preview ledger; no mirrored decision table or publishing backend. New UI reviews bind source/working revision and available preview hash transactionally; stale versions fail. Earlier reviews retain explicit unknown preview/source versions, and replacing image bytes does not retag the previous reaction. Latest reconsideration wins while history remains. Frame feedback does not become a subject ban or rights approval.
+
+Verification:267 automated tests /42 fixture browser workflows /syntax pass, plus11 focused image/HTTP/context checks after the final adjustment. Browser verifies exact preview feedback in next-run context and all prior review/generation/continuation flows. One browser run caught an overbroad frontend request-field edit affecting development review; corrected and complete browser suite rerun successfully. No model or new live photograph was evaluated. Private workspace remains intact; no hosting, credentials, environment, production or Buffer changes. Native continuation prompt changes fromc2a6383 await inactive staging/readback; worker must stay unexecuted and generation disabled.
+
+Full constitution, product map and acceptance gates remain in force. Hosting is a usability milestone; future source discovery, visual/editorial judgment, n8n operations and later verified performance remain core work. Next: stage the verified native continuation logic inactive, record exact readback, then pursue separately approved accessible contemporary sources/current Brave pricing and founder evaluation. Do not convert fixture proof into a live editorial-quality claim.
+
+---
+
 # Image-bound research continuation — 2026-10-30 (America/New_York)
 
 Continued clean `9f2dcb5` under the reaffirmed full constitution; hosting remains a founder-usability milestone, not the product endpoint. Added **Investigate this photograph / Find stronger alternatives** to the existing image dialog. Server derives exact owned asset, source/preview/source revision, working version and reported series/photographer trails. Preparation saves an immutable private brief/context only: zero network/model/native-queue calls. Missing/ambiguous credits remain research unknowns; copyright owners do not become photographers.

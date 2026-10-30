@@ -5,7 +5,7 @@ import {requestFingerprint} from './editorial-engine-client.js';
 const COMPLETED_STATES=new Set(['ready_to_review','needs_research','approved','rejected']);
 const REMOTE_STATES=new Set(['queued','generating','ready_to_review','needs_research','failed','rejected','approved']);
 export class EditorialEngineService {
-  constructor({research,client,sourceLeads=()=>[],prepareSources=async()=>{}}){this.research=research;this.client=client;this.sourceLeads=sourceLeads;this.prepareSources=prepareSources;this.inspection={configured:Boolean(client),generationAvailable:false,generationApproved:false,workerActive:false};this.refreshing=null;}
+  constructor({research,client,imageFeedback=()=>[],sourceLeads=()=>[],prepareSources=async()=>{}}){this.research=research;this.client=client;this.imageFeedback=imageFeedback;this.sourceLeads=sourceLeads;this.prepareSources=prepareSources;this.inspection={configured:Boolean(client),generationAvailable:false,generationApproved:false,workerActive:false};this.refreshing=null;}
   status(){return {...this.inspection};}
   async inspect(){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');this.inspection=await this.client.inspect();return this.status();}
   async queue(id){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');requireThat(!this.client.readOnly,'ENGINE_READ_ONLY','This connection observes existing results; native queueing is disabled.');const request=this.research.get(id);requireThat(request,'RESEARCH_REQUEST_NOT_FOUND','Research request is unavailable.');const scoped=this.requestForEngine(request);if(!request.engineJob){if(!request.continuation)await this.prepareSources();const context=this.editorialContext(request);if(context.continuation||context.feedback.length||context.sourceLeads?.length)scoped.editorialContext=context;}const claim=this.research.claimEngineQueue(id,requestFingerprint(scoped));if(!claim.claimed)return claim.job;
@@ -58,7 +58,7 @@ export class EditorialEngineService {
   }
   requestForEngine(request){return {...request,...(request.engineJob?.editorialContext?{editorialContext:request.engineJob.editorialContext}:{})};}
   editorialContext(request){
-    const sourceLeads=request?.continuation?[]:this.sourceLeads().slice(0,6);const result={schemaVersion:1,...(request?.continuation?{continuation:request.continuation}:{}),feedback:this.research.founderTasteFeedback(),...(sourceLeads.length?{sourceLeads}:{}),interpretation:'Specific editorial judgments, not factual findings, objective aesthetic measurements, or blanket genre bans.'};
+    const sourceLeads=request?.continuation?[]:this.sourceLeads().slice(0,6);const result={schemaVersion:1,...(request?.continuation?{continuation:request.continuation}:{}),feedback:[...this.research.founderTasteFeedback(),...this.imageFeedback()].sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))).slice(0,6),...(sourceLeads.length?{sourceLeads}:{}),interpretation:'Specific editorial judgments, not factual findings, objective aesthetic measurements, or blanket genre bans.'};
     while(result.sourceLeads?.length&&JSON.stringify(result).length>9500)result.sourceLeads.pop();
     while(result.feedback.length&&JSON.stringify(result).length>9500){result.feedback.pop();result.omittedFeedbackCount=(result.omittedFeedbackCount||0)+1;}return result;
   }

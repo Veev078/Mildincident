@@ -29,6 +29,7 @@ export class LocalPreviewStore {
       original_name TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, original_width INTEGER NOT NULL,
       original_height INTEGER NOT NULL, original_format TEXT NOT NULL, uploaded_at TEXT NOT NULL,
       UNIQUE(story_id,asset_id,original_sha256));
+      CREATE TABLE IF NOT EXISTS local_image_review_contexts(story_id TEXT NOT NULL,asset_id TEXT NOT NULL,version INTEGER NOT NULL,context_json TEXT NOT NULL,PRIMARY KEY(story_id,asset_id,version));
       CREATE TABLE IF NOT EXISTS local_image_review_events(story_id TEXT NOT NULL, asset_id TEXT NOT NULL,
       version INTEGER NOT NULL, decision TEXT NOT NULL, reason TEXT NOT NULL, created_at TEXT NOT NULL,
       PRIMARY KEY(story_id,asset_id,version));
@@ -139,7 +140,7 @@ export class LocalPreviewStore {
     const rows = this.db.prepare('SELECT * FROM local_image_review_events WHERE story_id=? AND asset_id=? ORDER BY version DESC').all(storyId, assetId);
     const latest = rows[0];
     return latest ? { decision: latest.decision, reason: latest.reason, version: latest.version, updatedAt: latest.created_at,
-      localOnly: true, rightsGranted: false, history: rows.slice(0, 50).map(r => ({version:r.version, decision:r.decision, reason:r.reason, updatedAt:r.created_at})) } : null;
+      context:JSON.parse(this.db.prepare('SELECT context_json FROM local_image_review_contexts WHERE story_id=? AND asset_id=? AND version=?').get(storyId,assetId,latest.version)?.context_json||'null'),localOnly: true, rightsGranted: false, history: rows.slice(0, 50).map(r => ({version:r.version, decision:r.decision, reason:r.reason, updatedAt:r.created_at})) } : null;
   }
 
   allReviews() {
@@ -147,7 +148,11 @@ export class LocalPreviewStore {
     return new Map(scopes.map(r => [JSON.stringify([r.story_id,r.asset_id]), this.review(r.story_id,r.asset_id)]));
   }
 
-  saveReview(storyId, assetId, input) {
+  tasteFeedback(){
+    return [...this.allReviews()].map(([key,review])=>{const [storyId,assetId]=JSON.parse(key),context=review.context;return {candidateId:'image-dialog:'+storyId+':'+assetId,subject:context?.subject||'Specific photograph '+assetId,decision:review.decision==='shortlist'?'approved':review.decision==='reject'?'rejected':'needs_research',reason:review.reason.slice(0,700),reviewer:'founder',basis:'editorial_taste',scope:'specific_photograph_selection',origin:'image_dialog',photograph:{storyId,assetId,sourceUrl:context?.sourceUrl||'',previewSha256:context?.previewSha256||null,previewVersionRecorded:Boolean(context?.previewSha256)},sourceRevision:context?.sourceRevision||null,workingVersion:context?.workingVersion??null,reviewVersion:review.version,createdAt:review.updatedAt};}).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,6);
+  }
+
+  saveReview(storyId, assetId, input,{context=null}={}) {
     requireThat(input && typeof input === 'object' && !Array.isArray(input) && Object.keys(input).every(k => ['expectedVersion','decision','reason'].includes(k)), 'INVALID_IMAGE_REVIEW', 'Use an editorial decision and reason only.');
     requireThat(['shortlist','reject','hold'].includes(input.decision) && typeof input.reason === 'string' && input.reason.trim().length >= 8 && input.reason.length <= 1500, 'INVALID_IMAGE_REVIEW', 'Choose a decision and give a reason between 8 and 1500 characters.');
     requireThat(Number.isSafeInteger(input.expectedVersion) && input.expectedVersion >= 0, 'INVALID_IMAGE_REVIEW', 'A review version is required.');
@@ -156,6 +161,7 @@ export class LocalPreviewStore {
       const previous = this.review(storyId,assetId);
       requireThat((previous?.version || 0) === input.expectedVersion, 'EDIT_CONFLICT', 'Another tab changed this image review. Reopen it before saving.');
       this.db.prepare('INSERT INTO local_image_review_events VALUES(?,?,?,?,?,?)').run(storyId,assetId,input.expectedVersion+1,input.decision,input.reason.trim(),new Date().toISOString());
+      if(context)this.db.prepare('INSERT INTO local_image_review_contexts VALUES(?,?,?,?)').run(storyId,assetId,input.expectedVersion+1,JSON.stringify(context));
       this.db.exec('COMMIT'); return this.review(storyId,assetId);
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
