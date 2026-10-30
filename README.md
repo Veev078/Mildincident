@@ -1,6 +1,8 @@
 # MILDINCIDENT
 
-An editorial workspace for an independent archival publication, backed by the existing n8n and Buffer system.
+A visual cultural editorial Studio, backed by the existing n8n and Buffer system.
+
+[Product constitution](docs/PRODUCT_CONSTITUTION.md) defines the approved direction; [product map](docs/PRODUCT_MAP.md) distinguishes current capabilities from targets. To open the actual Studio, follow [local start and private restore](docs/LOCAL_START.md).
 
 The product-wide development workspace includes editorial home, story pipeline, unified research/caption/music desk, image library, carousel review, publishing center, archive and measured analytics. It uses actual source snapshots and keeps edits in versioned private local proposals. **It has not replaced Founder Studio or changed any live workflow, story, Buffer item, schedule or Instagram post.**
 

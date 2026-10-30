@@ -1,3 +1,15 @@
+# Canonical foundation and frame-specific editorial memory — 2026-10-30 (America/New_York)
+
+Recovered portability checkpoint `214cbaf` pushed before new work. Founder-approved strategic direction now lives in PRODUCT_CONSTITUTION.md; PRODUCT_MAP.md maps current owners/native IDs/maturity; DECISIONS.md records consequential choices. README/AGENTS refer to this foundation. The attachment’s pending-approval label was superseded by the explicit current founder instruction, not treated as deployment or spending authorization.
+
+Fixed a concrete taste-loop defect: photograph-specific reviews now bind the exact story-owned asset, source and available local preview hash. Stale previews/foreign assets are rejected. Alternatives use that selected photograph’s source rather than the first unrelated media row, and explicitly keep the subject eligible. Reported factual/source/rights/retrieval/interface problems are distinct from editorial-taste feedback; none establishes verification or rights. Context retains exact image/source/revision provenance, hashes into the existing job identity, and trims oldest context with an omission count before exceeding its budget; original decisions remain intact.
+
+Validation:251 automated tests /39 fixture browser workflows /syntax pass. Browser proof covers exact frame review → private alternative brief → reload, with no native job created. Revised native prompt instructions are LOCAL/OFFLINE only; the inactive remote worker remains at the previously read-back saved version7273a017-55b8-41ff-a576-dea13e476189 and has not executed. No new real subject, model judgment or image-quality improvement has been proven. No production/Buffer writes, credentials, network configuration or paid calls changed.
+
+Private data/restore instructions remain under the checkpoint below. Next useful increment: improve source-page photograph credit/provenance and shoot/series follow-up using captured/offline evidence, while free contemporary source hosts remain blocked and current Brave pricing/entitlement unverified. Gate A still needs the founder’s actual device acceptance; Gate B needs approved live access, not more fixtures relabeled as discoveries.
+
+---
+
 # Recovered private workspace portability — 2026-10-30 (America/New_York)
 
 Continued verified remote `ffe4024`; interrupted edits preserved under ignored `.local/recovery/canonical-foundation/` before repairs. Added `npm run workspace:restore -- "extracted-backup-folder"`: inventory/checksum validation, disposable-copy SQLite integrity checks, private staging, complete previous-workspace preservation and conservative open-journal refusal. Portable inventory paths use `/` on Windows as well as Linux. Backing up restored state excludes the old manifest. No credentials, native workflow, production data or environment configuration changed.

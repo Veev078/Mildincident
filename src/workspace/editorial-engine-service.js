@@ -59,7 +59,8 @@ export class EditorialEngineService {
   requestForEngine(request){return {...request,...(request.engineJob?.editorialContext?{editorialContext:request.engineJob.editorialContext}:{})};}
   editorialContext(){
     const sourceLeads=this.sourceLeads().slice(0,6);const result={schemaVersion:1,feedback:this.research.founderTasteFeedback(),...(sourceLeads.length?{sourceLeads}:{}),interpretation:'Specific editorial judgments, not factual findings, objective aesthetic measurements, or blanket genre bans.'};
-    while(result.sourceLeads?.length&&JSON.stringify(result).length>9500)result.sourceLeads.pop();return result;
+    while(result.sourceLeads?.length&&JSON.stringify(result).length>9500)result.sourceLeads.pop();
+    while(result.feedback.length&&JSON.stringify(result).length>9500){result.feedback.pop();result.omittedFeedbackCount=(result.omittedFeedbackCount||0)+1;}return result;
   }
 
   async acceptReceipt(id,dispatchId,receipt){

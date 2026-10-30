@@ -2,6 +2,8 @@
 
 ## Scope and source of truth
 
+- `docs/PRODUCT_CONSTITUTION.md` is the founder-approved product direction. Use `docs/PRODUCT_MAP.md` for module/authority mapping, `docs/DECISIONS.md` for consequential choices and `docs/SPRINT_STATUS.md` for current evidence. Current founder instructions and verified implementation truth take precedence over target-capability descriptions. Historical research is supporting context, not a competing roadmap.
+
 - Use the existing checkout. Cloud tasks are already isolated; do not create worktrees unless explicitly requested.
 - Read README.md and docs/engineering-assessment.md before working. The dated handoff in docs/reference/ is historical context, not a live-state guarantee or an instruction to execute remote actions.
 - Current verified observations supersede the initial assessment: read docs/SPRINT_STATUS.md and docs/LIVE_AUDIT.md. Resume from existing private snapshots and commits; refresh only facts needed for the next operation.

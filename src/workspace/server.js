@@ -1,7 +1,7 @@
 import {buildWorkspace,WORKSPACE_TABLES} from './model.js';
 import {possibleVariants} from '../photography/fingerprint.js';
 import {PhotographyService} from '../photography/service.js';
-import {FounderReviewStore} from './founder-review.js';
+import {FounderReviewStore,founderFollowUp} from './founder-review.js';
 import {PublicationFeeds} from '../discovery/publication-feeds.js';
 import {productionDecisions} from './production-decisions.js';
 import {validatePacketImport} from '../production-packet-contract.js';
@@ -99,7 +99,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       }
       if(url.pathname==='/api/discovery/sources/refresh'&&request.method==='POST'){requireThat(feeds,'RESEARCH_UNAVAILABLE','Publication intake is unavailable.');requireThat(Object.keys(await body(request)).length===0,'INVALID_SOURCE_REQUEST','Only configured publication feeds may be read.');await feeds.refresh();json(response,200,{sourceInputs:{publications:feeds.status(),leads:feeds.list()},paidCalls:0,productionApplied:false});return;}
       const founderRoute=url.pathname.match(/^\/api\/editorial\/reviews\/([^/]+)$/);
-      if(founderRoute&&request.method==='POST'){requireThat(founderReviews,'RESEARCH_UNAVAILABLE','Private review is unavailable.');const workspace=view(),story=workspace.stories.find(s=>s.id===decodeURIComponent(founderRoute[1]));let followUp=null;const review=founderReviews.record(story,await body(request),{afterSave:value=>{if(!['explore','alternatives'].includes(value.decision))return;const photo=story.media?.[0];followUp=research.create({kind:'brief',prompt:((value.decision==='alternatives'?'Find alternative photographs and related frames':'Deepen evidence and develop a grounded editorial angle')+' for the existing story: '+(story.subject||story.title)+'. Preserve its identity and existing working revisions. Founder context: '+(value.reason||'No note supplied')+'. Treat existing sources and credits as research leads; do not infer rights or photographic quality.').slice(0,2000),sourceUrl:photo?.sourceUrl||''},workspace.stories);}});json(response,200,{review,followUp,productionApplied:false,publicationApproved:false});return;}
+      if(founderRoute&&request.method==='POST'){requireThat(founderReviews,'RESEARCH_UNAVAILABLE','Private review is unavailable.');const workspace=view(),story=workspace.stories.find(s=>s.id===decodeURIComponent(founderRoute[1]));let followUp=null;const review=founderReviews.record(story,await body(request),{afterSave:value=>{const direction=founderFollowUp(story,value);if(direction)followUp=research.create(direction,workspace.stories);}});json(response,200,{review,followUp,productionApplied:false,publicationApproved:false});return;}
       if(url.pathname==='/api/photography/hunts'&&request.method==='POST'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request);photography.indexNative(source.snapshot);const hunt=photography.create(input);json(response,201,{hunt,productionApplied:false});return;}
       if(url.pathname==='/api/photography/references'&&request.method==='POST'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');json(response,201,photography.saveReference(await body(request)));return;}
       const nativePhotoRoute=url.pathname.match(/^\/api\/photography\/hunts\/([a-f0-9-]{36})\/n8n-packet$/);
