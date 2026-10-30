@@ -1,7 +1,7 @@
 import { esc, date, human, storyUrl, effective, mediaFor, proposalContent } from './components.js';
 import * as views from './views.js';
 import { creativeBriefFor, emptyCreativeBrief, directionReviewSummary, directionSequenceObservations } from './direction.js';
-import {photoComparison} from './photography.js';
+import {photoComparison,photographicBrief} from './photography.js';
 
 const state = { workspace: null, search: '', pipelineGroup: 'all', librarySearch: '', libraryRights: 'all', compared: [], loading: true, error: null };
 const pending = new Map();
@@ -703,7 +703,7 @@ document.addEventListener('input',event=>{if(event.target.closest('[data-photo-h
 document.addEventListener('change',async event=>{if(event.target.matches('[data-photo-trail]')){state.activePhotoHunt=event.target.value;state.photoOffset=0;try{await hydrateActivePhoto();render();}catch(error){toast(error.message,{error:true});}}});
 document.addEventListener('click',async event=>{const expand=event.target.closest('[data-photo-expand]');if(expand){state.photoParent=expand.dataset.parent;state.photoRequestKey=null;const form=document.querySelector('[data-photo-hunt]');form.elements.query.value=expand.dataset.photoExpand;form.elements.mode.value=expand.dataset.mode;form.elements.parent.value=state.photoParent;form.scrollIntoView({behavior:'smooth'});return;}const resume=event.target.closest('[data-photo-resume]');if(resume){resume.disabled=true;try{await api('/api/photography/hunts/'+resume.dataset.photoResume,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({pages:1})});state.workspace=await api('/api/workspace');await hydrateActivePhoto();render();}catch(error){toast(error.message,{error:true});}finally{resume.disabled=false;}}});
 
-document.addEventListener('click',event=>{const button=event.target.closest('[data-photo-brief]');if(!button)return;const form=document.querySelector('[data-research-form]');if(form){form.elements.prompt.value='Investigate the cultural context and photographic story of '+button.dataset.photoBrief+'. Follow original credits and the surrounding shoot; distinguish sources from inference.';form.elements.sourceUrl.value=button.dataset.source;state.researchDraft={prompt:form.elements.prompt.value,sourceUrl:form.elements.sourceUrl.value};state.briefRequestKey=null;form.scrollIntoView({behavior:'smooth'});toast('Creative brief prepared for your editing. No AI call was made.');}});
+document.addEventListener('click',event=>{const button=event.target.closest('[data-photo-brief]');if(!button)return;const form=document.querySelector('[data-research-form]');const hunt=state.workspace.photoHunts.find(h=>h.id===state.activePhotoHunt)||state.workspace.photoHunts[0];const photo=hunt?.photos.find(p=>p.id===button.dataset.photoId);if(form&&photo){state.researchDraft=photographicBrief(photo);form.elements.prompt.value=state.researchDraft.prompt;form.elements.sourceUrl.value=state.researchDraft.sourceUrl;state.briefRequestKey=null;form.scrollIntoView({behavior:'smooth'});toast('Source-bound creative brief prepared for your editing. No AI call was made.');}});
 
 document.addEventListener('change',event=>{if(event.target.matches('[data-photo-blind]')){state.photoBlind=event.target.checked;event.target.closest('.photo-research').dataset.blind=String(event.target.checked);}});
 

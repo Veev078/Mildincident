@@ -3714,3 +3714,12 @@ dialog::backdrop {
 .photo-catalogues { line-height: 1.8; }
 .photo-comparison .photo { aspect-ratio: 4 / 5; }
 .photo-comparison .photo img { object-fit: contain; }
+.photo-research form { display: grid; gap: 16px; }
+.photo-research form > .button, .photo-research form > .small-button { justify-self: start; }
+.photo-research .field, .photo-research .field-pair > label { display: grid; gap: 8px; }
+.photo-research :is(input:not([type="checkbox"]):not([type="hidden"]), select, textarea) { width: 100%; padding: 11px 12px; border: 1px solid var(--line); background: #fff; color: var(--ink); font: inherit; border-radius: 0; }
+.photo-research [data-photo-trail] { margin: 8px 0 20px; }
+.photo-research .photo-record { padding-top: 16px; }
+.photo-research .photo-record form { margin: 16px 0; }
+.photo-research .carousel-actions { flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.photo-research .photo-record :is(p, dd) { overflow-wrap: anywhere; }

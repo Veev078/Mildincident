@@ -102,7 +102,7 @@ try {
   await page.getByLabel('Research trail',{exact:true}).waitFor();await page.getByRole('heading',{name:'Archive photograph 1',exact:true}).waitFor();
   const photoForm=page.locator('[data-photo-decision]').first();await photoForm.locator('[name="reason"]').fill('Inspect adjacent frames and photographer credits');await photoForm.getByRole('button',{name:'Save photo decision',exact:true}).click();
   await page.locator('.photo-research').getByText('Inspect adjacent frames and photographer credits',{exact:false}).waitFor();await page.reload();await page.getByLabel('Research trail',{exact:true}).waitFor();
-  await page.locator('[data-photo-brief]').first().click();assert.ok((await page.getByLabel('Creative direction',{exact:true}).inputValue()).includes('Investigate the cultural context'));
+  await page.locator('[data-photo-brief]').first().click();assert.ok((await page.getByLabel('Creative direction',{exact:true}).inputValue()).includes('Investigate a visually led cultural story'));
   checks.push('real saved-record photo research, unknown-rights review, persistent verdict and editorial-brief handoff work without paid calls');
   await page.locator('[data-photo-compare]').nth(0).click();await page.locator('[data-photo-compare]').nth(1).click();
   await page.getByRole('button',{name:'Compare marked frames (2)',exact:true}).click();await page.getByRole('heading',{name:'Compare the frames.',exact:true}).waitFor();assert.equal(await page.locator('.photo-comparison article').count(),2);
