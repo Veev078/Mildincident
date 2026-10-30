@@ -1,5 +1,6 @@
 import { esc, date, human, storyUrl, effective, mediaFor, proposalContent } from './components.js';
 import * as views from './views.js';
+import {sourceResearchBrief} from './sources.js';
 import {navigation,resolveRoute,destination,libraryNavigation} from './navigation.js';
 import { creativeBriefFor, emptyCreativeBrief, directionReviewSummary, directionSequenceObservations } from './direction.js';
 import {photoComparison,photographicBrief} from './photography.js';
@@ -30,13 +31,13 @@ function toast(message, { error = false, retryStory } = {}) {
   const node = document.querySelector('#toast');
   node.hidden = false;
   node.classList.toggle('error', error);
-  node.innerHTML = `<span>${esc(message)}</span>${retryStory ? `<button class="text-button" data-action="retry-save" data-story="${esc(retryStory)}">Retry local save</button>` : ''}<button class="toast-close" data-action="close-toast" aria-label="Dismiss notification">×</button>`;
+  node.innerHTML = `<span>${esc(message)}</span>${retryStory ? `<button class="text-button" data-action="retry-save" data-story="${esc(retryStory)}">Retry save</button>` : ''}<button class="toast-close" data-action="close-toast" aria-label="Dismiss notification">×</button>`;
   if (!error) toastTimer = setTimeout(() => { node.hidden = true; }, 6000);
 }
 
 async function api(url, options) {
   let response;
-  try { response = await fetch(url, { cache: 'no-store', ...options }); } catch { throw Object.assign(new Error('The local workspace could not be reached. Your production records are unchanged.'), { code: 'NETWORK_UNAVAILABLE' }); }
+  try { response = await fetch(url, { cache: 'no-store', ...options }); } catch { throw Object.assign(new Error('The Studio could not be reached. Your production records are unchanged.'), { code: 'NETWORK_UNAVAILABLE' }); }
   let data;
   try { data = await response.json(); } catch { throw new Error('The workspace returned an unreadable response.'); }
   if(response.status===401&&data.error?.code==='LOGIN_REQUIRED'){if(!state.workspace)location.assign('/login');else{document.querySelector('#session-reauth')?.remove();const link=document.createElement('a');link.id='session-reauth';link.href='/login';link.target='_blank';link.rel='noopener';link.textContent='Session expired — sign in in a new tab. Pending edits remain here.';link.className='notice warning';document.querySelector('#app').prepend(link);}}
@@ -641,7 +642,7 @@ document.addEventListener('submit', async event => {
     await api(`/api/stories/${encodeURIComponent(form.dataset.story)}/assets/${encodeURIComponent(form.dataset.asset)}/review`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({expectedVersion:Number(form.dataset.version),sourceRevision:form.dataset.revision,workingVersion:Number(form.dataset.working),previewSha256:form.dataset.previewHash,decision:form.elements.decision.value,reason:form.elements.reason.value,...(form.elements.basis?{basis:form.elements.basis.value}:{})})});
     await loadWorkspace({quiet:true});const story=storyById(form.dataset.story);const asset=story?.media.find(a=>a.id===form.dataset.asset);
     if(form.isConnected&&asset)openDialog(views.assetDialog(story,asset));
-    toast('Editorial review saved locally. Image rights and carousel selection are unchanged.');
+    toast('Image feedback saved. Rights and selected slides are unchanged.');
   }catch(error){status.textContent=error.message;}finally{button.disabled=false;}
 });
 
@@ -771,3 +772,13 @@ const researchUiTimer=setInterval(receiveResearchUpdates,15000);window.addEventL
 document.addEventListener('click',async event=>{const button=event.target.closest('[data-hosted-backup]');if(!button)return;button.disabled=true;try{if(!await flushAllDrafts())throw new Error('Save pending edits before creating a backup.');const result=await api('/api/backups',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:'{}'});location.assign('/api/backups/'+encodeURIComponent(result.backup.id)+'/archive');toast('Verified private backup ready. Keep this copy private and off the hosting disk.');}catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}});
 
 document.addEventListener('submit',async event=>{const form=event.target.closest('[data-hosted-logout]');if(!form)return;event.preventDefault();if(await flushAllDrafts())form.submit();else toast('Save or recover pending edits before signing out.',{error:true});});
+
+// A publication entry remains a source lead until researched; preparing its direction makes no request.
+document.addEventListener('click',event=>{
+ const button=event.target.closest('[data-source-brief]');if(!button)return;
+ const form=document.querySelector('[data-research-form]');if(!form)return;
+ if(state.researchDraft?.prompt?.trim()||state.researchDraft?.sourceUrl?.trim()){toast('Your unsaved direction is still here. Save it before preparing another.',{error:true});form.scrollIntoView({block:'center'});return;}
+ const lead=state.workspace.sourceInputs?.leads?.find(l=>l.id===button.dataset.sourceBrief),brief=sourceResearchBrief(lead);if(!brief)return;
+ state.researchDraft=brief;state.briefRequestKey=null;form.elements.prompt.value=brief.prompt;form.elements.sourceUrl.value=brief.sourceUrl;
+ form.scrollIntoView({block:'center'});form.elements.prompt.focus({preventScroll:true});toast('Direction prepared from the source. Review and save it; research has not started.');
+});

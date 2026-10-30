@@ -154,3 +154,19 @@ test('legacy image feedback preserves unknown preview versions and latest recons
  const {store,input}=await fixture(t);store.saveReview(input.storyId,input.assetId,{decision:'reject',reason:'A weak frame for this particular story',expectedVersion:0});let feedback=store.tasteFeedback()[0];assert.equal(feedback.photograph.previewVersionRecorded,false);assert.equal(feedback.photograph.previewSha256,null);assert.equal(feedback.sourceRevision,null);
  store.saveReview(input.storyId,input.assetId,{decision:'shortlist',reason:'Reconsidered for a different sequence context',expectedVersion:1});feedback=store.tasteFeedback()[0];assert.equal(feedback.decision,'approved');assert.equal(feedback.reviewVersion,2);assert.equal(store.review(input.storyId,input.assetId).history.length,2);
 });
+test('image retrieval, factual and permission problems remain reported issues while aesthetic reconsideration changes future context',async t=>{
+ const {store,input}=await fixture(t),context={subject:'Synthetic photographed scene',sourceRevision:'source-1',workingVersion:0,previewSha256:'a'.repeat(64)};
+ const {EditorialEngineService}=await import('../src/workspace/editorial-engine-service.js');
+ const {requestFingerprint}=await import('../src/workspace/editorial-engine-client.js');
+ const engine=new EditorialEngineService({research:{founderTasteFeedback:()=>[]},imageFeedback:()=>store.tasteFeedback()});
+ let version=0;
+ for(const basis of ['retrieval_issue','source_issue','factual_issue','rights_issue','interface_issue']){
+  store.saveReview(input.storyId,input.assetId,{decision:'hold',basis,reason:'A reported problem to investigate, not an aesthetic finding',expectedVersion:version++},{context});
+  const feedback=engine.editorialContext().feedback[0];assert.equal(feedback.basis,'reported_'+basis);assert.equal(feedback.decisionBasis,basis);assert.equal(feedback.photograph.previewSha256,context.previewSha256);assert.equal(feedback.scope,'specific_photograph_selection');
+ }
+ const before=requestFingerprint({kind:'discovery',prompt:'New source-led research',editorialContext:engine.editorialContext()});
+ const review=store.saveReview(input.storyId,input.assetId,{decision:'shortlist',basis:'composition',reason:'The framing supports this particular story after reconsideration',expectedVersion:version},{context});
+ const feedback=engine.editorialContext().feedback[0];assert.equal(feedback.basis,'editorial_taste');assert.equal(feedback.decisionBasis,'composition');assert.equal(feedback.decision,'approved');assert.equal(review.history.length,6);assert.equal(review.history[0].basis,'composition');assert.equal(review.history[1].basis,'interface_issue');assert.equal(review.rightsGranted,false);
+ assert.notEqual(requestFingerprint({kind:'discovery',prompt:'New source-led research',editorialContext:engine.editorialContext()}),before);
+ assert.throws(()=>store.saveReview(input.storyId,input.assetId,{decision:'shortlist',basis:'rights_cleared',reason:'A prohibited permission assertion',expectedVersion:6}),{code:'INVALID_IMAGE_REVIEW'});
+});

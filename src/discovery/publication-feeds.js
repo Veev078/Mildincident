@@ -1,4 +1,5 @@
 import Parser from 'rss-parser';
+import {developedSourceIdentities,selectPublicationLeads} from './lead-selection.js';
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {safePhotoReference as safe} from '../n8n/photo-url-guard.js';
@@ -38,5 +39,14 @@ export class PublicationFeeds {
    this.db.prepare('INSERT INTO publication_feed_reads(source_key,status,data_json,observed_at) VALUES(?,?,?,?)').run(source.key,outcome.status,JSON.stringify(outcome),at);
   }return this.status();
  }finally{this.running=false;}}
- context(){const used=new Set(this.research.all().flatMap(r=>(r.engineJob?.candidates||[]).flatMap(c=>(c.claims||[]).map(claim=>claim.url))));return this.list().filter(l=>!used.has(l.url)).slice(0,6).map(l=>({title:l.title.slice(0,180),url:l.url,source:l.sourceName,summary:l.summary.slice(0,300),publishedAt:l.publishedAt,observedAt:l.observedAt,availability:this.latest(l.sourceKey)?.status||'unverified',photographDate:null,basis:'feed_metadata_not_verified',isGeneratedStory:false}));}
+ context(){
+  const selected=selectPublicationLeads(this.list(),{used:developedSourceIdentities(this.research.all())});
+  return selected.map(l=>({title:l.title.slice(0,180),url:l.url,source:l.sourceName,summary:l.summary.slice(0,300),publishedAt:l.publishedAt,observedAt:l.observedAt,availability:this.latest(l.sourceKey)?.status||'unverified',photographDate:null,basis:'feed_metadata_not_verified',isGeneratedStory:false,
+   reportedByline:l.authorReported||'',photographer:null,
+   ...(l.previewUrl?{previewReference:{url:l.previewUrl,basis:'feed_supplied_unverified',pixelsInspected:false}}:{}),
+   selectionReason:'Unused source page; publishers interleaved to broaden research, not an editorial endorsement.',
+   investigation:['Inspect the original project and its specific cultural context.','Establish photograph credits separately from the publication byline.','Follow credited series and alternative frames; record unknown dates, image identity and rights.'],
+  }));
+ }
+
 }

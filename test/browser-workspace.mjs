@@ -463,7 +463,7 @@ try {
   await inlineReview.getByLabel('Development editorial decision').selectOption('needs_research');
   await inlineReview.getByLabel('Decision basis',{exact:true}).selectOption('editorial_taste');
   await inlineReview.getByLabel('Decision reason').fill('Keep the original research, refine the documented angle.');
-  await inlineReview.getByRole('button',{name:'Save development decision'}).click();
+  await inlineReview.getByRole('button',{name:'Save editorial decision'}).click();
   await page.getByText('Earlier editorial assessment',{exact:true}).click();await page.getByText('Keep the original research, refine the documented angle.',{exact:false}).first().waitFor();
   await page.goto(`${origin}/#/story/${devStoryId}/caption`);
   assert.ok(!await page.getByLabel('Local caption draft').isDisabled());

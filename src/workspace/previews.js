@@ -8,6 +8,8 @@ import sharp from 'sharp';
 import { safePhotoReference } from '../n8n/photo-url-guard.js';
 import { HandoffError, requireThat } from '../errors.js';
 
+export const IMAGE_FEEDBACK_BASES=['editorial_taste','photographic_style','composition','mood','story_potential','factual_issue','source_issue','rights_issue','retrieval_issue','interface_issue'];
+
 export const MAX_PREVIEW_BYTES = 25 * 1024 * 1024;
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const TYPES = { jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
@@ -139,8 +141,9 @@ export class LocalPreviewStore {
   review(storyId, assetId) {
     const rows = this.db.prepare('SELECT * FROM local_image_review_events WHERE story_id=? AND asset_id=? ORDER BY version DESC').all(storyId, assetId);
     const latest = rows[0];
+    const contexts=new Map(this.db.prepare('SELECT version,context_json FROM local_image_review_contexts WHERE story_id=? AND asset_id=? ORDER BY version DESC LIMIT 50').all(storyId,assetId).map(r=>[r.version,JSON.parse(r.context_json)]));
     return latest ? { decision: latest.decision, reason: latest.reason, version: latest.version, updatedAt: latest.created_at,
-      context:JSON.parse(this.db.prepare('SELECT context_json FROM local_image_review_contexts WHERE story_id=? AND asset_id=? AND version=?').get(storyId,assetId,latest.version)?.context_json||'null'),localOnly: true, rightsGranted: false, history: rows.slice(0, 50).map(r => ({version:r.version, decision:r.decision, reason:r.reason, updatedAt:r.created_at})) } : null;
+      context:JSON.parse(this.db.prepare('SELECT context_json FROM local_image_review_contexts WHERE story_id=? AND asset_id=? AND version=?').get(storyId,assetId,latest.version)?.context_json||'null'),localOnly: true, rightsGranted: false, history: rows.slice(0, 50).map(r => ({version:r.version, decision:r.decision, reason:r.reason, updatedAt:r.created_at,...(contexts.get(r.version)?.decisionBasis?{basis:contexts.get(r.version).decisionBasis}:{})})) } : null;
   }
 
   allReviews() {
@@ -149,12 +152,14 @@ export class LocalPreviewStore {
   }
 
   tasteFeedback(){
-    return [...this.allReviews()].map(([key,review])=>{const [storyId,assetId]=JSON.parse(key),context=review.context;return {candidateId:'image-dialog:'+storyId+':'+assetId,subject:context?.subject||'Specific photograph '+assetId,decision:review.decision==='shortlist'?'approved':review.decision==='reject'?'rejected':'needs_research',reason:review.reason.slice(0,700),reviewer:'founder',basis:'editorial_taste',scope:'specific_photograph_selection',origin:'image_dialog',photograph:{storyId,assetId,sourceUrl:context?.sourceUrl||'',previewSha256:context?.previewSha256||null,previewVersionRecorded:Boolean(context?.previewSha256)},sourceRevision:context?.sourceRevision||null,workingVersion:context?.workingVersion??null,reviewVersion:review.version,createdAt:review.updatedAt};}).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,6);
+    return [...this.allReviews()].map(([key,review])=>{const [storyId,assetId]=JSON.parse(key),context=review.context;return {candidateId:'image-dialog:'+storyId+':'+assetId,subject:context?.subject||'Specific photograph '+assetId,decision:review.decision==='shortlist'?'approved':review.decision==='reject'?'rejected':'needs_research',reason:review.reason.slice(0,700),reviewer:'founder',basis:['factual_issue','source_issue','rights_issue','retrieval_issue','interface_issue'].includes(context?.decisionBasis)?'reported_'+context.decisionBasis:'editorial_taste',decisionBasis:context?.decisionBasis||'editorial_taste',scope:'specific_photograph_selection',origin:'image_dialog',photograph:{storyId,assetId,sourceUrl:context?.sourceUrl||'',previewSha256:context?.previewSha256||null,previewVersionRecorded:Boolean(context?.previewSha256)},sourceRevision:context?.sourceRevision||null,workingVersion:context?.workingVersion??null,reviewVersion:review.version,createdAt:review.updatedAt};}).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,6);
   }
 
   saveReview(storyId, assetId, input,{context=null}={}) {
-    requireThat(input && typeof input === 'object' && !Array.isArray(input) && Object.keys(input).every(k => ['expectedVersion','decision','reason'].includes(k)), 'INVALID_IMAGE_REVIEW', 'Use an editorial decision and reason only.');
+    requireThat(input && typeof input === 'object' && !Array.isArray(input) && Object.keys(input).every(k => ['expectedVersion','decision','reason','basis'].includes(k)), 'INVALID_IMAGE_REVIEW', 'Use an editorial decision and reason only.');
     requireThat(['shortlist','reject','hold'].includes(input.decision) && typeof input.reason === 'string' && input.reason.trim().length >= 8 && input.reason.length <= 1500, 'INVALID_IMAGE_REVIEW', 'Choose a decision and give a reason between 8 and 1500 characters.');
+    requireThat(input.basis===undefined||IMAGE_FEEDBACK_BASES.includes(input.basis),'INVALID_IMAGE_REVIEW','Choose a supported feedback type.');
+    if(input.basis!==undefined)context={...(context||{}),decisionBasis:input.basis};
     requireThat(Number.isSafeInteger(input.expectedVersion) && input.expectedVersion >= 0, 'INVALID_IMAGE_REVIEW', 'A review version is required.');
     this.db.exec('BEGIN IMMEDIATE');
     try {

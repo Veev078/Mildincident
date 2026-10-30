@@ -89,6 +89,15 @@ try{
   await page.waitForFunction(()=>document.querySelectorAll('[data-request-id]').length===2);
   assert.equal(app.research.all().length,2);assert.ok(!calls.some(c=>/queue|dispatch|activate/.test(c.path)));
   checks.push('saving directions preserves unsent input and never queues or dispatches paid research');
+  const lead={id:'synthetic-source-lead',sourceKey:'synthetic',sourceName:'Synthetic publication fixture',title:'Synthetic photographic project — not real research',url:'https://example.org/project',summary:'A clearly labeled metadata-only source lead',previewUrl:'',aiGenerated:false,rightsGranted:false};
+  app.research.db.prepare('INSERT INTO publication_leads VALUES(?,?,?)').run(lead.id,lead.sourceKey,JSON.stringify(lead));
+  await page.reload();await page.getByText('Publication leads',{exact:true}).click();
+  const requestCount=calls.length;await page.getByRole('button',{name:'Develop a research direction',exact:true}).click();
+  assert.ok((await page.getByLabel('Creative direction',{exact:true}).inputValue()).includes(lead.title));assert.equal(await page.getByLabel('Source link (optional)',{exact:true}).inputValue(),lead.url);assert.equal(calls.length,requestCount);assert.equal(app.research.all().length,2);
+  await page.getByRole('button',{name:'Save research direction',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('[data-request-id]').length===3);
+  assert.equal(app.research.all()[0].sourceUrl,lead.url);assert.ok(!calls.some(c=>/queue|dispatch|activate/.test(c.path)));
+  checks.push('a publication source lead becomes an editable, persisted source-bound direction without automatic research');
+
   for(const [width,height]of [[1366,768],[1440,900],[390,844]]){
    await page.setViewportSize({width,height});
    for(const route of ['today','discover','stories','production','library','story/'+id+'/overview','story/'+id+'/images','story/'+id+'/caption']){

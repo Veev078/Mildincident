@@ -1,3 +1,4 @@
+import {selectEditorialFeedback} from '../editorial-feedback.js';
 import {randomUUID} from 'node:crypto';
 import {requireThat} from '../errors.js';
 import {captureEditorialEvidence} from '../editorial-evidence.js';
@@ -66,7 +67,7 @@ export class EditorialEngineService {
   }
   requestForEngine(request){return {...request,...(request.engineJob?.editorialContext?{editorialContext:request.engineJob.editorialContext}:{})};}
   editorialContext(request){
-    const sourceLeads=request?.continuation?[]:this.sourceLeads().slice(0,6);const result={schemaVersion:1,...(request?.continuation?{continuation:request.continuation}:{}),feedback:[...this.research.founderTasteFeedback(),...this.imageFeedback()].sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||''))).slice(0,6),...(sourceLeads.length?{sourceLeads}:{}),interpretation:'Specific editorial judgments, not factual findings, objective aesthetic measurements, or blanket genre bans.'};
+    const sourceLeads=request?.continuation?[]:this.sourceLeads().slice(0,6);const result={schemaVersion:1,...(request?.continuation?{continuation:request.continuation}:{}),feedback:selectEditorialFeedback([...this.research.founderTasteFeedback(),...this.imageFeedback()]),...(sourceLeads.length?{sourceLeads}:{}),interpretation:'Specific editorial judgments, not factual findings, objective aesthetic measurements, or blanket genre bans.'};
     while(result.sourceLeads?.length&&JSON.stringify(result).length>9500)result.sourceLeads.pop();
     while(result.feedback.length&&JSON.stringify(result).length>9500){result.feedback.pop();result.omittedFeedbackCount=(result.omittedFeedbackCount||0)+1;}return result;
   }

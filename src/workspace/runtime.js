@@ -1,4 +1,5 @@
 import sharp from 'sharp';import {HostedBackups} from './hosted-backups.js';
+import {closeStudioServer} from './shutdown.js';
 import fs from 'node:fs/promises';import path from 'node:path';import {WorkspaceSource,fetchWorkspaceSnapshot} from './data-source.js';import {n8nReader} from '../audit.js';import {BufferReader} from '../buffer-reader.js';import {LocalDraftStore} from './store.js';import {LocalPreviewStore} from './previews.js';import {LocalResearchStore} from './research-store.js';import {PublicationFeeds} from '../discovery/publication-feeds.js';import {EditorialEngineClient,loadEditorialEngineClient} from './editorial-engine-client.js';import {EditorialEngineService} from './editorial-engine-service.js';import {ResearchDelivery} from './research-delivery.js';import {PrivateAccess} from './private-access.js';import {hostingConfig} from './hosting-config.js';
 export async function startWorkspace({createServer,env=process.env,installSignals=true,loadSnapshot=null,createEngineClient=options=>new EditorialEngineClient(options)}={}){
  const config=hostingConfig(env);if(config.hosted){sharp.concurrency(1);sharp.cache({memory:16,files:0,items:10});}await fs.mkdir(config.dataRoot,{recursive:true,mode:0o700});
@@ -11,7 +12,7 @@ export async function startWorkspace({createServer,env=process.env,installSignal
  }catch(error){console.error('Research connection unavailable: '+(error.code||'CONFIGURATION_ERROR'));}
  const backups=config.hosted?await new HostedBackups({workspace:config.workspace,destinationRoot:config.backups,stateFile:path.join(config.dataRoot,'backup-state.json')}).initialize():null;
  const server=createServer({source,drafts,previews,research,engine,feeds,access,backups,delivery});
- let closing=false;const close=async()=>{if(closing)return;closing=true;await delivery?.stop();await backups?.stop();await new Promise(r=>{server.close(r);server.closeIdleConnections?.();});if(source.inflight)await source.inflight.catch(()=>{});drafts.close();previews.close();research.close();access?.close();};
+ let closing=null;const close=()=>closing||=(async()=>{await delivery?.stop();await backups?.stop();await closeStudioServer(server);if(source.inflight)await source.inflight.catch(()=>{});drafts.close();previews.close();research.close();access?.close();})();
  try{await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(config.port,config.host,resolve);});}catch(error){drafts.close();previews.close();research.close();access?.close();throw error;}
  console.log('MILDINCIDENT '+(config.hosted?'private hosted':'local')+' Studio listening on port '+config.port+'. Production writes disabled.');
  delivery?.start();backups?.start();if(engine&&!delivery)engine.refresh().catch(error=>console.error('Research read unavailable: '+(error.code||'READ_FAILED')));

@@ -24,7 +24,8 @@
     "studio:open": "node scripts/open-studio.mjs",
     "workspace:restore": "node scripts/restore-workspace.mjs",
     "studio:password": "node scripts/studio-password.mjs",
-    "test:hosted": "node test/browser-hosted.mjs"
+    "test:hosted": "node test/browser-hosted.mjs",
+    "test:ux": "node test/browser-editorial-ux.mjs"
   },
   "dependencies": {
     "rss-parser": "3.13.0",
