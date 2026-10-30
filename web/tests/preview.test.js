@@ -14,6 +14,11 @@ test('small story thumbnails expose a compact retry without implying that the so
  const html=image({previewUrl:'https://example.org/frame.jpg',title:'A source reference'},{compact:true});
  assert.match(html,/compact-preview/);assert.match(html,/data-action="retry-preview" hidden>Retry<\/button>/);assert.match(html,/Loading preview/);assert.ok(!html.includes('Image verified'));
 });
+test('reported photographer and project trails remain inspectable when a source caption is absent',()=>{
+ const asset={id:'reference',sourceResearchLinks:[{kind:'series',label:'Recorded project',url:'https://example.org/project'},{kind:'photographer',label:'Reported creator',url:'https://example.org/photographer'}]};
+ const html=assetDialog({id:'CON-TRAIL',title:'Story',media:[asset]},asset);
+ assert.match(html,/https:\/\/example.org\/project/);assert.match(html,/Photographer: Reported creator/);assert.match(html,/Destinations, full-series coverage and rights have not been verified/);assert.ok(!html.includes('Caption recorded at the source'));
+});
 test('private preview review discloses rights and identity uncertainty and escapes filenames', () => {
  const html=assetDialog({id:'CON-1',title:'Story'}, {id:'asset-1',title:'<unsafe>',localPreview:{width:900,height:1200},rightsStatus:'preview_unreviewed'});
  assert.match(html,/Identity and rights remain unverified/);

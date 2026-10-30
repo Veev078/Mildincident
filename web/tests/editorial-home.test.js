@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {todaySelection,home} from '../today.js';
+import {todaySelection,home,lastSavedAt} from '../today.js';
 import {resolveRoute,destination,navigation} from '../navigation.js';
 import {analytics} from '../views.js';
 const story=(id,extra={})=>({id,title:id,hook:'A recorded editorial premise',revision:'r1',media:[],...extra});
@@ -13,6 +13,17 @@ test('Today separates fresh proposals, historical results and genuinely saved wo
 test('working story revisions stay visible and stale founder decisions return to review rather than silently hiding material',()=>{
  const workspace={stories:[story('changed',{origin:'n8n_development',localDraft:{version:2,title:'Working title'}})],founderReviews:{changed:{decision:'pass',sourceRevision:'r1',workingVersion:1}}};
  assert.equal(todaySelection(workspace).fresh[0].title,'Working title');assert.equal(workspace.stories[0].title,'changed');
+});
+test('Continue working uses actual private-save and current decision times rather than native row order or invented recency',()=>{
+ const workspace={stories:[story('older',{localDraft:{updatedAt:'2026-10-28T10:00:00Z'}}),story('recent',{localDraft:{updatedAt:'2026-10-30T11:00:00Z'}}),story('just-saved'),story('undated',{localDraft:{updatedAt:'invalid-date'}})],founderReviews:{'just-saved':{decision:'save',sourceRevision:'r1',workingVersion:0,createdAt:'2026-10-30T12:00:00Z'}}};
+ const before=JSON.stringify(workspace);assert.deepEqual(todaySelection(workspace).continuing.map(s=>s.id),['just-saved','recent','older','undated']);assert.equal(lastSavedAt(workspace.stories[3]),null);assert.equal(JSON.stringify(workspace),before);
+ const outdated={decision:'save',sourceRevision:'old',workingVersion:0,createdAt:'2026-10-31T12:00:00Z'};assert.equal(lastSavedAt(workspace.stories[1],{recent:outdated}),'2026-10-30T11:00:00Z');
+});
+test('Today can resume a visited stage while stale copies still lead to explicit source comparison',()=>{
+ const make=extra=>({workspace:{stories:[story('saved',{localDraft:{updatedAt:'2026-10-30T11:00:00Z',...extra}})]},lastStoryTabs:{saved:'caption'}});
+ assert.match(home(make({})),/#\/story\/saved\/caption/);assert.match(home(make({})),/Continue the caption/);
+ const stale=home(make({stale:true}));assert.ok(!stale.includes('Continue the caption'));assert.match(stale,/Review source changes/);
+ const unknown=make({});unknown.lastStoryTabs.saved='__proto__';assert.ok(!home(unknown).includes('[object Object]'));
 });
 test('five editorial destinations preserve all old bookmarks, exact story IDs and library secondary routes',()=>{
  assert.equal(navigation.length,5);

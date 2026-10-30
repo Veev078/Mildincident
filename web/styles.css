@@ -4158,3 +4158,5 @@ dialog:has(>.image-inspector) { padding:24px; max-height:calc(100vh - 40px); }
 @media(max-width:700px) {
  dialog:has(>.image-inspector) { padding:18px; width:calc(100vw - 24px); max-height:calc(100dvh - 24px); }
 }
+
+.story-card .story-saved-at { font-size:12px; color:var(--quiet); margin:0 0 12px; }

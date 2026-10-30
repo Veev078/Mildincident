@@ -24,18 +24,19 @@ let toastTimer;
 let keyboardPrefix = false;
 let drag = null;
 let rehearsal = null;
+state.lastStoryTabs={};
 
 function route() { return resolveRoute(location.hash); }
 
 const storyById = id => state.workspace?.stories?.find(story => story.id === id);
 const announce = message => { document.querySelector('#announcement').textContent = message; };
 
-function toast(message, { error = false, retryStory } = {}) {
+function toast(message, { error = false, retryStory, reviewFilter } = {}) {
   clearTimeout(toastTimer);
   const node = document.querySelector('#toast');
   node.hidden = false;
   node.classList.toggle('error', error);
-  node.innerHTML = `<span>${esc(message)}</span>${retryStory ? `<button class="text-button" data-action="retry-save" data-story="${esc(retryStory)}">Retry save</button>` : ''}<button class="toast-close" data-action="close-toast" aria-label="Dismiss notification">×</button>`;
+  node.innerHTML = `<span>${esc(message)}</span>${retryStory ? `<button class="text-button" data-action="retry-save" data-story="${esc(retryStory)}">Retry save</button>` : ''}${reviewFilter?`<button class="text-button" data-action="open-review-view" data-value="${esc(reviewFilter)}">${reviewFilter==='saved'?'View saved':'View passed'}</button>`:''}<button class="toast-close" data-action="close-toast" aria-label="Dismiss notification">×</button>`;
   if (!error) toastTimer = setTimeout(() => { node.hidden = true; }, 6000);
 }
 
@@ -57,6 +58,7 @@ function rememberFocus() {
 function render({ focusMain = false } = {}) {
   const focus = rememberFocus();
   const current = route();
+  if(current.view==='story'&&storyById(current.id))state.lastStoryTabs[current.id]=['overview','research','images','direction','caption','carousel','music','publishing'].includes(current.tab)?current.tab:'overview';
   const source = state.workspace?.source || {};
   const active = destination(current.view);
   const viewTitle = current.view === 'story' ? 'Stories' : ({archive:'Published archive',analytics:'Insights'}[current.view] || nav.find(n => n[0] === current.view)?.[2]);
@@ -427,6 +429,8 @@ document.addEventListener('click', event => {
       break;
     }
     case 'close-dialog': document.querySelector('#asset-dialog').close(); break;
+    case 'open-review-view':
+      if(['saved','passed'].includes(button.dataset.value)){state.reviewFilter=button.dataset.value;location.hash='#/discover';render();}break;
     case 'copy-caption': copyCaption(story); break;
     case 'review-current-frame': {
       const form=button.closest('[data-image-review]');if(!form?._currentContext)break;for(const [key,value]of Object.entries(form._currentContext))form.dataset[key]=value;form.querySelector('[data-review-status]').textContent='Note applied to this version. Save when your review is ready.';form.querySelector('button[type=submit]').disabled=false;rememberImageReview(form);break;
@@ -790,7 +794,7 @@ document.addEventListener('click',event=>{const button=event.target.closest('[da
 document.addEventListener('submit',async event=>{
  const form=event.target.closest('[data-founder-review]');if(!form)return;event.preventDefault();const decision=event.submitter?.value;if(!decision)return;for(const b of form.querySelectorAll('button'))b.disabled=true;
  try{const fields=new FormData(form);const result=await api('/api/editorial/reviews/'+encodeURIComponent(form.dataset.founderReview),{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({decision,basis:fields.get('basis'),reason:fields.get('reason')||'',dimensions:fields.getAll('dimension'),...(fields.get('basis')==='individual_photograph'?{assetId:form.dataset.asset,previewSha256:form.dataset.previewHash}:{}),expectedVersion:Number(form.dataset.version),sourceRevision:form.dataset.revision,workingVersion:Number(form.dataset.working)})});
-  await loadWorkspace({quiet:true});if(decision==='develop')location.hash='#/story/'+encodeURIComponent(form.dataset.founderReview)+'/direction';toast(result.followUp?'Decision and research direction saved. Research has not started.':({save:'Saved to Discover → Saved / developing.',pass:'Passed. You can reconsider it in Discover → Passed.',develop:'Saved. Continue developing the angle.',reset:'Returned to the review queue.'}[decision]||'Editorial decision saved.'));
+  await loadWorkspace({quiet:true});if(decision==='develop')location.hash='#/story/'+encodeURIComponent(form.dataset.founderReview)+'/direction';toast(result.followUp?'Decision and research direction saved. Research has not started.':({save:'Saved to Discover → Saved / developing.',pass:'Passed. You can reconsider it in Discover → Passed.',develop:'Saved. Continue developing the angle.',reset:'Returned to the review queue.'}[decision]||'Editorial decision saved.'),{reviewFilter:decision==='save'?'saved':decision==='pass'?'passed':null});
  }catch(error){toast(error.message,{error:true});}finally{for(const b of form.querySelectorAll('button'))b.disabled=false;}
 });
 
