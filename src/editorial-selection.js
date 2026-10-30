@@ -7,7 +7,7 @@ export function editorialSelectionTools(){
  const caseOf=c=>c.editorialCase||c.editorial_case||{};
  function assess(c,{phase='research',feedback=[],photos=[],sources=[]}={}){
   const reasons=[];const add=(code,message)=>reasons.push({code,message});const ec=caseOf(c);
-  const rejection=feedback.find(f=>f.reviewer==='founder'&&f.basis==='editorial_taste'&&f.decision==='rejected'&&normal(f.subject)===normal(c.subject));
+  const rejection=feedback.find(f=>f.scope!=='specific_photograph_selection'&&f.reviewer==='founder'&&f.basis==='editorial_taste'&&f.decision==='rejected'&&normal(f.subject)===normal(c.subject));
   if(rejection)add('FOUNDER_TASTE_PASS','Founder declined this specific editorial selection. Preserve its research; this is not a factual or attractiveness finding.');
   if(['hold','reject'].includes(ec.recommendation))add('RESEARCH_EDITOR_DISPOSITION',clean(ec.comparison_reason)||'The research response holds this lead on editorial grounds; do not spend drafting tokens to rescue it.');
   if(c.prechecks_passed===false)add('RESEARCH_PRECHECK_FAILED','Existing duplicate/source prechecks did not pass.');

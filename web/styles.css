@@ -3697,3 +3697,13 @@ dialog::backdrop {
 [data-form="music-intent"] label { display: block; font-size: 11px; }
 [data-form="music-intent"] textarea { margin-top: 8px; }
 [data-form="music-intent"] button[type="submit"] { margin-top: 16px; }
+
+/* Photographic research reuses the editorial palette and stays usable on narrow screens. */
+.photo-research { min-width: 0; overflow-wrap: anywhere; }
+.photo-research :is(input, select, form, label, .field-pair) { min-width: 0; max-width: 100%; }
+.photo-research select { width: 100%; }
+.photo-research .paper-panel { min-width: 0; }
+.photo-research .photo { aspect-ratio: 4 / 5; background: var(--accent-soft); }
+.photo-research .photo img { width: 100%; height: 100%; object-fit: contain; }
+.photo-research[data-blind="true"] .photo-record { visibility: hidden; height: 0; overflow: hidden; }
+.photo-research .text-button { white-space: normal; overflow-wrap: anywhere; text-align: left; }

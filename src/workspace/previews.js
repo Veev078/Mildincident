@@ -1,3 +1,4 @@
+import {fingerprint} from '../photography/fingerprint.js';
 import { DatabaseSync } from 'node:sqlite';
 import { constants, chmodSync, closeSync, mkdirSync, openSync } from 'node:fs';
 import fs from 'node:fs/promises';
@@ -22,6 +23,7 @@ export class LocalPreviewStore {
     chmodSync(filename, 0o600);
     this.db = new DatabaseSync(filename);
     this.db.exec(`PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;
+      CREATE TABLE IF NOT EXISTS local_preview_fingerprints(hash TEXT PRIMARY KEY,data_json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS local_image_previews(id INTEGER PRIMARY KEY, story_id TEXT NOT NULL,
       asset_id TEXT NOT NULL, original_sha256 TEXT NOT NULL, preview_sha256 TEXT NOT NULL,
       original_name TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, original_width INTEGER NOT NULL,
@@ -36,7 +38,7 @@ export class LocalPreviewStore {
   }
 
   #public(row) {
-    return row ? { originalSha256: row.original_sha256, sha256: row.preview_sha256, originalName: row.original_name,
+    return row ? { fingerprint:JSON.parse(this.db.prepare('SELECT data_json FROM local_preview_fingerprints WHERE hash=?').get(row.preview_sha256)?.data_json||'null'),originalSha256: row.original_sha256, sha256: row.preview_sha256, originalName: row.original_name,
       width: row.width, height: row.height, originalWidth: row.original_width, originalHeight: row.original_height,
       originalFormat: row.original_format, uploadedAt: row.uploaded_at,
       sourceInspection: this.sourceInspection(row.story_id,row.asset_id,row.preview_sha256),
@@ -100,8 +102,10 @@ export class LocalPreviewStore {
       if (error instanceof HandoffError) throw error;
       throw new HandoffError('INVALID_PREVIEW_FILE', 'The local image could not be safely decoded. Originals and production data were not changed.');
     }
+    const visualFingerprint=await fingerprint(preview);
     const originalHash = sha256(bytes);
     const previewHash = sha256(preview);
+    this.db.prepare('INSERT OR IGNORE INTO local_preview_fingerprints VALUES(?,?)').run(previewHash,JSON.stringify(visualFingerprint));
     const previous = this.db.prepare('SELECT * FROM local_image_previews WHERE story_id=? AND asset_id=? AND original_sha256=?').get(storyId, assetId, originalHash);
     if (previous) {
       await this.#readBlob(previous.original_sha256, 'original');

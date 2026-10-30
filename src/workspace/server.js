@@ -1,3 +1,6 @@
+import {buildWorkspace,WORKSPACE_TABLES} from './model.js';
+import {possibleVariants} from '../photography/fingerprint.js';
+import {PhotographyService} from '../photography/service.js';
 import {productionDecisions} from './production-decisions.js';
 import {validatePacketImport} from '../production-packet-contract.js';
 import {prepareProductionPacket} from './production-bridge.js';
@@ -51,9 +54,10 @@ async function imageBody(request) {
   return Buffer.concat(chunks);
 }
 
-export function createWorkspaceServer({ source, drafts, previews, research, engine, webRoot = WEB_ROOT }) {
+export function createWorkspaceServer({ source, drafts, previews, research, engine, photography=research?new PhotographyService(research):null, webRoot = WEB_ROOT }) {
   const view = () => {
-    const workspace = source.view(drafts.all());
+    const workspace = source.snapshot?source.view(drafts.all()):buildWorkspace({records:Object.fromEntries(Object.keys(WORKSPACE_TABLES).map(k=>[k,[]])),buffer:{posts:[],complete:false,observedAt:null},observedAt:new Date().toISOString(),warnings:[]});
+    if(!source.snapshot)workspace.source={...workspace.source,kind:'disconnected',observedAt:null,bufferObservedAt:null,stale:true,unavailable:true,warnings:['No authoritative production snapshot is available. Private photographic research remains usable; connect n8n/Buffer or restore your private backup to inspect existing stories.'],refreshError:{code:'SOURCE_UNAVAILABLE',message:'Production observations unavailable; no example stories were substituted.'}};
     workspace.researchRequests = research?.all() || [];
     workspace.engine = engine?.status() || {configured:false,generationAvailable:false,generationApproved:false,workerActive:false};
     for (const request of workspace.researchRequests) for (const candidate of request.engineJob?.candidates || []) {
@@ -63,7 +67,8 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       workspace.stories.push(story);
     }
     attachLocalPreviews(workspace,previews);
-    for (const story of workspace.stories) { story.sourceSequencePlan = buildSourceSequencePlan(story); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity}; }
+    for (const story of workspace.stories) { story.visualVariants=possibleVariants(story.media);story.sourceSequencePlan = buildSourceSequencePlan(story); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity}; }
+    workspace.photoHunts=photography?.all()||[];
     workspace.discovery = buildDiscoveryDesk(workspace.stories);
     workspace.researchHandoffAvailable = Boolean(research);
     return workspace;
@@ -87,6 +92,9 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       if (url.pathname === '/api/health' && request.method === 'GET') {
         json(response, 200, { status: 'ok', mode: 'local_editorial_workspace', productionMutationsEnabled: false, sourceAvailable: Boolean(source.snapshot), refreshing: Boolean(source.inflight) }); return;
       }
+      if(url.pathname==='/api/photography/hunts'&&request.method==='POST'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request);photography.indexNative(source.snapshot);const hunt=photography.create(input);json(response,201,{hunt,productionApplied:false});return;}
+      const photoRoute=url.pathname.match(/^\/api\/photography\/(hunts|decisions)\/([^/]+)$/);
+      if(photoRoute&&request.method==='POST'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request),id=decodeURIComponent(photoRoute[2]);if(photoRoute[1]==='decisions'){json(response,200,photography.decide(id,input));return;}const hunt=await photography.resume(id,input.pages??1);json(response,200,{hunt,productionApplied:false,rightsGranted:false});return;}
       if (url.pathname === '/api/workspace' && request.method === 'GET') { json(response, 200, view()); return; }
       if (url.pathname === '/api/research/requests' && request.method === 'POST') {
         requireThat(research, 'RESEARCH_UNAVAILABLE', 'The private research request store is unavailable.');

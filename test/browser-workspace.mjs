@@ -97,6 +97,14 @@ try {
     assert.ok((await page.locator('h1').innerText()).length > 0);
   }
   checks.push('seven product-wide views render without JavaScript errors');
+  await page.goto(`${origin}/#/discovery`);await page.getByRole('heading',{name:'Follow the photograph.',exact:true}).waitFor();
+  await page.locator('[data-photo-hunt] input[name="query"]').fill('Archive photograph');await page.getByRole('button',{name:'Explore photographs',exact:true}).click();
+  await page.getByLabel('Research trail',{exact:true}).waitFor();await page.getByRole('heading',{name:'Archive photograph 1',exact:true}).waitFor();
+  const photoForm=page.locator('[data-photo-decision]').first();await photoForm.locator('[name="reason"]').fill('Inspect adjacent frames and photographer credits');await photoForm.getByRole('button',{name:'Save photo decision',exact:true}).click();
+  await page.locator('.photo-research').getByText('Inspect adjacent frames and photographer credits',{exact:false}).waitFor();await page.reload();await page.getByLabel('Research trail',{exact:true}).waitFor();
+  await page.locator('[data-photo-brief]').first().click();assert.ok((await page.getByLabel('Creative direction',{exact:true}).inputValue()).includes('Investigate the cultural context'));
+  checks.push('real saved-record photo research, unknown-rights review, persistent verdict and editorial-brief handoff work without paid calls');
+
   const id = snapshot.records.stories[0].concept_id;
   await page.goto(`${origin}/#/story/${id}/publishing`);
   await page.getByRole('heading',{name:'Existing production package',exact:true}).waitFor();
