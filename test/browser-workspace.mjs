@@ -134,7 +134,7 @@ try {
 
 
   const id = snapshot.records.stories[0].concept_id;
-  await page.goto(`${origin}/#/story/${id}/publishing`);
+  await page.goto(`${origin}/#/story/${id}/publishing`);await page.getByText('Production records & review packet',{exact:true}).click();
   await page.getByRole('heading',{name:'Existing production package',exact:true}).waitFor();
   await page.getByText('Recorded handoff history · 1',{exact:true}).click();
   assert.ok((await page.locator('[data-production-visibility]').textContent()).includes('Historical draft creation records'));

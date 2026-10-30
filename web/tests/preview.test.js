@@ -10,6 +10,10 @@ test('only scoped hashed local preview paths are allowed alongside HTTPS images'
  assert.match(image({previewUrl:url,title:'<unsafe>'}),/src="\/api\/stories/);
  assert.ok(!image({previewUrl:url,title:'<unsafe>'}).includes('alt="<unsafe>'));
 });
+test('small story thumbnails expose a compact retry without implying that the source or image is globally missing',()=>{
+ const html=image({previewUrl:'https://example.org/frame.jpg',title:'A source reference'},{compact:true});
+ assert.match(html,/compact-preview/);assert.match(html,/data-action="retry-preview" hidden>Retry<\/button>/);assert.match(html,/Loading preview/);assert.ok(!html.includes('Image verified'));
+});
 test('private preview review discloses rights and identity uncertainty and escapes filenames', () => {
  const html=assetDialog({id:'CON-1',title:'Story'}, {id:'asset-1',title:'<unsafe>',localPreview:{width:900,height:1200},rightsStatus:'preview_unreviewed'});
  assert.match(html,/Identity and rights remain unverified/);

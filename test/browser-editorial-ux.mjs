@@ -17,6 +17,7 @@ const artifacts=path.resolve('.local/ux-transformation');
 await fs.mkdir(artifacts,{recursive:true,mode:0o700});
 const servers=[],stores=[],checks=[],errors=[];
 let browser;
+let captureBasis='existing_private_cached_snapshot';
 async function boot(snapshot,webRoot){
  const directory=await fs.mkdtemp(path.join(root,'store-'));
  const source=new WorkspaceSource({root:directory,loadLive:async()=>snapshot});source.snapshot=snapshot;
@@ -34,17 +35,17 @@ async function capture(label,webRoot,snapshot){
  const model=app.source.view(),id=model.stories[0]?.id;
  for(const [width,height]of [[1366,768],[1440,900]]){
   await page.setViewportSize({width,height});
-  for(const [name,route]of [['today','home'],['discover','discovery'],['story','story/'+encodeURIComponent(id)+'/overview']]){
+  for(const [name,route]of [['today','home'],['discover','discovery'],['story','story/'+encodeURIComponent(id)+'/overview'],['production','publishing']]){
    if(name==='story'&&!id)continue;
    await page.goto(app.origin+'/#/'+route);await page.locator('h1').waitFor();await page.waitForTimeout(450);
    await page.screenshot({path:path.join(artifacts,label+'-'+name+'-'+width+'x'+height+'.png')});
   }
  }
- await page.close();return {source:'existing_private_cached_snapshot',stories:model.stories.length,externalPhotographsInspected:false,originalStoresModified:false};
+ await page.close();return {source:captureBasis,stories:model.stories.length,externalPhotographsInspected:false,originalStoresModified:false};
 }
 try{
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
- let cached;try{cached=JSON.parse(await fs.readFile('.local/workspace/snapshot.json','utf8'));}catch{cached=workspaceSnapshot();cached.records.stories[0].title='Synthetic UI fixture — no live editorial content';}
+ let cached;try{cached=JSON.parse(await fs.readFile('.local/workspace/snapshot.json','utf8'));}catch{captureBasis='generated_fixture_snapshot';cached=workspaceSnapshot();cached.records.stories[0].title='Synthetic UI fixture — no live editorial content';}
  const baselineDir=path.join(root,'baseline');await fs.mkdir(baselineDir);const archive=path.join(root,'baseline.tar');
  await fs.writeFile(archive,execFileSync('git',['archive','f501fd5','web']));await extract({cwd:baselineDir,file:archive});
  const before=await capture('before',path.join(baselineDir,'web'),cached);

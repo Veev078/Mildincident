@@ -585,7 +585,7 @@ document.addEventListener('error', event => {
   if (!photo) return;
   photo.classList.add('preview-failed');
   const status = photo.querySelector('.preview-status');
-  if (status) status.textContent = 'This browser could not load the preview. Open the source record or attach a private file.';
+  if (status) status.textContent = photo.classList.contains('compact-preview')?'Preview unavailable':'This browser could not load the preview. Open the source record or attach a private file.';
   const retry = photo.querySelector('.preview-retry'); if (retry) retry.hidden = false;
 }, true);
 
