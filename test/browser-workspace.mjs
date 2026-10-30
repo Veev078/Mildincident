@@ -334,6 +334,7 @@ try {
   fixtureCandidate.editorialSelection={decision:'hold',basis:'source_text_and_caption_correspondence',visualSupport:'not_established',reasons:[{code:'VISUAL_CASE_UNSUPPORTED',message:'Fixture visual case needs source-caption evidence.'}]};
   fixtureCandidate.editorialCase={cultural_payoff:'Synthetic cultural proposal, not a real researched story.',visual_detail:'Synthetic fixture composition for UI coverage only.',preset_connection:'Fixture native preset.'};
   fixtureCandidate.leadComparison=[{subject:'Fixture institutional identification puzzle',territory:'wildcard',decision:'hold',selected:false,reasons:[{code:'IDENTIFICATION_WITHOUT_INDEPENDENT_PAYOFF',message:'Fixture identification alone is insufficient.'}]},{subject:fixtureCandidate.story.title,territory:'fixture-photography',decision:'hold',selected:true,reasons:[{code:'VISUAL_CASE_UNSUPPORTED',message:'Fixture visual case needs source-caption evidence.'}]}];
+  fixtureCandidate.leadComparison[0].claims=[{claim:'A retained alternative fixture claim, not verified research.',source_url:'https://example.org/alternative'}];
   fixtureCandidate.selectionProvenance={territory:'wildcard',candidateTerritory:'fixture-photography',preset:'fixture-native-preset',considered:2};
   fixtureCandidate.sourceEvidence=[{claimIndex:0,url:'https://example.org/source',title:'Synthetic captured source',httpStatus:200,access:'source_text_captured',textExcerpt:'A labeled source-text fixture, not real editorial research.'}];
   fixtureCandidate.story.format='single_image';fixtureCandidate.proposedAssetIds=['dev-photo-1'];
@@ -352,6 +353,8 @@ try {
   await page.getByText('Research leads compared · 2',{exact:true}).click();
   assert.ok((await page.locator('.story-workspace').textContent()).includes('Fixture institutional identification puzzle'));
   assert.ok((await page.locator('.story-workspace').textContent()).includes('not additional generated stories'));
+  await page.getByText('Retained research references · 1',{exact:true}).click();
+  assert.ok((await page.locator('.story-workspace').textContent()).includes('A retained alternative fixture claim, not verified research.'));
   checks.push('selection case and compared research leads retain preset provenance and explicit hold reasons without presenting new generated stories');
 
   await page.goto(`${origin}/#/story/${devStoryId}/caption`);

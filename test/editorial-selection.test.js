@@ -4,7 +4,7 @@ const tools=editorialSelectionTools();
 const caseFor=(detail,payoff)=>({primary_appeal:'photography',cultural_payoff:payoff,visual_detail:detail,image_story_connection:'The documented creative relationship changes the reading of this particular frame.',preset_connection:'A distinctive photographic moment within visual culture.',familiarity_risk:'Use a specific frame and relationship rather than celebrity name recognition.',supporting_claim_indices:[0]});
 const scenario=(subject,territory,detail,payoff)=>({subject,territory,prechecks_passed:true,claims:[{claim:payoff,source_url:'https://example.org/recorded-fixture'}],editorialCase:caseFor(detail,payoff)});
 test('a sourced puzzle and generic archive prestige cannot stand in for an independent editorial case',()=>{
- const puzzle={subject:'An unidentified actress in a mystery photo',hook_fact:'An identification puzzle solved by its subject',prechecks_passed:true,visual:{reference_url:'https://www.loc.gov/',notes:'A beautiful visually strong portrait'}};const held=tools.assess(puzzle);assert.equal(held.decision,'hold');assert.ok(held.reasons.some(r=>r.code==='IDENTIFICATION_WITHOUT_INDEPENDENT_PAYOFF'));assert.ok(held.reasons.some(r=>r.code==='EDITORIAL_CASE_INCOMPLETE'));
+ const puzzle={subject:'An unidentified actress in a mystery photo',hook_fact:'An identification puzzle solved by its subject',prechecks_passed:true,visual:{reference_url:'https://www.loc.gov/',notes:'A beautiful visually strong portrait'}};puzzle.editorialCase={primary_appeal:'identification_puzzle'};const held=tools.assess(puzzle);assert.equal(held.decision,'hold');assert.ok(held.reasons.some(r=>r.code==='IDENTIFICATION_WITHOUT_INDEPENDENT_PAYOFF'));assert.ok(held.reasons.some(r=>r.code==='EDITORIAL_CASE_INCOMPLETE'));
  const founder={subject:puzzle.subject,reviewer:'founder',basis:'editorial_taste',decision:'rejected'};assert.equal(tools.assess(puzzle,{feedback:[founder]}).decision,'reject');assert.equal(tools.assess({...puzzle,subject:'A different cultural story'},{feedback:[founder]}).decision,'hold');
 });
 test('varied public-reference scenarios can advance provisionally, but sources and specific visual details are required before drafting',()=>{
@@ -18,7 +18,7 @@ test('comparison considers alternatives rather than committing to the first sour
 });
 
 test('anonymous archival subjects are eligible when a separate cultural story and specific visual evidence warrant them',()=>{
- const c=scenario('An unidentified underground club participant','fashion_subculture','handmade glitter makeup and layered clothing','Club participants used handmade glitter makeup to express a new queer nightlife identity.');c.editorialCase.primary_appeal='identification_puzzle';const assessment=tools.assess(c,{phase:'sources',sources:[{claimIndex:0,access:'source_text_captured'}],photos:[{source_relation:'subject_caption_match',source_caption:'Handmade glitter makeup and layered clothing in the club.'}]});assert.equal(assessment.decision,'advance');assert.ok(assessment.rationale[0].message.includes('aesthetic quality remains unverified'));
+ const c=scenario('An unidentified underground club participant','fashion_subculture','handmade glitter makeup and layered clothing','Club participants used handmade glitter makeup to express a new queer nightlife identity.');c.editorialCase.primary_appeal='identification_puzzle';c.editorialCase.independent_payoff='The nightlife community expressed a new shared queer cultural identity through dress.';const assessment=tools.assess(c,{phase:'sources',sources:[{claimIndex:0,access:'source_text_captured'}],photos:[{source_relation:'subject_caption_match',source_caption:'Handmade glitter makeup and layered clothing in the club.'}]});assert.equal(assessment.decision,'advance');assert.ok(assessment.rationale[0].message.includes('aesthetic quality remains unverified'));
 });
 
 test('an explicit weak-lead disposition is respected and reasoned preference precedes diversity tie-breaking',()=>{
@@ -32,4 +32,18 @@ test('flattering generic adjectives do not satisfy the specific visual-detail re
 
 test('a recognizable name in a legitimate caption cannot masquerade as a specific visual detail',()=>{
  const c=scenario('Mira Sol','music_film_pop','An iconic beautiful portrait of Mira Sol','A documented relationship between a film role and a designer.');const result=tools.assess(c,{phase:'sources',sources:[{claimIndex:0,access:'source_text_captured'}],photos:[{source_relation:'subject_caption_match',source_caption:'Mira Sol publicity portrait'}]});assert.equal(result.decision,'hold');assert.ok(result.reasons.some(r=>r.code==='VISUAL_DETAIL_NOT_SPECIFIC'));
+});
+
+test('provider parsing isolates malformed leads, refuses incomplete JSON and keeps compact evidence for alternatives',()=>{
+ const response=candidates=>({output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({candidates})}]}]});
+ const good=scenario('A documented scene','fashion_subculture','handmade club makeup and clothing','Participants constructed a shared nightlife identity through dress.');
+ assert.deepEqual(tools.responseCandidates({status:'incomplete',...response([good])}),[]);assert.deepEqual(tools.responseCandidates({output:[{type:'message',content:[{type:'output_text',text:'{"candidates":['}]}]}),[]);
+ const parsed=tools.responseCandidates(response([null,{subject:1},{...good,claims:[null,...good.claims]}]));assert.equal(parsed.length,1);assert.equal(parsed[0].claims.length,1);
+ const selected=tools.select([good,{...good,subject:'Another photographed cultural scene'}]);assert.equal(selected.comparison[1].claims[0].claim,good.claims[0].claim);assert.equal(selected.comparison[1].editorialCase.visual_detail,good.editorialCase.visual_detail);
+});
+test('sparse captions remain unknown, while captured image-page context can support differently worded captions',()=>{
+ const c=scenario('A particular club scene','fashion_subculture','handmade glitter makeup and layered clothing','Nightlife participants constructed cultural identities through styling.');const source={claimIndex:0,access:'source_text_captured',url:'https://example.org/page',textExcerpt:'Handmade glitter makeup and layered clothing expressed the club scene.'};
+ const photo={source_relation:'subject_caption_match',source_caption:'Club scene, 1982',source_page_url:source.url};const supported=tools.assess(c,{phase:'sources',sources:[source],photos:[photo]});assert.equal(supported.decision,'advance');assert.equal(supported.pixelInspectionPerformed,false);
+ const sparse=tools.assess(c,{phase:'sources',sources:[{...source,textExcerpt:''}],photos:[photo]});assert.equal(sparse.decision,'hold');assert.ok(sparse.reasons.some(r=>r.code==='VISUAL_EVIDENCE_UNKNOWN'));
+ assert.equal(tools.assess(c,{phase:'sources',sources:[source],photos:[{...photo,source_relation:'context_only'}]}).decision,'hold');assert.equal(tools.assess(c,{phase:'sources',sources:[{...source,contradiction:true}],photos:[photo]}).decision,'hold');
 });

@@ -34,6 +34,6 @@ export function providerWebSearchUsage(response){
 
 export function attributionReviewSignals(concept,sources=[]){
  const copy=[concept.title,concept.hook,concept.caption].filter(Boolean).join(' ');
- if(/(?:solved|identified|discovered)\s+(?:it\s+)?(?:herself|himself|themselves)|solved by (?:its|the) subject/i.test(copy)&&sources.some(s=>s.access==='source_text_captured'&&/identified by|guess from|suggested .{0,80} in the first place/i.test(s.textExcerpt||'')))return [{code:'ATTRIBUTION_ROLES_NEED_REVIEW',message:'The source names a separate contributor. Preserve who suggested the identification and who confirmed it; do not credit the subject alone.'}];
+ if(/(?:\b(?:creat|design|discover|identif|solv|invent|produc|author|photograph)\w*[^.!?]{0,70}\b(?:alone|single.handedly|herself|himself|themselves)\b|\bsole (?:creator|author|discoverer|designer|credit)\b)/i.test(copy)&&sources.some(s=>s.access==='source_text_captured'&&/identified by|suggested by|credited to|co.author|collaborat|contribut|guess from|suggested .{0,80} in the first place/i.test(s.textExcerpt||'')))return [{code:'ATTRIBUTION_ROLES_NEED_REVIEW',message:'The copy asserts sole credit while a captured source describes other contributors. Review the original roles; this lexical flag does not establish a factual contradiction.'}];
  return [];
 }

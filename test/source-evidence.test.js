@@ -20,3 +20,7 @@ test('provider tool accounting distinguishes incomplete emitted records from act
 test('sole-credit claims are flagged against captured contributor evidence without rewriting copy',async()=>{
  const {attributionReviewSignals}=await import('../src/source-evidence.js');const sources=[{access:'source_text_captured',textExcerpt:'She was identified by James Owen; the subject confirmed it.'}];assert.equal(attributionReviewSignals({title:'The mystery she solved herself'},sources)[0].code,'ATTRIBUTION_ROLES_NEED_REVIEW');assert.deepEqual(attributionReviewSignals({title:'A reader suggested her name; she confirmed it'},sources),[]);
 });
+
+test('contributor attribution review generalizes beyond identity puzzles and is explicitly uncertain',async()=>{
+ const {attributionReviewSignals}=await import('../src/source-evidence.js');const sources=[{access:'source_text_captured',textExcerpt:'The photographer collaborated with a designer on the project.'}];const copy={caption:'She created this series alone.'};const before=JSON.stringify(copy);assert.equal(attributionReviewSignals(copy,sources).length,1);assert.equal(JSON.stringify(copy),before);assert.equal(attributionReviewSignals({caption:'The photographer and designer collaborated on the series.'},sources).length,0);assert.equal(attributionReviewSignals({caption:'She walks alone through the city.'},sources).length,0);
+});
