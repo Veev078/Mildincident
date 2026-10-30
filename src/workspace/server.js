@@ -28,13 +28,13 @@ function json(response, status, value) {
   response.end(JSON.stringify(value));
 }
 
-async function body(request) {
+async function body(request,maxSize=128*1024) {
   requireThat(String(request.headers['content-type'] || '').split(';')[0] === 'application/json', 'JSON_REQUIRED', 'Use application/json for local edits.');
   const chunks = [];
   let size = 0;
   for await (const chunk of request) {
     size += chunk.length;
-    requireThat(size <= 128 * 1024, 'BODY_TOO_LARGE', 'Local edit exceeds 128 KiB.');
+    requireThat(size <= maxSize, 'BODY_TOO_LARGE', 'Local request exceeds its permitted size.');
     chunks.push(chunk);
   }
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
@@ -94,6 +94,9 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       }
       if(url.pathname==='/api/photography/hunts'&&request.method==='POST'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request);photography.indexNative(source.snapshot);const hunt=photography.create(input);json(response,201,{hunt,productionApplied:false});return;}
       if(url.pathname==='/api/photography/references'&&request.method==='POST'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');json(response,201,photography.saveReference(await body(request)));return;}
+      const nativePhotoRoute=url.pathname.match(/^\/api\/photography\/hunts\/([a-f0-9-]{36})\/n8n-packet$/);
+      if(nativePhotoRoute&&request.method==='POST'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');json(response,200,{packet:photography.exportNative(nativePhotoRoute[1],await body(request)),productionApplied:false});return;}
+      if(url.pathname==='/api/photography/n8n-results'&&request.method==='POST'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');json(response,200,photography.importNative(await body(request,512*1024)));return;}
       const photoRoute=url.pathname.match(/^\/api\/photography\/(hunts|decisions)\/([^/]+)$/);
       if(photoRoute&&photoRoute[1]==='hunts'&&request.method==='GET'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');json(response,200,{hunt:photography.get(decodeURIComponent(photoRoute[2]),Number(url.searchParams.get('offset')||0))});return;}
       if(photoRoute&&request.method==='POST'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request),id=decodeURIComponent(photoRoute[2]);if(photoRoute[1]==='decisions'){json(response,200,photography.decide(id,input));return;}const hunt=await photography.resume(id,input.pages??1);json(response,200,{hunt,productionApplied:false,rightsGranted:false});return;}

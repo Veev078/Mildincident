@@ -1,13 +1,14 @@
 import {safePhotoReference as safe} from '../n8n/photo-url-guard.js';
 export const PHOTO_SOURCES={saved:{name:'Saved research + existing n8n photographs',live:true},commons:{name:'Wikimedia Commons',host:'commons.wikimedia.org',live:false},loc:{name:'Library of Congress photographs',host:'www.loc.gov',live:false},aic:{name:'Art Institute of Chicago',host:'api.artic.edu',live:false}};
 const plain=v=>String(v||'').replace(/<[^>]*>/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim().slice(0,2000);
-export function photoQueryURL(source,query,page){
- if(!Number.isInteger(page)||page<1||page>1000)throw new Error('INVALID_PAGE');let url;
- if(source==='commons'){url=new URL('https://commons.wikimedia.org/w/api.php');for(const [k,v]of Object.entries({action:'query',format:'json',generator:'search',gsrnamespace:'6',gsrsearch:query,gsrlimit:'20',gsroffset:String((page-1)*20),prop:'imageinfo',iiprop:'url|size|extmetadata',iiurlwidth:'800'}))url.searchParams.set(k,v);}
- else if(source==='loc'){url=new URL('https://www.loc.gov/photos/');for(const[k,v]of Object.entries({q:query,fo:'json',c:'20',sp:String(page)}))url.searchParams.set(k,v);}
- else if(source==='aic'){url=new URL('https://api.artic.edu/api/v1/artworks/search');for(const[k,v]of Object.entries({q:query,page:String(page),limit:'20',fields:'id,title,image_id,artist_display,date_display,medium_display,is_public_domain'}))url.searchParams.set(k,v);}
- else throw new Error('UNKNOWN_PHOTO_SOURCE');return url;
+export function photoRequestURL(source,query,page){
+ if(!Number.isInteger(page)||page<1||page>1000)throw new Error('INVALID_PAGE');let base,params;
+ if(source==='commons'){base='https://commons.wikimedia.org/w/api.php';params={action:'query',format:'json',generator:'search',gsrnamespace:'6',gsrsearch:query,gsrlimit:'20',gsroffset:String((page-1)*20),prop:'imageinfo',iiprop:'url|size|extmetadata',iiurlwidth:'800'};}
+ else if(source==='loc'){base='https://www.loc.gov/photos/';params={q:query,fo:'json',c:'20',sp:String(page)};}
+ else if(source==='aic'){base='https://api.artic.edu/api/v1/artworks/search';params={q:query,page:String(page),limit:'20',fields:'id,title,image_id,artist_display,date_display,medium_display,is_public_domain'};}
+ else throw new Error('UNKNOWN_PHOTO_SOURCE');return base+'?'+Object.entries(params).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&');
 }
+export const photoQueryURL=(source,query,page)=>new URL(photoRequestURL(source,query,page));
 const textList=value=>(Array.isArray(value)?value:[value]).filter(v=>typeof v==='string').map(plain).join('; ');
 function sourceRecords(source,data) {
  if(source==='commons'&&(data?.query?.pages||Object.hasOwn(data||{},'batchcomplete')))return Object.values(data.query?.pages||{});
@@ -39,6 +40,9 @@ export async function fetchPhotoPage(source,query,page,{fetchImpl=fetch}={}){
  // A page of incomplete/unusable metadata is not evidence that later pages are empty.
  return {photos:normalizePhotos(source,raw,query),hasMore:records.length>0,providerRecords:records.length};
 }
+
+/** The same normalizers/URL guard execute in a reviewed n8n Code node; no copied provider logic. */
+export function photographyAdapterCode(){return `const safe=${safe.toString()};const plain=${plain.toString()};const textList=${textList.toString()};const sourceRecords=${sourceRecords.toString()};const normalizePhotos=${normalizePhotos.toString()};const photoRequestURL=${photoRequestURL.toString()};`;}
 export function expansionQueries(photo){const credit=String(photo.creator||'').split(/\/|—/)[0].trim();const creator=/unknown|unverified|not recorded/i.test(credit)?'':credit;const terms=[['photographer',creator],['series',photo.series&&photo.series],['archive',photo.title+' original publication'],['adjacent',creator&&creator+' '+(photo.date||'')+' contact sheet'],['image',photo.sourceUrl]];return terms.filter(([,q])=>q).map(([mode,query])=>({mode,query:query.slice(0,500),basis:'research_direction_not_verified_relationship'}));}
 
 /** Browser catalogue links only. No scraping, proxying or claims of source connectivity. */

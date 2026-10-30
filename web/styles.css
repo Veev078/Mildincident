@@ -3723,3 +3723,6 @@ dialog::backdrop {
 .photo-research .photo-record form { margin: 16px 0; }
 .photo-research .carousel-actions { flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .photo-research .photo-record :is(p, dd) { overflow-wrap: anywhere; }
+.photo-native { margin: 20px 0; padding: 16px; border: 1px solid var(--line); }
+.photo-native summary { color: var(--accent); cursor: pointer; font-weight: 700; }
+.photo-native form { margin: 16px 0; }

@@ -1,3 +1,15 @@
+# Native photographic research integration — 2026-10-30 (America/New_York)
+
+Continued clean `c9e64d6`. Founder priority: earlier cultural examples are regression cases only; fresh discovery and integrated n8n research take precedence. Buffer automation is deferred. Current enforced environment policy still excludes all archive hosts; no bypass or configuration publication. Current read-only research/sourcing captures confirm active versions unchanged (`7240d849-d676-43ef-86ca-9b367d99add5` / `75efdc48-8cdf-467d-983a-fc164524867d`).
+
+Implemented a private Studio → n8n research packet → returned result → new Studio research branch contract, with exact candidate/source/native IDs where present, recorded feedback, a content digest, original direction/source/page, and one free source-call budget. No publishing authority or rights flags can be added. Results bind to a locally exported packet, import idempotently into a child trail and preserve earlier decisions. Imported IDs are reported, not independently verified executions; offline receipts are labeled. Source metadata is not pixel inspection. Existing research SQLite holds the receipts, not a new production database or queue.
+
+The offline n8n builder pins two actual active-source node hashes and emits a five-node manual development graph. It uses the SAME URL guard, archive API construction and normalization as Studio. One GET, no redirects/retries, models, credentials, table writers, webhooks, schedules or production package calls. It removes seven-result/preview/dimension/rights shortlist assumptions from this private research proof without changing active sourcing. Cloud crypto/HTTP behavior and live archive retrieval still require an isolated permitted test; local VM replay is not a deployed execution.
+
+Checkpoint validation: 226 automated tests and 37 browser workflows (the first browser attempt found a test-variable scope collision; fixed). Tests cover complete packet/VM/receipt/import journey, scope and budget tampering, source mismatch, duplicate import, source failure and unverified execution identity. Browser checks download/import/reload alongside existing Studio workflows. Private real source captures remain ignored; synthetic unfamiliar theatre/music cases are labeled tests, not new discoveries. No live source discovery or improved taste has been claimed.
+
+---
+
 # MILDINCIDENT 2.0 photographic research — 2026-10-30 UTC
 
 Resumed the clean, verified remote `16cd1f5` on `development/photography-review-20261029`. Both supplied master TXT and Muse PDF were read; the master governs. There were no recoverable interrupted edits or private `.local` files in this environment. Baseline was **205 passing tests**, not the previously reported 210. Do not claim earlier private Wendy/Deneuve working revisions/photos are restored. Their native records/workflow history were not modified; restoring older local revisions requires the founder's private backup.

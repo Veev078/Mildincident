@@ -1,3 +1,4 @@
+import {normalizePhotos} from '../src/photography/sources.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -115,6 +116,16 @@ try {
   await page.reload();await page.getByRole('heading',{name:'Synthetic manual source reference',exact:true}).waitFor();
   assert.equal(research.db.prepare("SELECT COUNT(*) n FROM photo_candidates WHERE id LIKE 'manual:%'").get().n,1);
   checks.push('manual source fallback retains incomplete metadata on reload and large-frame comparison works without a new backend or production asset');
+  {
+  await page.getByText('Continue research with n8n',{exact:true}).click();await page.locator('[data-photo-native] select[name="source"]').selectOption('loc');
+  const packetDownload=page.waitForEvent('download');await page.getByRole('button',{name:'Download n8n research packet',exact:true}).click();const pd=await packetDownload;const packetFile=path.join(root,'private-native-packet.json');await pd.saveAs(packetFile);const packet=JSON.parse(await fs.readFile(packetFile,'utf8'));assert.equal(packet.payload.direction.source,'loc');assert.equal(packet.payload.budget.paidCalls,0);
+  const photos=normalizePhotos('loc',{results:[{id:'https://www.loc.gov/item/synthetic-unfamiliar-scene/',title:'SYNTHETIC TEST — unfamiliar rehearsal frame',image_url:['https://example.org/rehearsal.jpg']}]},packet.payload.direction.query);
+  const receipt={schemaVersion:1,purpose:'private_photographic_research_result',inputDigest:packet.digest,requestId:packet.payload.requestId,source:'loc',query:packet.payload.direction.query,page:packet.payload.direction.page,status:'ok',photos,hasMore:false,observedAt:new Date().toISOString(),executionId:null,remoteWrites:0,paidCalls:0,rightsGranted:false};
+  await page.locator('[data-photo-native-import] input[type="file"]').setInputFiles({name:'synthetic-native-result.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(receipt))});await page.getByRole('button',{name:'Import private n8n result',exact:true}).click();await page.getByRole('heading',{name:'SYNTHETIC TEST — unfamiliar rehearsal frame',exact:true}).waitFor();
+  assert.ok((await page.locator('.photo-research').innerText()).includes('imported_receipt_unverified'));await page.reload();await page.getByRole('heading',{name:'SYNTHETIC TEST — unfamiliar rehearsal frame',exact:true}).waitFor();assert.equal(photos[0].rightsGranted,false);
+  checks.push('private n8n packet download and correlated result import create a persistent research branch without generation, production imports or execution-verification claims');
+  }
+
 
 
   const id = snapshot.records.stories[0].concept_id;

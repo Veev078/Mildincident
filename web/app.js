@@ -727,3 +727,15 @@ document.addEventListener('click',event=>{
  }
  if(event.target.closest('[data-photo-open-comparison]')&&(state.photoCompared||[]).length>=2)openDialog(photoComparison(state.photoCompared));
 });
+
+// Explicit file handoff to inactive n8n development research; never an execution or production save.
+document.addEventListener('submit',async event=>{
+ const form=event.target.closest('[data-photo-native],[data-photo-native-import]');if(!form)return;event.preventDefault();const button=form.querySelector('button');button.disabled=true;
+ try{if(form.matches('[data-photo-native]')){
+  const fields=Object.fromEntries(new FormData(form));const result=await api('/api/photography/hunts/'+fields.huntId+'/n8n-packet',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({source:fields.source,photoIds:(state.photoCompared||[]).map(p=>p.id)})});
+  const blob=new Blob([JSON.stringify(result.packet,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mildincident-private-research-'+result.packet.digest.slice(0,12)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Private research packet downloaded. No n8n execution was started.');
+ }else{
+  const file=form.elements.receipt.files[0];if(!file||file.size>512*1024)throw new Error('Choose a returned research JSON file under 512 KiB.');const receipt=JSON.parse(await file.text());const result=await api('/api/photography/n8n-results',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(receipt)});
+  state.activePhotoHunt=result.hunt.id;state.photoOffset=0;await loadWorkspace({quiet:true});toast('Research result imported into a new private branch. Remote execution and image identity remain unverified.');
+ }}catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
+});
