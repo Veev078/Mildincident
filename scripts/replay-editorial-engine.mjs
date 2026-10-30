@@ -31,5 +31,17 @@ for(const leads of [[],[good],[{subject:'Synthetic weak celebrity portrait',clai
  }else assert.equal(c.prechecks_passed,false);
  reports.push({mode:'synthetic_native_path',leadCount:leads.length,selectedDecision:c.editorialSelection.decision});
 }
+for(const scenario of ['malformed','incomplete','duplicate','founder_rejected','unrelated_image','source_access_failure']){
+ const provider={output:[{type:'message',content:[{type:'output_text',text:scenario==='malformed'?'broken JSON':JSON.stringify({candidates:scenario==='duplicate'?[good,good]:[good]})}]}],...(scenario==='incomplete'?{status:'incomplete'}:{})};
+ const records={'Verify Development Claim':[job],'Research Candidates':[provider],'Build Research Prompt':[{avoid:[],founderFeedback:scenario==='founder_rejected'?[{subject:good.subject,reviewer:'founder',basis:'editorial_taste',decision:'rejected'}]:[],discoveryPlan:{preset:'fixture-preset'}}]};
+ const selected=run('Parse Research',[provider],records)[0].json;
+ if(['malformed','incomplete','founder_rejected'].includes(scenario))assert.equal(selected.editorialSelection.decision,'reject');
+ if(scenario==='duplicate'){assert.equal(selected.leadComparison.filter(c=>c.decision==='reject').length,1);assert.equal(selected.editorialSelection.decision,'advance');}
+ if(['unrelated_image','source_access_failure'].includes(scenario)){
+ records['Collect Link Checks']=[{...selected,sourceEvidence:scenario==='source_access_failure'?[{claimIndex:0,access:'access_unconfirmed'}]:[{claimIndex:0,access:'source_text_captured'}]}];
+ const context=run('Prepare Visual Draft Context',[{asset_id:'fixture',source_relation:scenario==='unrelated_image'?'context_only':'subject_caption_match',source_caption:good.editorial_case.visual_detail}],records)[0].json;assert.equal(context.editorialSelection.decision,'hold');
+ }
+ reports.push({mode:'synthetic_native_edge',scenario,passed:true});
+}
 const failure=run('Prepare Development Failure',[],{'Claim Queued Development Job':[job],'Validate Development Dispatch':[{job_id:job.job_id,dispatch_id:'lease'}]})[0].json;assert.equal(failure.error,'DEVELOPMENT_EXECUTION_FAILED');
 await fs.writeFile(dir+'intelligence2-worker.json',JSON.stringify(workflow),{mode:0o600});await fs.writeFile(dir+'intelligence2-native-replay.json',JSON.stringify({reports,review,paidCalls:0,productionWrites:0},null,2),{mode:0o600});console.log(JSON.stringify({reports,nodes:workflow.nodes.length,paidCalls:0,productionWrites:0}));
