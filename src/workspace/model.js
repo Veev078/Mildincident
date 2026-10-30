@@ -1,3 +1,4 @@
+import {nativeImageRightsEvidence} from '../native-rights-contract.js';
 import {captionIsInternalTest} from '../n8n/draft-guards.js';
 import {projectProduction} from './production-bridge.js';
 import { createHash } from 'node:crypto';
@@ -53,7 +54,7 @@ export function buildWorkspace(snapshot, drafts = new Map()) {
     const media = records.media.filter(m => m.concept_id === row.concept_id).map(m => ({
       id: String(m.asset_id || ''), title: String(m.title || 'Archival image'), creator: String(m.creator || ''),
       sourceUrl: browserUrl(m.source_page_url), fileUrl:browserUrl(m.file_url), attribution:String(m.attribution_text||''), licenseUrl:browserUrl(m.license_url), previewUrl: browserUrl(m.thumb_url),
-      license: String(m.license || ''), rightsStatus: String(m.rights_status || 'unreviewed'),
+      nativeRightsReview:nativeImageRightsEvidence(m.rights_status,m.notes), license: String(m.license || ''), rightsStatus: String(m.rights_status || 'unreviewed'),
       provider: String(m.provider || ''), width: Number(m.width) || null, height: Number(m.height) || null,
       selected: selectedAssetIds.includes(m.asset_id),
     }));
@@ -82,7 +83,7 @@ export function buildWorkspace(snapshot, drafts = new Map()) {
       format: story.format, approvalStatus: story.approvalStatus, targetSlideCount: story.targetSlideCount, sourceClaimsReviewed: story.sourceClaimsReviewed,
       sourceNotes: story.sourceNotes, productionNotes: story.productionNotes, sourceReviewNotes: story.sourceReviewNotes,
       selectedAssetIds, rightsStatus: story.rightsStatus, research: story.research, musicSelection: story.musicSelection,
-      availableMedia: [...media].map(({fileUrl,attribution,licenseUrl,...original})=>original).sort((a, b) => a.id.localeCompare(b.id)),
+      availableMedia: [...media].map(({fileUrl,attribution,licenseUrl,nativeRightsReview,...original})=>original).sort((a, b) => a.id.localeCompare(b.id)),
     })).digest('hex');
     story.production=projectProduction({row,records,buffer,observedAt:snapshot.observedAt,safeUrl:browserUrl});
     for (const asset of media) { asset.sourcePreviewUrl = asset.previewUrl; asset.previewOrigin = 'source'; asset.localPreview = null; }

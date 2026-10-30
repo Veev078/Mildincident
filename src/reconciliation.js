@@ -1,3 +1,4 @@
+import {nativeImageRightsEvidence} from './native-rights-contract.js';
 // Observational projection only: this never changes source lifecycle rows or remote posts.
 export function projectLifecycle({ manualStatus, posts, complete, instagramEvidence = [] }) {
   const ids = new Set(instagramEvidence.filter(e => e.verified === true && e.postId && e.url).map(e => e.postId));
@@ -35,9 +36,9 @@ export function editorialReadiness({ story, productionPackage, media, imports, p
   const assets = selected.map(id => media.find(m => m.asset_id === id && m.concept_id === story.concept_id));
   if (assets.some(a => !a)) issues.push('MISSING_SELECTED_MEDIA');
   // Do not infer clearance from license labels; the existing per-image review state is authoritative.
-  const pending = assets.filter(a => !a || a.rights_status !== 'cleared').length;
+  const pending = assets.filter(a => !a || a.rights_status !== 'cleared'&&!nativeImageRightsEvidence(a.rights_status,a.notes).reviewed).length;
   if (pending) issues.push('PER_IMAGE_RIGHTS_PENDING');
-  if (productionPackage?.rights_review_status !== 'complete') issues.push('PACKAGE_RIGHTS_REVIEW_INCOMPLETE');
+  if (productionPackage?.rights_review_status !== 'reviewed') issues.push('PACKAGE_RIGHTS_REVIEW_INCOMPLETE');
   if (Number(productionPackage?.production_version) !== Number(productionPackage?.editorial_handoff_version)) issues.push('UNSAVED_CURRENT_HANDOFF');
   if (/INTERNAL[\s\S]{0,60}TEST|DO\s+NOT\s+PUBLISH/iu.test(productionPackage?.caption_draft || '')) issues.push('INTERNAL_TEST_CAPTION');
   if (/locate original production photographs|can anchor a .*photo essay|all photographic reuse requires|check rights before selecting/iu.test(productionPackage?.caption_draft || '')) issues.push('CAPTION_CONTAINS_PRODUCTION_NOTES');
