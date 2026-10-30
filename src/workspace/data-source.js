@@ -7,6 +7,8 @@ import { readAllPages } from '../production-audit.js';
 import { WORKSPACE_TABLES, buildWorkspace } from './model.js';
 import { HandoffError, requireThat } from '../errors.js';
 
+export const PRODUCTION_CONTEXT_TABLES=Object.freeze({exports:'dbyxu6uxL2Tpiaxd',proofs:'NEO7s23dFiIdUb1u',guardedHandoffs:'lBncgD93WV9a8oMu',staging:'lLXVATP5mOBIoogV'});
+
 async function atomicJson(filename, value) {
   await fs.mkdir(path.dirname(filename), { recursive: true, mode: 0o700 });
   const temporary = `${filename}.${randomUUID()}.tmp`;
@@ -98,6 +100,7 @@ export async function fetchWorkspaceSnapshot({ read = n8nReader(process.env.N8N_
       records[name] = await readAllPages(read, `/api/v1/data-tables/${id}/rows`);
     }));
   }
+  const contextWarnings=[];for(const [name,id] of Object.entries(PRODUCTION_CONTEXT_TABLES)){try{records[name]=await readAllPages(read,`/api/v1/data-tables/${id}/rows`);}catch{contextWarnings.push(`${name} production context unavailable; relationships remain unverified.`);}}
   const account = await bufferReader.account();
   const channels = [];
   for (const org of account.organizations) channels.push(...(await bufferReader.channels(org.id))
@@ -105,7 +108,7 @@ export async function fetchWorkspaceSnapshot({ read = n8nReader(process.env.N8N_
   requireThat(channels.length === 1, 'BUFFER_CHANNEL_AMBIGUOUS', 'Expected exactly one existing mildincident Instagram channel.');
   const channel = channels[0];
   const buffer = await bufferReader.posts({ organizationId: channel.organizationId, channelId: channel.id });
-  const warnings = [];
+  const warnings = [...contextWarnings];
   let metricsFailures = 0;
   const sent = buffer.posts.filter(p => p.status === 'sent');
   for (let offset = 0; offset < sent.length; offset += 2) {

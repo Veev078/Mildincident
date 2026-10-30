@@ -42,6 +42,7 @@ test('workspace API exposes sanitized reads and local-only versioned editing whi
   const proposal = await fetch(`${origin}/api/stories/${story.id}/proposal`);
   assert.match(proposal.headers.get('content-disposition'), /attachment/);
   assert.equal((await proposal.json()).publicationApproved, false);
+  const packetResponse=await fetch(`${origin}/api/stories/${story.id}/production-packet`);assert.equal(packetResponse.status,200);const packet=await packetResponse.json();assert.equal(packet.kind,'mildincident_editorial_to_production_review');assert.equal(packet.editorial.caption,patch.caption);assert.equal(packet.identity.localVersion,1);assert.equal(packet.productionApplied,false);assert.equal(packet.bufferCreateEnabled,false);assert.ok(packet.readiness.blockers.includes('PER_IMAGE_RIGHTS_PENDING'));assert.equal((await fetch(`${origin}/api/stories/${story.id}/production-packet`,{method:'POST',headers:options.headers})).status,404);
   assert.equal((await fetch(`${origin}/api/publish`, { method: 'POST', headers: options.headers })).status, 404);
   assert.equal((await fetch(`${origin}/.local/workspace/drafts.sqlite`)).status, 404);
   assert.equal((await fetch(`${origin}/leak.js`)).status, 404);

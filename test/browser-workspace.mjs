@@ -97,6 +97,13 @@ try {
     assert.ok((await page.locator('h1').innerText()).length > 0);
   }
   checks.push('seven product-wide views render without JavaScript errors');
+  await page.goto(`${origin}/#/story/${id}/publishing`);
+  await page.getByRole('heading',{name:'Existing production package',exact:true}).waitFor();
+  await page.getByText('Recorded handoff history · 1',{exact:true}).click();
+  assert.ok((await page.locator('[data-production-visibility]').textContent()).includes('Historical draft creation records'));
+  const packetDownload=page.waitForEvent('download');await page.getByRole('link',{name:'Download production review packet ↗',exact:true}).click();
+  const downloadedPacket=await packetDownload;const packet=JSON.parse(await fs.readFile(await downloadedPacket.path(),'utf8'));assert.equal(packet.kind,'mildincident_editorial_to_production_review');assert.equal(packet.identity.conceptId,id);assert.equal(packet.productionApplied,false);assert.equal(packet.publicationApproved,false);assert.equal(packet.bufferCreateEnabled,false);
+  checks.push('Publishing joins exact native package and handoff history and downloads a blocked review packet without a provider write');
   await page.goto(`${origin}/#/pipeline`);
   await page.getByRole('searchbox', { name: 'Find a story', exact: true }).fill('nothing-matches-this');
   await page.waitForFunction(() => document.querySelectorAll('.pipeline-row').length === 0);

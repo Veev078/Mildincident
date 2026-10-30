@@ -161,6 +161,7 @@ async function flushDraft(id) {
       if (result.editorialDirection) current.editorialDirection = result.editorialDirection;
       if (result.editorialAudit) { current.editorialAudit=result.editorialAudit;const notice=document.querySelector('[data-editorial-audit]');if(notice&&route().id===id)notice.innerHTML=views.editorialAuditNotice(current); }
       if (result.readiness) {current.readiness=result.readiness;const panel=document.querySelector('[data-readiness-panel]');if(panel&&route().id===id)panel.innerHTML=views.readinessPanel(current);}
+      if(result.productionPreparation){current.productionPreparation=result.productionPreparation;const panel=document.querySelector('[data-production-visibility]');if(panel&&route().id===id)panel.innerHTML=views.productionVisibility(current);}
       if (result.sourceSequencePlan) current.sourceSequencePlan=result.sourceSequencePlan;
       const sequenceIssues = document.querySelector('[data-direction-sequence-issues]');
       if (sequenceIssues && route().id === id) sequenceIssues.innerHTML = directionSequenceObservations(current);
@@ -296,6 +297,13 @@ async function rebaseDraft(story) {
   } catch (error) { toast(error.message, { error: true }); }
 }
 
+async function downloadProductionPacket(story){
+ if(!story)return;
+ if((pending.has(story.id)||saving.has(story.id))&&!story.localDraft?.stale)await flushDraft(story.id);
+ if(pending.has(story.id)||saving.has(story.id)){toast('Save or export your pending edits before preparing the production review packet.',{error:true});return;}
+ try{const packet=await api(`/api/stories/${encodeURIComponent(story.id)}/production-packet`);const url=URL.createObjectURL(new Blob([JSON.stringify(packet,null,2)],{type:'application/json'}));const anchor=document.createElement('a');anchor.href=url;anchor.download=`${story.id}-production-review.json`;document.body.append(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Production review packet downloaded. Existing production records are unchanged.');}catch(error){toast(error.message,{error:true});}
+}
+
 async function downloadProposal(story) {
   if (!story) return;
   let proposal;
@@ -321,6 +329,8 @@ document.addEventListener('click', event => {
   const proposalLink = event.target.closest('a[href]');
   if (proposalLink) {
     const url = new URL(proposalLink.href, location.origin);
+    const packetMatch=url.origin===location.origin&&url.pathname.match(/^\/api\/stories\/([^/]+)\/production-packet$/);
+    if(packetMatch){event.preventDefault();downloadProductionPacket(storyById(decodeURIComponent(packetMatch[1])));return;}
     const match = url.origin === location.origin && url.pathname.match(/^\/api\/stories\/([^/]+)\/proposal$/);
     if (match) { event.preventDefault(); downloadProposal(storyById(decodeURIComponent(match[1]))); return; }
   }

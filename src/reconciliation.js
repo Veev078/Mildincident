@@ -46,6 +46,8 @@ export function editorialReadiness({ story, productionPackage, media, imports, p
   const matched = posts.filter(p => postIds.has(p.id));
   if (matched.length !== postIds.size) issues.push('UNRESOLVED_BUFFER_ID');
   const observation = projectLifecycle({ manualStatus: lifecycle?.lifecycle_status, posts: matched, complete: auditComplete });
+  if(matched.length!==postIds.size||rows.some(r=>!r.buffer_id)){observation.observed='unknown';observation.requiresReview=true;}
+  observation.postIds=[...postIds];observation.multipleHandoffs=rows.length>1||postIds.size>1;
   return { conceptId: story.concept_id, title: story.title, packageVersion: productionPackage?.production_version || null,
     selectedCount: selected.length, pendingRightsCount: pending, existingHandoffCount: rows.length,
     observation, blockers: [...new Set(issues)], publicationApproved: false };

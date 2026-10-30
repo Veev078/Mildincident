@@ -1,3 +1,4 @@
+import {prepareProductionPacket} from './production-bridge.js';
 import {assessStudioReadiness,imageEvidenceState} from '../editorial-readiness.js';
 import {buildSourceSequencePlan} from '../editorial-sequence.js';
 import http from 'node:http';
@@ -60,7 +61,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       workspace.stories.push(story);
     }
     attachLocalPreviews(workspace,previews);
-    for (const story of workspace.stories) { story.sourceSequencePlan = buildSourceSequencePlan(story); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story); }
+    for (const story of workspace.stories) { story.sourceSequencePlan = buildSourceSequencePlan(story); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionPreparation={...packet.readiness,digest:packet.digest,identity:packet.identity}; }
     workspace.discovery = buildDiscoveryDesk(workspace.stories);
     workspace.researchHandoffAvailable = Boolean(research);
     return workspace;
@@ -149,7 +150,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
           json(response, 200, { assetId, preview, scope: 'local_only', rightsGranted: false, productionApplied: false }); return;
         }
       }
-      const match = url.pathname.match(/^\/api\/stories\/(CON-[A-Za-z0-9_-]{1,120})(?:\/(draft|proposal|draft\/history|draft\/rebase))?$/);
+      const match = url.pathname.match(/^\/api\/stories\/(CON-[A-Za-z0-9_-]{1,120})(?:\/(draft|proposal|production-packet|draft\/history|draft\/rebase))?$/);
       if (match) {
         const [, id, operation] = match;
         const story = view().stories.find(s => s.id === id);
@@ -161,7 +162,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
           requireThat(current, 'STORY_NOT_FOUND', 'Story was removed from the source snapshot.');
           const draft = drafts.save(current, input);
           const updated = view().stories.find(s => s.id === id);
-          json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, editorialDirection: updated.editorialDirection, editorialAudit:updated.editorialAudit, readiness:updated.readiness, sourceSequencePlan:updated.sourceSequencePlan, scope: 'local_only', productionApplied: false }); return;
+          json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, editorialDirection: updated.editorialDirection, editorialAudit:updated.editorialAudit, readiness:updated.readiness, sourceSequencePlan:updated.sourceSequencePlan, productionPreparation:updated.productionPreparation, scope: 'local_only', productionApplied: false }); return;
         }
         if (operation === 'draft/history' && request.method === 'GET') { json(response, 200, { versions: drafts.history(id), scope: 'local_only' }); return; }
         if (operation === 'draft/rebase' && request.method === 'POST') {
@@ -170,8 +171,9 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
           requireThat(current, 'STORY_NOT_FOUND', 'Story was removed from the source snapshot.');
           const draft = drafts.rebase(current, input);
           const updated = view().stories.find(s => s.id === id);
-          json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, editorialDirection: updated.editorialDirection, editorialAudit:updated.editorialAudit, readiness:updated.readiness, sourceSequencePlan:updated.sourceSequencePlan, scope: 'local_only', productionApplied: false }); return;
+          json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, editorialDirection: updated.editorialDirection, editorialAudit:updated.editorialAudit, readiness:updated.readiness, sourceSequencePlan:updated.sourceSequencePlan, productionPreparation:updated.productionPreparation, scope: 'local_only', productionApplied: false }); return;
         }
+        if(operation==='production-packet'&&request.method==='GET'){response.setHeader('Content-Disposition',`attachment; filename="${id}-production-review.json"`);json(response,200,prepareProductionPacket(story));return;}
         if (operation === 'proposal' && request.method === 'GET') {
           response.setHeader('Content-Disposition', `attachment; filename="${id}-local-proposal.json"`);
           json(response, 200, drafts.proposal(story)); return;

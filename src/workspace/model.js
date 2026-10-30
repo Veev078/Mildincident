@@ -1,3 +1,4 @@
+import {projectProduction} from './production-bridge.js';
 import { createHash } from 'node:crypto';
 import { canonical } from '../package.js';
 import { editorialReadiness } from '../reconciliation.js';
@@ -50,13 +51,13 @@ export function buildWorkspace(snapshot, drafts = new Map()) {
     const selectedAssetIds = jsonArray(p?.slide_sequence_asset_ids).filter(id => typeof id === 'string');
     const media = records.media.filter(m => m.concept_id === row.concept_id).map(m => ({
       id: String(m.asset_id || ''), title: String(m.title || 'Archival image'), creator: String(m.creator || ''),
-      sourceUrl: browserUrl(m.source_page_url), previewUrl: browserUrl(m.thumb_url),
+      sourceUrl: browserUrl(m.source_page_url), fileUrl:browserUrl(m.file_url), attribution:String(m.attribution_text||''), licenseUrl:browserUrl(m.license_url), previewUrl: browserUrl(m.thumb_url),
       license: String(m.license || ''), rightsStatus: String(m.rights_status || 'unreviewed'),
       provider: String(m.provider || ''), width: Number(m.width) || null, height: Number(m.height) || null,
       selected: selectedAssetIds.includes(m.asset_id),
     }));
     const lifecycle = records.lifecycle.find(l => l.concept_id === row.concept_id);
-    const readiness = editorialReadiness({ story: row, productionPackage: p, media: records.media, imports: records.imports,
+    const readiness = editorialReadiness({ story: row, productionPackage: p, media: records.media, imports: [...records.imports,...(records.guardedHandoffs||[]).map(h=>({...h,state:h.status,buffer_id:h.buffer_post_id}))],
       posts: buffer.posts, lifecycle, auditComplete: buffer.complete });
     const sound = records.soundSelections.find(s => s.concept_id === row.concept_id);
     const story = {
@@ -80,8 +81,9 @@ export function buildWorkspace(snapshot, drafts = new Map()) {
       format: story.format, approvalStatus: story.approvalStatus, targetSlideCount: story.targetSlideCount, sourceClaimsReviewed: story.sourceClaimsReviewed,
       sourceNotes: story.sourceNotes, productionNotes: story.productionNotes, sourceReviewNotes: story.sourceReviewNotes,
       selectedAssetIds, rightsStatus: story.rightsStatus, research: story.research, musicSelection: story.musicSelection,
-      availableMedia: [...media].sort((a, b) => a.id.localeCompare(b.id)),
+      availableMedia: [...media].map(({fileUrl,attribution,licenseUrl,...original})=>original).sort((a, b) => a.id.localeCompare(b.id)),
     })).digest('hex');
+    story.production=projectProduction({row,records,buffer,observedAt:snapshot.observedAt,safeUrl:browserUrl});
     for (const asset of media) { asset.sourcePreviewUrl = asset.previewUrl; asset.previewOrigin = 'source'; asset.localPreview = null; }
     const draft = drafts.get(story.id);
     story.localDraft = draft ? { ...draft, stale: draft.baseRevision !== story.revision } : null;

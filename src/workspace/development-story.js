@@ -1,3 +1,5 @@
+import {projectProduction} from './production-bridge.js';
+import {browserUrl} from './model.js';
 import {analyzeStory} from '../editorial-intelligence.js';
 import {buildEditorialDirection} from '../editorial-direction.js';
 import {assessEditorialPackage} from '../editorial-evidence.js';
@@ -32,6 +34,7 @@ export function developmentCandidateStory(candidate,{soundtrack=[],drafts=new Ma
   story.selectionProposalBasis=proposed.length?'source_caption_metadata_match':'no_automatic_selection';
   story.editorialSelection=candidate.editorialSelection||null;story.editorialCase=candidate.editorialCase||null;story.leadComparison=candidate.leadComparison||[];story.selectionProvenance=candidate.selectionProvenance||null;
   story.generationFormat=format;story.generationFormatBasis=candidate.formatBasis;story.discoveryPlan=candidate.discoveryPlan||null;
+  story.production=projectProduction({row:{concept_id:id},records:{packages:[],imports:[],archives:[],exports:[],proofs:[],guardedHandoffs:[]},buffer:{posts:[],complete:false,observedAt:candidate.provenance.generatedAt},observedAt:candidate.provenance.generatedAt,safeUrl:browserUrl});
   story.origin='n8n_development';story.engineCandidateId=candidate.id;story.engineJobId=candidate.jobId;story.engineProvenance=candidate.provenance;story.developmentDecision=decision;
   return story;
 }
