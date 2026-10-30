@@ -12,3 +12,6 @@ test('unmatched observations are quarantined, outages back off and incomplete re
 test('delivery coalesces overlap and refuses a writable connection; it never invokes queue/start',async t=>{
  const {delivery,engine,state}=await setup(t);assert.throws(()=>new ResearchDelivery({...engine,client:{readOnly:false}}),/READ_ONLY_DELIVERY_REQUIRED/);let release;const old=engine.refresh.bind(engine);engine.refresh=async()=>{await new Promise(r=>{release=r;});return old();};const one=delivery.tick(),two=delivery.tick();assert.equal(one,two);release();await one;assert.equal(state.reads,2);await delivery.stop();
 });
+test('a restart respects a persisted unavailable-read backoff instead of immediately repeating the failed API read',async t=>{
+ const {delivery,research,engine}=await setup(t);let reads=0;engine.refresh=async()=>{reads++;};research.saveDeliveryState({state:'unavailable',nextAttempt:new Date(Date.now()+60000).toISOString(),failures:1});delivery.start();await new Promise(r=>setImmediate(r));assert.equal(reads,0);await delivery.stop();
+});

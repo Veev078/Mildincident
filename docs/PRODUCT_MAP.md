@@ -4,6 +4,7 @@
 
 | Founder task | Existing implementation owner | Authority / current maturity | Next acceptance evidence |
 | --- | --- | --- | --- |
+| Private hosting / daily use | `workspace/runtime.js`, `private-access.js`, `hosted-backups.js`, `render.yaml` | Opt-in authenticated persistent server and verified backups; HTTPS fixture tested, not deployed. Native delivery is read-only. | Current provider price/schema, owner account/secrets/approval and actual-host TLS/disk restart proof. [Steps](PRIVATE_HOSTING.md). |
 | Today / Review | `web/review.js`, `founder-review.js`, `research-store.js` | Local versioned founder decisions; real native results separated from history. Working in fixture browser tests and cached-data smoke. | Founder reviews the populated restored Studio on their own computer (Gate A). |
 | Discover / Explore | `photography/service.js`, `discovery/publication-feeds.js`, `n8n/editorial-development-engine.js` | Local private research plus existing n8n orchestration. Archive adapters/feed parsing are fixture-tested; publication hosts currently blocked. Native Brave historically observed, current costs unknown. | Approved legitimate live source path with inspectable new photographs (Gate B). |
 | Develop | `web/app.js`, `workspace/store.js`, `editorial-readiness.js` | Versioned local caption/sequence/direction/history. No production save. Cached real stories and synthetic browser edit tests. | Founder image/claim/working-copy review; demonstrate scoped feedback effect on a subsequent authorized run (Gates A/C). |

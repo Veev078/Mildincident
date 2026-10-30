@@ -10,7 +10,7 @@ export async function startWorkspace({createServer,env=process.env,installSignal
  if(client){engine=new EditorialEngineService({research,client,imageFeedback:()=>previews.tasteFeedback(),sourceLeads:()=>feeds.context(),prepareSources:()=>feeds.refresh()});if(client.readOnly)delivery=new ResearchDelivery(engine,{intervalMs:config.intervalMs});}
  }catch(error){console.error('Research connection unavailable: '+(error.code||'CONFIGURATION_ERROR'));}
  const backups=config.hosted?await new HostedBackups({workspace:config.workspace,destinationRoot:config.backups,stateFile:path.join(config.dataRoot,'backup-state.json')}).initialize():null;
- const server=createServer({source,drafts,previews,research,engine,feeds,access,backups});
+ const server=createServer({source,drafts,previews,research,engine,feeds,access,backups,delivery});
  let closing=false;const close=async()=>{if(closing)return;closing=true;await delivery?.stop();await backups?.stop();await new Promise(r=>{server.close(r);server.closeIdleConnections?.();});if(source.inflight)await source.inflight.catch(()=>{});drafts.close();previews.close();research.close();access?.close();};
  try{await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(config.port,config.host,resolve);});}catch(error){drafts.close();previews.close();research.close();access?.close();throw error;}
  console.log('MILDINCIDENT '+(config.hosted?'private hosted':'local')+' Studio listening on port '+config.port+'. Production writes disabled.');

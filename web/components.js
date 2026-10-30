@@ -75,7 +75,7 @@ export function blockers(story) {
 }
 export function draftNotice(story) {
   if (story.localDraft?.stale) return `<div class="notice warning"><strong>Source revision changed</strong><p>This local draft was based on an earlier package. Editing is paused so it cannot silently replace newer work. Compare it with the current source before deciding which local edits to retain.</p><button class="small-button" data-action="review-stale" data-story="${esc(story.id)}">Compare source and local draft →</button></div>`;
-  return `<div class="local-notice"><span class="status-dot" aria-hidden="true"></span><span data-save-status>${story.localDraft ? `Saved locally · ${esc(date(story.localDraft.updatedAt))}` : 'Edits save privately in this development workspace'}</span><small>Not synced to n8n</small></div>`;
+  return `<div class="local-notice"><span class="status-dot" aria-hidden="true"></span><span data-save-status>${story.localDraft ? `${story.storageMode==='hosted'?'Saved to private Studio':'Saved locally'} · ${esc(date(story.localDraft.updatedAt))}` : 'Edits save privately in this development workspace'}</span><small>Not synced to n8n</small></div>`;
 }
 export function fieldDisabled(story) { return story.localDraft?.stale ? 'disabled' : ''; }
 export function proposalContent(story, label = 'Download local proposal ↗', className = 'button button-light') {

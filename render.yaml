@@ -1,0 +1,38 @@
+# REVIEW-ONLY: current provider schema/pricing and owner deployment approval are still required.
+# Applying this Blueprint creates paid resources. Nothing has been deployed by Codex.
+services:
+  - type: web
+    name: mildincident-private-studio
+    runtime: node
+    plan: starter
+    branch: development/photography-review-20261029
+    numInstances: 1
+    autoDeploy: false
+    buildCommand: npm ci --omit=dev
+    startCommand: npm run workspace
+    healthCheckPath: /healthz
+    disk:
+      name: mildincident-private-data
+      mountPath: /var/data
+      sizeGB: 10
+    envVars:
+      - key: NODE_VERSION
+        value: 24.19.0
+      - key: NODE_ENV
+        value: production
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=256
+      - key: MALLOC_ARENA_MAX
+        value: "2"
+      - key: STUDIO_MODE
+        value: hosted
+      - key: STUDIO_DATA_DIR
+        value: /var/data/mildincident
+      - key: STUDIO_SYNC_INTERVAL_MS
+        value: "120000"
+      - key: STUDIO_PUBLIC_ORIGIN
+        sync: false
+      - key: STUDIO_PASSWORD_HASH
+        sync: false
+      - key: N8N_API_KEY
+        sync: false

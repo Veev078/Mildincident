@@ -13,6 +13,6 @@ export class ResearchDelivery {
    catch(error){const failures=(before.failures||0)+1,delay=Math.min(900000,this.intervalMs*2**Math.min(failures,4));const code=/^[A-Z][A-Z0-9_]{0,80}$/.test(error.code||'')?error.code:'RESEARCH_READ_UNAVAILABLE';return this.engine.research.saveDeliveryState({...before,mode:'read_only',state:'unavailable',lastAttempt:at,failures,nextAttempt:new Date(this.now()+delay).toISOString(),errorCode:code});}
   })().finally(()=>{this.inflight=null;});return this.inflight;
  }
- start(){if(!this.stopped)return;this.stopped=false;const run=async()=>{try{await this.tick();}catch{this.stopped=true;return;}if(this.stopped)return;const delay=Math.max(1000,Date.parse(this.status().nextAttempt)-this.now());this.timer=setTimeout(run,delay);this.timer.unref?.();};run();}
+ start(){if(!this.stopped)return;this.stopped=false;const run=async()=>{try{await this.tick();}catch{this.stopped=true;return;}if(this.stopped)return;const delay=Math.max(1000,Date.parse(this.status().nextAttempt)-this.now());this.timer=setTimeout(run,delay);this.timer.unref?.();};const previous=this.status();if(previous?.state==='unavailable'&&Date.parse(previous.nextAttempt)>this.now()){this.timer=setTimeout(run,Date.parse(previous.nextAttempt)-this.now());this.timer.unref?.();}else run();}
  async stop(){this.stopped=true;clearTimeout(this.timer);if(this.inflight)await this.inflight;}
 }

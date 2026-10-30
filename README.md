@@ -2,6 +2,8 @@
 
 A visual cultural editorial Studio, backed by the existing n8n and Buffer system.
 
+[Private-hosting preparation and approval steps](docs/PRIVATE_HOSTING.md) now cover the authenticated persistent Studio and read-only n8n delivery. No deployment occurred.
+
 [Product constitution](docs/PRODUCT_CONSTITUTION.md) defines the approved direction; [product map](docs/PRODUCT_MAP.md) distinguishes current capabilities from targets. To open the actual Studio, follow [local start and private restore](docs/LOCAL_START.md).
 
 The product-wide development workspace includes editorial home, story pipeline, unified research/caption/music desk, image library, carousel review, publishing center, archive and measured analytics. It uses actual source snapshots and keeps edits in versioned private local proposals. **It has not replaced Founder Studio or changed any live workflow, story, Buffer item, schedule or Instagram post.**

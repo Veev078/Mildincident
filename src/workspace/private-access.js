@@ -15,6 +15,8 @@ export class PrivateAccess {
  form(response,status,error=''){const nonce=randomBytes(32).toString('hex');response.writeHead(status,{'Content-Type':'text/html; charset=utf-8','Set-Cookie':setCookie(csrfName,nonce,600)});response.end(loginPage(nonce,error));}
  async handle(request,response,url){
   response.setHeader('Vary','Cookie');response.setHeader('Strict-Transport-Security','max-age=31536000');
+  // Render terminates TLS at its private ingress. No forwarded host/identity header is trusted.
+  if(!request.socket.encrypted&&request.headers['x-forwarded-proto']!=='https'){response.writeHead(308,{Location:this.origin+url.pathname+url.search});response.end();return true;}
   if(url.pathname==='/auth.css'&&request.method==='GET'){response.writeHead(200,{'Content-Type':'text/css'});response.end('body{background:#f6f8ff;color:#142c63;font:16px system-ui;margin:0}main{max-width:420px;margin:12vh auto;padding:28px}h1{font:42px Georgia}label,input,button{display:block;width:100%;box-sizing:border-box}input,button{padding:14px;margin-top:12px;border:1px solid #c4cee5}button{background:#173c89;color:white;cursor:pointer}input{margin-bottom:20px}');return true;}
   if(url.pathname==='/login'&&request.method==='GET'){if(this.session(request)){response.writeHead(303,{Location:'/'});response.end();}else this.form(response,200);return true;}
   if(url.pathname==='/auth/login'&&request.method==='POST'){
