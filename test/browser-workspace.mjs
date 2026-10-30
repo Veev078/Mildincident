@@ -104,6 +104,18 @@ try {
   await page.locator('.photo-research').getByText('Inspect adjacent frames and photographer credits',{exact:false}).waitFor();await page.reload();await page.getByLabel('Research trail',{exact:true}).waitFor();
   await page.locator('[data-photo-brief]').first().click();assert.ok((await page.getByLabel('Creative direction',{exact:true}).inputValue()).includes('Investigate the cultural context'));
   checks.push('real saved-record photo research, unknown-rights review, persistent verdict and editorial-brief handoff work without paid calls');
+  await page.locator('[data-photo-compare]').nth(0).click();await page.locator('[data-photo-compare]').nth(1).click();
+  await page.getByRole('button',{name:'Compare marked frames (2)',exact:true}).click();await page.getByRole('heading',{name:'Compare the frames.',exact:true}).waitFor();assert.equal(await page.locator('.photo-comparison article').count(),2);
+  await page.getByRole('button',{name:'Close photographic review',exact:true}).click();
+  await page.getByText('Save a source reference',{exact:true}).click();const reference=page.locator('[data-photo-reference]');
+  await reference.locator('[name="title"]').fill('Synthetic manual source reference');await reference.locator('[name="sourceUrl"]').fill('https://example.org/original-record');await reference.locator('[name="previewUrl"]').fill('https://example.org/manual-preview.jpg');
+  await reference.getByRole('button',{name:'Save private reference',exact:true}).click();await page.getByRole('heading',{name:'Synthetic manual source reference',exact:true}).waitFor();
+  const manual=page.locator('.photo-research article').filter({has:page.getByRole('heading',{name:'Synthetic manual source reference',exact:true})});assert.ok((await manual.innerText()).includes('founder_supplied_metadata_unverified'));
+  await manual.getByRole('button',{name:'Inspect photograph',exact:true}).click();await page.getByRole('heading',{name:'Inspect the photograph.',exact:true}).waitFor();await page.getByRole('button',{name:'Close photographic review',exact:true}).click();
+  await page.reload();await page.getByRole('heading',{name:'Synthetic manual source reference',exact:true}).waitFor();
+  assert.equal(research.db.prepare("SELECT COUNT(*) n FROM photo_candidates WHERE id LIKE 'manual:%'").get().n,1);
+  checks.push('manual source fallback retains incomplete metadata on reload and large-frame comparison works without a new backend or production asset');
+
 
   const id = snapshot.records.stories[0].concept_id;
   await page.goto(`${origin}/#/story/${id}/publishing`);

@@ -1,6 +1,7 @@
 import { esc, date, human, storyUrl, effective, mediaFor, proposalContent } from './components.js';
 import * as views from './views.js';
 import { creativeBriefFor, emptyCreativeBrief, directionReviewSummary, directionSequenceObservations } from './direction.js';
+import {photoComparison} from './photography.js';
 
 const state = { workspace: null, search: '', pipelineGroup: 'all', librarySearch: '', libraryRights: 'all', compared: [], loading: true, error: null };
 const pending = new Map();
@@ -704,7 +705,25 @@ document.addEventListener('click',async event=>{const expand=event.target.closes
 
 document.addEventListener('click',event=>{const button=event.target.closest('[data-photo-brief]');if(!button)return;const form=document.querySelector('[data-research-form]');if(form){form.elements.prompt.value='Investigate the cultural context and photographic story of '+button.dataset.photoBrief+'. Follow original credits and the surrounding shoot; distinguish sources from inference.';form.elements.sourceUrl.value=button.dataset.source;state.researchDraft={prompt:form.elements.prompt.value,sourceUrl:form.elements.sourceUrl.value};state.briefRequestKey=null;form.scrollIntoView({behavior:'smooth'});toast('Creative brief prepared for your editing. No AI call was made.');}});
 
-document.addEventListener('change',event=>{if(event.target.matches('[data-photo-blind]'))event.target.closest('.photo-research').dataset.blind=String(event.target.checked);});
+document.addEventListener('change',event=>{if(event.target.matches('[data-photo-blind]')){state.photoBlind=event.target.checked;event.target.closest('.photo-research').dataset.blind=String(event.target.checked);}});
 
 async function hydrateActivePhoto(){if(!state.activePhotoHunt||!state.workspace)return;const result=await api('/api/photography/hunts/'+state.activePhotoHunt+'?offset='+(state.photoOffset||0));if(!result.hunt)return;const index=state.workspace.photoHunts.findIndex(h=>h.id===result.hunt.id);if(index>=0)state.workspace.photoHunts[index]=result.hunt;else state.workspace.photoHunts.unshift(result.hunt);}
 document.addEventListener('click',async event=>{const button=event.target.closest('[data-photo-page]');if(!button)return;state.activePhotoHunt=button.dataset.photoPage;state.photoOffset=Number(button.dataset.offset);try{await hydrateActivePhoto();render();}catch(error){toast(error.message,{error:true});}});
+
+document.addEventListener('input',event=>{const form=event.target.closest('[data-photo-reference]');if(form){state.photoRefRequestKey=null;state.photoReferenceDraft=Object.fromEntries(new FormData(form));}});
+document.addEventListener('submit',async event=>{
+ const form=event.target.closest('[data-photo-reference]');if(!form)return;event.preventDefault();const button=form.querySelector('button');button.disabled=true;
+ try{const fields=Object.fromEntries(new FormData(form));if(!fields.huntId)delete fields.huntId;
+  const result=await api('/api/photography/references',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({...fields,idempotencyKey:state.photoRefRequestKey||=crypto.randomUUID()})});
+  state.photoRefRequestKey=null;state.photoReferenceDraft=null;state.activePhotoHunt=result.hunt.id;state.photoOffset=Math.floor((result.hunt.totalPhotos-1)/100)*100;
+  await loadWorkspace({quiet:true});toast('Source reference saved privately. Credits, image identity and rights remain unverified.');
+ }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
+});
+document.addEventListener('click',event=>{
+ const mark=event.target.closest('[data-photo-compare]'),inspect=event.target.closest('[data-photo-inspect]');
+ if(mark||inspect){const id=mark?.dataset.photoCompare||inspect.dataset.photoInspect;const hunt=state.workspace.photoHunts.find(h=>h.id===state.activePhotoHunt)||state.workspace.photoHunts[0];const photo=hunt?.photos.find(p=>p.id===id);if(!photo)return;
+  if(inspect){openDialog(photoComparison([photo]));return;}
+  state.photoCompared||=[];const index=state.photoCompared.findIndex(p=>p.id===id);if(index<0)state.photoCompared.push(photo);else state.photoCompared.splice(index,1);render();return;
+ }
+ if(event.target.closest('[data-photo-open-comparison]')&&(state.photoCompared||[]).length>=2)openDialog(photoComparison(state.photoCompared));
+});

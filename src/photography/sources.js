@@ -18,4 +18,13 @@ export function normalizePhotos(source,data,query){
 export async function fetchPhotoPage(source,query,page,{fetchImpl=fetch}={}){
  const response=await fetchImpl(photoQueryURL(source,query,page),{redirect:'error',signal:AbortSignal.timeout(12000)});if(!response.ok)throw new Error('ARCHIVE_HTTP_'+response.status);let size=0,chunks=[];for await(const c of response.body){size+=c.byteLength;if(size>2*1024*1024)throw new Error('ARCHIVE_RESPONSE_TOO_LARGE');chunks.push(c);}const raw=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(raw.error||raw.status==='error')throw new Error('ARCHIVE_RESPONSE_ERROR');return normalizePhotos(source,raw,query);
 }
-export function expansionQueries(photo){const credit=String(photo.creator||'').split(/\/|—/)[0].trim();const creator=/unknown|unverified|not recorded/i.test(credit)?'':credit;const terms=[['photographer',creator&&creator+' photographs'],['series',photo.series&&photo.series],['archive',photo.title+' original publication'],['adjacent',creator&&creator+' '+(photo.date||'')+' contact sheet'],['image',photo.sourceUrl]];return terms.filter(([,q])=>q).map(([mode,query])=>({mode,query:query.slice(0,500),basis:'research_direction_not_verified_relationship'}));}
+export function expansionQueries(photo){const credit=String(photo.creator||'').split(/\/|—/)[0].trim();const creator=/unknown|unverified|not recorded/i.test(credit)?'':credit;const terms=[['photographer',creator],['series',photo.series&&photo.series],['archive',photo.title+' original publication'],['adjacent',creator&&creator+' '+(photo.date||'')+' contact sheet'],['image',photo.sourceUrl]];return terms.filter(([,q])=>q).map(([mode,query])=>({mode,query:query.slice(0,500),basis:'research_direction_not_verified_relationship'}));}
+
+/** Browser catalogue links only. No scraping, proxying or claims of source connectivity. */
+export function catalogueLinks(query) {
+ const commons=new URL('https://commons.wikimedia.org/w/index.php');
+ commons.searchParams.set('title','Special:MediaSearch');commons.searchParams.set('type','image');commons.searchParams.set('search',query);
+ const loc=new URL('https://www.loc.gov/photos/');loc.searchParams.set('q',query);
+ const aic=new URL('https://www.artic.edu/collection');aic.searchParams.set('q',query);
+ return [{label:'Wikimedia Commons',url:commons.href},{label:'LOC photographs (partial catalogue)',url:loc.href},{label:'Art Institute collection',url:aic.href}];
+}

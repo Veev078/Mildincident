@@ -3707,3 +3707,10 @@ dialog::backdrop {
 .photo-research .photo img { width: 100%; height: 100%; object-fit: contain; }
 .photo-research[data-blind="true"] .photo-record { visibility: hidden; height: 0; overflow: hidden; }
 .photo-research .text-button { white-space: normal; overflow-wrap: anywhere; text-align: left; }
+.photo-manual { margin: 20px 0; padding: 16px; border: 1px solid var(--line); }
+.photo-manual summary { cursor: pointer; font-weight: 700; color: var(--accent); }
+.photo-manual form { margin-top: 16px; }
+.photo-manual textarea { width: 100%; min-height: 90px; }
+.photo-catalogues { line-height: 1.8; }
+.photo-comparison .photo { aspect-ratio: 4 / 5; }
+.photo-comparison .photo img { object-fit: contain; }

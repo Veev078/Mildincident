@@ -11,3 +11,21 @@ test('photo feedback reaches future editorial context, can be reconsidered, and 
 test('missing archive schema is unavailable rather than a fabricated empty result',()=>{assert.throws(()=>normalizePhotos('loc',{unexpected:[]},'photograph'),/SCHEMA_UNVERIFIED/);assert.throws(()=>normalizePhotos('aic',{unexpected:[]},'photograph'),/SCHEMA_UNVERIFIED/);});
 
 test('deeper retrieval remains inspectable beyond the first contact sheet without discarding candidates',async t=>{const f=await fixture(t,async(source,query,page)=>Array.from({length:20},(_,i)=>photo('page-'+page+'-'+i)));const h=f.service.create({query:'whole session',mode:'series',source:'commons'});await f.service.resume(h.id,5);await f.service.resume(h.id,1);const next=f.service.get(h.id,100);assert.equal(next.totalPhotos,120);assert.equal(next.photos.length,20);assert.equal(next.offset,100);assert.throws(()=>f.service.get(h.id,-1),{code:'INVALID_PHOTO_PAGE'});});
+
+test('manual source research persists incomplete metadata without network access or permission inference',async t=>{
+ const f=await fixture(t,async()=>{throw new Error('A manual reference must not fetch');});
+ const input={title:'A frame worth investigating',sourceUrl:'https://example.org/original-issue',context:'The magazine caption needs independent checking'};
+ const saved=f.service.saveReference(input);const p=saved.hunt.photos[0];assert.equal(saved.networkRequests,0);assert.equal(p.creator,'');assert.equal(p.date,'');assert.equal(p.rightsStatus,'unreviewed');assert.equal(p.sourceConfidence,'founder_supplied_metadata_unverified');assert.equal(p.publicationApproved,false);assert.equal(p.technicalStatus,'reference_not_decoded');
+ const ticket=saved.hunt.id;const repeated=f.service.saveReference({...input,idempotencyKey:ticket});assert.equal(repeated.photoId,saved.photoId);assert.equal(repeated.hunt.totalPhotos,1);assert.equal(f.store.db.prepare('SELECT COUNT(*) n FROM photo_candidate_versions WHERE photo_id=?').get(p.id).n,1);
+ assert.throws(()=>f.service.saveReference({...input,idempotencyKey:ticket,title:'Changed after an uncertain response'}),{code:'EDIT_CONFLICT'});
+ assert.equal(f.service.search('original issue','image')[0].id,p.id);
+ assert.throws(()=>f.service.saveReference({...input,rightsStatus:'cleared'}),{code:'INVALID_PHOTO_REFERENCE'});
+ for(const url of ['https://localhost/original','http://example.org/original','https://example.org/original?api_key=synthetic-test'])assert.throws(()=>f.service.saveReference({...input,sourceUrl:url}),{code:'INVALID_PHOTO_REFERENCE'});
+ const trail=f.service.create({query:'Another angle',mode:'adjacent',source:'saved'});const second=f.service.saveReference({...input,huntId:trail.id,previewUrl:'https://example.org/alternate.jpg'});assert.equal(second.hunt.id,trail.id);assert.equal(second.hunt.photos.length,1);assert.notEqual(second.photoId,p.id);
+});
+
+test('follow a recorded photographer keeps the exact name searchable and external catalogue links remain query-only',async t=>{
+ const f=await fixture(t,async()=>[]);f.service.put([{...photo(),creator:'Shoichi Aoki'}]);const found=f.service.search('Shoichi Aoki','photographer')[0];
+ const h=f.service.create({query:'Shoichi Aoki',mode:'photographer',source:'saved'});const result=await f.service.resume(h.id);assert.equal(result.photos.length,1);assert.equal(result.photos[0].expansions.find(e=>e.mode==='photographer').query,'Shoichi Aoki');assert.equal(found.id,result.photos[0].id);
+ assert.equal(result.catalogueLinks.length,3);for(const link of result.catalogueLinks){const u=new URL(link.url);assert.equal(u.protocol,'https:');assert.ok([...u.searchParams.values()].includes('Shoichi Aoki'));}
+});
