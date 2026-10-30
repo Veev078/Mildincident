@@ -13,7 +13,9 @@ import {LocalResearchStore} from '../src/workspace/research-store.js';
 import {workspaceSnapshot} from './helpers/workspace-fixture.js';
 
 const root=await fs.mkdtemp(path.join(os.tmpdir(),'mi-editorial-ux-'));
-const artifacts=path.resolve('.local/ux-transformation');
+const artifacts=path.resolve(process.argv.find(a=>a.startsWith('--artifacts='))?.slice(12)||'.local/ux-transformation');
+const baseline=process.argv.find(a=>a.startsWith('--baseline='))?.slice(11)||'f501fd5';
+assert.match(baseline,/^[a-f0-9]{7,40}$/);
 await fs.mkdir(artifacts,{recursive:true,mode:0o700});
 const servers=[],stores=[],checks=[],errors=[];
 let browser;
@@ -35,7 +37,7 @@ async function capture(label,webRoot,snapshot){
  const model=app.source.view(),id=model.stories[0]?.id;
  for(const [width,height]of [[1366,768],[1440,900]]){
   await page.setViewportSize({width,height});
-  for(const [name,route]of [['today','home'],['discover','discovery'],['story','story/'+encodeURIComponent(id)+'/overview'],['production','publishing']]){
+  for(const [name,route]of [['today','home'],['discover','discovery'],['story','story/'+encodeURIComponent(id)+'/overview'],['production','publishing'],['stories','pipeline'],['library','library'],['caption','story/'+encodeURIComponent(id)+'/caption']]){
    if(name==='story'&&!id)continue;
    await page.goto(app.origin+'/#/'+route);await page.locator('h1').waitFor();await page.waitForTimeout(450);
    await page.screenshot({path:path.join(artifacts,label+'-'+name+'-'+width+'x'+height+'.png')});
@@ -47,7 +49,7 @@ try{
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
  let cached;try{cached=JSON.parse(await fs.readFile('.local/workspace/snapshot.json','utf8'));}catch{captureBasis='generated_fixture_snapshot';cached=workspaceSnapshot();cached.records.stories[0].title='Synthetic UI fixture — no live editorial content';}
  const baselineDir=path.join(root,'baseline');await fs.mkdir(baselineDir);const archive=path.join(root,'baseline.tar');
- await fs.writeFile(archive,execFileSync('git',['archive','f501fd5','web']));await extract({cwd:baselineDir,file:archive});
+ await fs.writeFile(archive,execFileSync('git',['archive',baseline,'web']));await extract({cwd:baselineDir,file:archive});
  const before=await capture('before',path.join(baselineDir,'web'),cached);
  if(process.argv.includes('--before-only')){console.log(JSON.stringify({before,captureOnly:true}));}
  else{

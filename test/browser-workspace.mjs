@@ -193,6 +193,7 @@ try {
   await page.getByRole('button', { name: 'Close image comparison' }).click();
   checks.push('image comparison opens provenance-aware accessible dialog');
   await page.locator('[data-action="inspect"]').first().click();
+  await page.getByText('Attach a private preview',{exact:true}).click();
   const upload = page.locator('[data-preview-upload]');
   const bytes = await sharp({ create: { width: 900, height: 1200, channels: 3, background: '#2451a4' } }).jpeg().toBuffer();
   await upload.getByLabel('Private preview file').setInputFiles({ name: 'synthetic-private.jpg', mimeType: 'image/jpeg', buffer: bytes });
@@ -402,6 +403,7 @@ try {
   checks.push('native captured-source packet opens in Studio research without another fetch or asserting human verification');
   await page.goto(`${origin}/#/story/${devStoryId}/images`);
   await page.locator('[data-action="inspect"]').first().click();
+  await page.getByText('Full source record',{exact:true}).click();
   await page.getByRole('dialog').getByText('Copyright holder recorded; the photographer is not established by that credit.',{exact:true}).waitFor();
   await page.getByRole('dialog').getByRole('link',{name:'Series / project: Synthetic series trail'}).waitFor();
   assert.ok((await page.getByRole('dialog').textContent()).includes('40 of 55 image references retained'));
@@ -411,6 +413,7 @@ try {
   await page.goto(`${origin}/#/story/${devStoryId}/images`);
   await page.locator('[data-action="inspect"]').first().click();
   const requestsBeforePhotoResearch=research.all().length,jobsBeforePhotoResearch=engineFixture.jobs.length;
+  await page.getByText('Explore this photograph further',{exact:true}).click();
   await page.getByRole('button',{name:'Investigate this photograph',exact:true}).click();
   await page.getByText('Photographic research brief prepared. No AI or source request was started.',{exact:true}).waitFor();
   const photoRequest=research.all().find(r=>r.continuation);assert.ok(photoRequest);assert.equal(photoRequest.continuation.origin.assetId,'dev-photo-1');assert.equal(photoRequest.continuation.origin.storyId,devStoryId);assert.equal(photoRequest.continuation.routes[0].url,'https://example.org/project');assert.equal(photoRequest.handoffUrl,null);
@@ -455,6 +458,7 @@ try {
   await page.goto(`${origin}/#/story/${devStoryId}/images`);
   await page.locator('[data-action="inspect"]').first().click();
   // Original source context remains available alongside later captured image captions.
+  await page.getByText('Full source record',{exact:true}).click();
   await page.getByRole('dialog').getByText('Caption recorded at the source',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Close image details',exact:true}).click();
   const savedVersion=drafts.get(devStoryId).version;

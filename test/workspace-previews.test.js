@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import sharp from 'sharp';
-import { LocalPreviewStore, attachLocalPreviews } from '../src/workspace/previews.js';
+import { LocalPreviewStore, attachLocalPreviews, imageFeedbackProvenance } from '../src/workspace/previews.js';
 import { buildWorkspace } from '../src/workspace/model.js';
 import { workspaceSnapshot } from './helpers/workspace-fixture.js';
 import { createWorkspaceServer } from '../src/workspace/server.js';
@@ -82,6 +82,8 @@ test('HTTP preview upload requires existing scoped asset, intent and declaration
   const drafts = new LocalDraftStore(path.join(root, 'drafts.sqlite'));
   const source = new WorkspaceSource({ root, loadLive: async () => workspaceSnapshot() });
   source.snapshot = workspaceSnapshot();
+  const recordedPhoto={creator:'Reported fixture photographer',creatorBasis:'explicit_source_photo_credit',copyrightHolder:'Fixture copyright holder',sourceCaption:'A recorded frame in the original fixture series',sourceYears:[1974],sourceResearchLinks:[{kind:'series',url:'https://example.org/recorded-series',label:'Recorded fixture series',verified:true},{kind:'photographer',url:'https://example.org/reported-photographer',label:'Reported fixture photographer',verified:true}]};
+  const originalView=source.view.bind(source);source.view=(...args)=>{const model=originalView(...args);Object.assign(model.stories[0].media[0],recordedPhoto);return model;};
   const server = createWorkspaceServer({ source, drafts, previews: store });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
   t.after(async () => { await new Promise(resolve => server.close(resolve)); drafts.close(); });
@@ -117,9 +119,20 @@ test('HTTP preview upload requires existing scoped asset, intent and declaration
   const scoped={decision:'hold',reason:'Reassess this exact preview before choosing the opening image',expectedVersion:1,sourceRevision:reviewed.stories[0].revision,workingVersion:0,previewSha256:reviewed.stories[0].media[0].localPreview.sha256};
   for(const change of [{sourceRevision:'old'},{workingVersion:99},{previewSha256:'b'.repeat(64)}])assert.equal((await fetch(reviewUrl,{method:'POST',headers:reviewHeaders,body:JSON.stringify({...scoped,...change})})).status,409);
   assert.equal(store.review(input.storyId,input.assetId).version,1);
+  assert.equal((await fetch(reviewUrl,{method:'POST',headers:reviewHeaders,body:JSON.stringify({...scoped,photographicResearch:{rightsGranted:true}})})).status,400);
   const scopedResult=await(await fetch(reviewUrl,{method:'POST',headers:reviewHeaders,body:JSON.stringify(scoped)})).json();assert.equal(scopedResult.review.context.previewSha256,scoped.previewSha256);assert.equal(store.tasteFeedback()[0].sourceRevision,scoped.sourceRevision);
+  assert.equal(scopedResult.review.context.photographicResearch.photographerReported,'Reported fixture photographer');assert.equal(scopedResult.review.context.photographicResearch.trails[0].verified,false);assert.equal(scopedResult.review.context.photographicResearch.rightsGranted,false);
+  recordedPhoto.creator='Changed source metadata';recordedPhoto.sourceResearchLinks[0].url='https://example.org/later-series';
+  assert.equal((await(await fetch(`${origin}/api/workspace`)).json()).stories[0].media[0].creator,'Changed source metadata');
+  assert.equal(store.tasteFeedback()[0].photograph.research.photographerReported,'Reported fixture photographer');assert.equal(store.tasteFeedback()[0].photograph.research.trails[0].url,'https://example.org/recorded-series');
+});
 
-
+test('photographic feedback keeps bounded reported credits and safe series trails without upgrading bylines or copyright into photographers',()=>{
+ const asset={creator:'Reported publication writer',creatorBasis:'article_byline',copyrightHolder:'Recorded rights holder',sourceCaption:'s'.repeat(1000),sourceCredit:'c'.repeat(800),sourceYears:[1974,1974,0,99999,1981],sourceResearchLinks:[{kind:'series',url:'https://example.org/series#frame-1',label:'Original series',verified:true},{kind:'series',url:'https://example.org/series#frame-2',label:'Repeated page'},{kind:'photographer',url:'http://example.org/unsafe',label:'Insecure'},{kind:'photographer',url:'https://example.org/private?token=secret',label:'Private URL'},{kind:'source',url:'https://example.org/unrelated',label:'Unsupported link'},{kind:'photographer',url:'https://example.org/artist',label:'Reported artist'}]};
+ const before=JSON.stringify(asset),research=imageFeedbackProvenance(asset);
+ assert.equal(research.photographerReported,'');assert.equal(research.creatorReported,asset.creator);assert.equal(research.copyrightHolderReported,asset.copyrightHolder);assert.equal(research.captionReported.length,300);assert.equal(research.creditReported.length,180);assert.deepEqual(research.yearsReported,[1974,1981]);assert.equal(research.trails.length,2);assert.ok(research.trails.every(l=>l.verified===false));assert.equal(research.sourceAssertionsVerified,false);assert.equal(research.visualAnalysisPerformed,false);assert.equal(research.rightsGranted,false);assert.equal(JSON.stringify(asset),before);
+ assert.equal(imageFeedbackProvenance({...asset,creatorBasis:'copyright_holder_only'}).photographerReported,'');assert.equal(imageFeedbackProvenance({...asset,creatorBasis:'explicit_source_photo_credit'}).photographerReported,asset.creator);assert.equal(imageFeedbackProvenance({}),null);
+ const many=imageFeedbackProvenance({sourceResearchLinks:Array.from({length:20},(_,i)=>({kind:'series',url:'https://example.org/project/'+i+'?q='+'q'.repeat(400),label:'l'.repeat(500)}))});assert.ok(many.trails.length<=3);assert.ok(JSON.stringify(many.trails).length<1250);
 });
 
 test('editorial image reviews persist with append-only history, conflict checks and no source rights mutation',async t=>{

@@ -14,6 +14,23 @@ export const MAX_PREVIEW_BYTES = 25 * 1024 * 1024;
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const TYPES = { jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
 
+/** Snapshot recorded source assertions for later research, never inferred authorship or clearance. */
+export function imageFeedbackProvenance(asset={}) {
+  const text=(value,max)=>typeof value==='string'?value.trim().slice(0,max):'';
+  const creatorReported=text(asset.creator,160),creatorBasis=text(asset.creatorBasis,80)||'not_established';
+  const trails=[],seen=new Set();let trailBytes=0;
+  for(const link of Array.isArray(asset.sourceResearchLinks)?asset.sourceResearchLinks:[]){
+    if(!['series','photographer'].includes(link?.kind))continue;
+    const url=safePhotoReference(link.url);if(!url||url.length>800)continue;
+    const identity=new URL(url);identity.hash='';if(seen.has(identity.href))continue;
+    const trail={kind:link.kind,url,label:text(link.label,100),basis:'reported_source_caption_link',verified:false};
+    const bytes=JSON.stringify(trail).length;if(trailBytes+bytes>1200)continue;
+    trails.push(trail);seen.add(identity.href);trailBytes+=bytes;if(trails.length===3)break;
+  }
+  const value={creatorReported,creatorBasis,photographerReported:creatorBasis==='explicit_source_photo_credit'?creatorReported:'',copyrightHolderReported:text(asset.copyrightHolder,160),captionReported:text(asset.sourceCaption,300),creditReported:text(asset.sourceCredit,180),yearsReported:[...new Set((Array.isArray(asset.sourceYears)?asset.sourceYears:[]).filter(y=>Number.isInteger(y)&&y>=1000&&y<=9999))].slice(0,4),dateContext:text(asset.dateContext,80),trails,sourceAssertionsVerified:false,visualAnalysisPerformed:false,rightsGranted:false};
+  return creatorReported||value.copyrightHolderReported||value.captionReported||value.creditReported||value.yearsReported.length||value.dateContext||trails.length?value:null;
+}
+
 /** Private file input, never a downloader or a production asset registry. */
 export class LocalPreviewStore {
   constructor(root) {
@@ -152,7 +169,7 @@ export class LocalPreviewStore {
   }
 
   tasteFeedback(){
-    return [...this.allReviews()].map(([key,review])=>{const [storyId,assetId]=JSON.parse(key),context=review.context;return {candidateId:'image-dialog:'+storyId+':'+assetId,subject:context?.subject||'Specific photograph '+assetId,decision:review.decision==='shortlist'?'approved':review.decision==='reject'?'rejected':'needs_research',reason:review.reason.slice(0,700),reviewer:'founder',basis:['factual_issue','source_issue','rights_issue','retrieval_issue','interface_issue'].includes(context?.decisionBasis)?'reported_'+context.decisionBasis:'editorial_taste',decisionBasis:context?.decisionBasis||'editorial_taste',scope:'specific_photograph_selection',origin:'image_dialog',photograph:{storyId,assetId,sourceUrl:context?.sourceUrl||'',previewSha256:context?.previewSha256||null,previewVersionRecorded:Boolean(context?.previewSha256)},sourceRevision:context?.sourceRevision||null,workingVersion:context?.workingVersion??null,reviewVersion:review.version,createdAt:review.updatedAt};}).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,6);
+    return [...this.allReviews()].map(([key,review])=>{const [storyId,assetId]=JSON.parse(key),context=review.context;return {candidateId:'image-dialog:'+storyId+':'+assetId,subject:context?.subject||'Specific photograph '+assetId,decision:review.decision==='shortlist'?'approved':review.decision==='reject'?'rejected':'needs_research',reason:review.reason.slice(0,700),reviewer:'founder',basis:['factual_issue','source_issue','rights_issue','retrieval_issue','interface_issue'].includes(context?.decisionBasis)?'reported_'+context.decisionBasis:'editorial_taste',decisionBasis:context?.decisionBasis||'editorial_taste',scope:'specific_photograph_selection',origin:'image_dialog',photograph:{storyId,assetId,sourceUrl:context?.sourceUrl||'',previewSha256:context?.previewSha256||null,previewVersionRecorded:Boolean(context?.previewSha256),...(context?.photographicResearch?{research:context.photographicResearch}:{})},sourceRevision:context?.sourceRevision||null,workingVersion:context?.workingVersion??null,reviewVersion:review.version,createdAt:review.updatedAt};}).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,6);
   }
 
   saveReview(storyId, assetId, input,{context=null}={}) {

@@ -2,6 +2,15 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {EditorialEngineService} from '../src/workspace/editorial-engine-service.js';
 import {requestFingerprint} from '../src/workspace/editorial-engine-client.js';
 import {selectEditorialFeedback} from '../src/editorial-feedback.js';
+import {imageFeedbackProvenance} from '../src/workspace/previews.js';
+import {planDevelopmentResearch} from '../src/n8n/development-discovery-plan.js';
+test('recorded photograph creator and series trails reach the native research prompt as unverified research context',()=>{
+ const research=imageFeedbackProvenance({creator:'Recorded fixture photographer',creatorBasis:'explicit_source_photo_credit',sourceResearchLinks:[{kind:'series',url:'https://example.org/original-shoot',label:'Recorded shoot'}]});
+ const feedback={candidateId:'image-dialog:story:frame',scope:'specific_photograph_selection',basis:'editorial_taste',decision:'needs_research',photograph:{storyId:'CON-fixture',assetId:'frame',previewSha256:'a'.repeat(64),research},createdAt:'2026-10-30T12:00:00Z'};
+ const service=new EditorialEngineService({research:{founderTasteFeedback:()=>[]},imageFeedback:()=>[feedback]});const context=service.editorialContext();
+ const [planned]=planDevelopmentResearch([{json:{territory:'photography',instructions:'Existing brand rules',userPrompt:'Continue the requested photographic investigation',discovery_approach:'visual_first',diversity:{selected_seed_preset:'fixture-preset'}}}],[],{kind:'brief',prompt:'Investigate the original credited series',editorial_context_json:JSON.stringify(context)});
+ assert.match(planned.json.userPrompt,/https:\/\/example.org\/original-shoot/);assert.match(planned.json.userPrompt,/Recorded fixture photographer/);assert.match(planned.json.userPrompt,/"sourceAssertionsVerified":false/);assert.match(planned.json.userPrompt,/"visualAnalysisPerformed":false/);assert.equal(context.feedback[0].photograph.previewSha256,feedback.photograph.previewSha256);assert.equal(planned.json.discoveryPlan.preset,'fixture-preset');
+});
 test('latest reconsideration wins without changing the stored judgments or treating a whole subject as rejected',()=>{
  const a={candidateId:'frame-one',decision:'rejected',scope:'specific_photograph_selection',createdAt:'2026-10-29'},b={...a,decision:'approved',createdAt:'2026-10-30'};
  assert.deepEqual(selectEditorialFeedback([a,b]),[b]);assert.equal(a.decision,'rejected');

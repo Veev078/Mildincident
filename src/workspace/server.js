@@ -21,7 +21,7 @@ import { developmentCandidateStory } from './development-story.js';
 import { LocalResearchStore } from './research-store.js';
 import { LocalDraftStore } from './store.js';
 import { HandoffError, requireThat } from '../errors.js';
-import { LocalPreviewStore, attachLocalPreviews, MAX_PREVIEW_BYTES } from './previews.js';
+import { LocalPreviewStore, attachLocalPreviews, MAX_PREVIEW_BYTES, imageFeedbackProvenance } from './previews.js';
 
 const WEB_ROOT = fileURLToPath(new URL('../../web/', import.meta.url));
 const CONTENT_TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
@@ -162,7 +162,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
           requireThat(request.method === 'POST', 'METHOD_NOT_ALLOWED', 'Use the local review action.');
           const input=await body(request),{story,asset}=findAsset();let context=null;
           const scoped=['sourceRevision','workingVersion','previewSha256'].some(k=>Object.hasOwn(input,k));
-          if(scoped){requireThat(input.sourceRevision===story.revision&&input.workingVersion===(story.localDraft?.version||0)&&input.previewSha256===(asset.localPreview?.sha256||''),'EDIT_CONFLICT','This story or preview changed. Reopen the image before reviewing.');context={subject:story.subject||story.title,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,sourceUrl:asset.sourceUrl||'',previewSha256:asset.localPreview?.sha256||null};}
+          if(scoped){requireThat(input.sourceRevision===story.revision&&input.workingVersion===(story.localDraft?.version||0)&&input.previewSha256===(asset.localPreview?.sha256||''),'EDIT_CONFLICT','This story or preview changed. Reopen the image before reviewing.');const photographicResearch=imageFeedbackProvenance(asset);context={subject:story.subject||story.title,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,sourceUrl:asset.sourceUrl||'',previewSha256:asset.localPreview?.sha256||null,...(photographicResearch?{photographicResearch}:{})};}
           const reviewInput={...input};for(const k of ['sourceRevision','workingVersion','previewSha256'])delete reviewInput[k];
           json(response, 200, { review: previews.saveReview(storyId, assetId, reviewInput,{context}), scope: 'local_only', rightsGranted: false, productionApplied: false }); return;
         }

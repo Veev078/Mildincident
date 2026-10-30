@@ -7,6 +7,10 @@ import {photoComparison,photographicBrief} from './photography.js';
 
 const state = { photoDeskOpen:sessionStorage.getItem('mi-photo-desk-open')==='true', workspace: null, search: '', pipelineGroup: 'all', librarySearch: '', libraryRights: 'all', compared: [], loading: true, error: null };
 const pending = new Map();
+const imageReviewDrafts=new Map(),imageReviewSaving=new Set();
+const imageReviewKey=(story,asset)=>JSON.stringify([story,asset]);
+const reviewValues=form=>({decision:form.elements.decision.value,basis:form.elements.basis?.value||'editorial_taste',reason:form.elements.reason.value});
+const reviewContext=form=>Object.fromEntries(['version','revision','working','previewHash'].map(k=>[k,form.dataset[k]]));
 const saving = new Set();
 const inFlight = new Map();
 const savePromises = new Map();
@@ -228,6 +232,36 @@ function openDialog(html) {
   dialog.querySelector('button')?.focus();
 }
 
+function rememberImageReview(form) {
+ if(!form?._initialReview)return;
+ const key=imageReviewKey(form.dataset.story,form.dataset.asset),values=reviewValues(form);
+ if(JSON.stringify(values)===JSON.stringify(form._initialReview))imageReviewDrafts.delete(key);
+ else imageReviewDrafts.set(key,{values,context:reviewContext(form)});
+}
+function showInspection(story,asset,{focusStep=null}={}) {
+ openDialog(views.assetDialog(story,asset));
+ const dialog=document.querySelector('#asset-dialog'),form=dialog.querySelector('[data-image-review]');
+ form._initialReview=reviewValues(form);form._currentContext=reviewContext(form);
+ const key=imageReviewKey(story.id,asset.id),draft=imageReviewDrafts.get(key);
+ if(draft){
+  for(const [field,value]of Object.entries(draft.values))form.elements[field].value=value;
+  for(const [field,value]of Object.entries(draft.context))form.dataset[field]=value;
+  if(JSON.stringify(draft.context)!==JSON.stringify(form._currentContext)){
+   const status=form.querySelector('[data-review-status]');status.textContent='This material changed after you wrote the note. Review this frame before applying it here. ';
+   const button=document.createElement('button');button.type='button';button.className='text-button';button.dataset.action='review-current-frame';button.textContent='Use note with this version';status.append(button);form.querySelector('button[type=submit]').disabled=true;
+  }else form.querySelector('[data-review-status]').textContent='Your unsaved feedback is retained while you look through photographs.';
+ }
+ if(imageReviewSaving.has(key))for(const control of form.querySelectorAll('select,textarea,button'))control.disabled=true;
+ dialog.scrollTop=0;
+ if(focusStep)dialog.querySelector('[aria-label="'+focusStep+' photograph"]:not(:disabled)')?.focus({preventScroll:true});
+}
+async function copyCaption(story){
+ if(!story)return;const text=effective(story).caption;
+ if(!text.trim()){toast('Write a caption first, then copy it.');return;}
+ try{if(!navigator.clipboard?.writeText)throw new Error('Clipboard unavailable');await navigator.clipboard.writeText(text);toast('Caption copied. This does not approve or publish it.');}
+ catch{openDialog(`<div class="dialog-heading"><div><p class="eyebrow">Your working caption</p><h2>Copy your caption</h2></div><button class="icon-button" data-action="close-dialog" aria-label="Close caption copy">×</button></div><p>Automatic copy is unavailable here. The text is selected below; use Ctrl+C or ⌘C.</p><textarea class="caption-copy-fallback" aria-label="Caption ready to copy" readonly rows="10">${esc(text)}</textarea><p class="small muted">Copying does not approve or publish the post.</p>`);const editor=document.querySelector('[aria-label="Caption ready to copy"]');editor.focus();editor.select();announce('Caption selected for manual copying.');}
+}
+
 function showRehearsal(story, index = 0, fit = 'frame') {
   if (!story) return;
   const count = mediaFor(story).length;
@@ -393,9 +427,14 @@ document.addEventListener('click', event => {
       break;
     }
     case 'close-dialog': document.querySelector('#asset-dialog').close(); break;
+    case 'copy-caption': copyCaption(story); break;
+    case 'review-current-frame': {
+      const form=button.closest('[data-image-review]');if(!form?._currentContext)break;for(const [key,value]of Object.entries(form._currentContext))form.dataset[key]=value;form.querySelector('[data-review-status]').textContent='Note applied to this version. Save when your review is ready.';form.querySelector('button[type=submit]').disabled=false;rememberImageReview(form);break;
+    }
+    case 'inspect-step':
     case 'inspect': {
       const asset = story?.media?.find(item => item.id === button.dataset.asset);
-      if (asset) openDialog(views.assetDialog(story, asset));
+      if(asset){if(imageReviewSaving.size){toast('Your image review is saving. Try the next photograph in a moment.');break;}if(button.dataset.action==='inspect-step'&&document.querySelector('[data-preview-upload] input[type=file]')?.files.length){toast('Save or clear the selected preview file before changing photographs.',{error:true});break;}showInspection(story,asset,{focusStep:button.dataset.action==='inspect-step'?(button.textContent.includes('Next')?'Next':'Previous'):null});}
       break;
     }
     case 'compare-asset': {
@@ -443,6 +482,7 @@ document.addEventListener('click', event => {
 });
 
 document.addEventListener('input', event => {
+  const imageForm=event.target.closest('[data-image-review]');if(imageForm)rememberImageReview(imageForm);
   const input = event.target;
   if (input.closest('[data-research-form]')) { state.briefRequestKey = null; state.researchDraft = { ...(state.researchDraft || {}), [input.name]: input.value }; }
   if (input.dataset.briefField && input.matches('textarea,input[type="text"]')) {
@@ -477,6 +517,7 @@ document.addEventListener('input', event => {
 });
 
 document.addEventListener('change', event => {
+  const imageForm=event.target.closest('[data-image-review]');if(imageForm)rememberImageReview(imageForm);
   if (event.target.matches('[data-rehearsal-fit]') && rehearsal) {
     showRehearsal(storyById(rehearsal.storyId), rehearsal.index, event.target.value);
     document.querySelector('[data-rehearsal-fit]')?.focus(); return;
@@ -637,13 +678,16 @@ document.addEventListener('submit', async event => {
 document.addEventListener('submit', async event => {
   const form = event.target.closest('[data-image-review]'); if (!form) return;
   event.preventDefault(); const button = form.querySelector('button[type="submit"]'); const status = form.querySelector('[data-review-status]');
-  button.disabled=true; status.textContent='Saving your editorial judgment…';
+  const key=imageReviewKey(form.dataset.story,form.dataset.asset),controls=[...form.querySelectorAll('select,textarea,button')].map(control=>({control,disabled:control.disabled}));imageReviewSaving.add(key);for(const {control}of controls)control.disabled=true;status.textContent='Saving your editorial judgment…';
   try {
-    await api(`/api/stories/${encodeURIComponent(form.dataset.story)}/assets/${encodeURIComponent(form.dataset.asset)}/review`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({expectedVersion:Number(form.dataset.version),sourceRevision:form.dataset.revision,workingVersion:Number(form.dataset.working),previewSha256:form.dataset.previewHash,decision:form.elements.decision.value,reason:form.elements.reason.value,...(form.elements.basis?{basis:form.elements.basis.value}:{})})});
-    await loadWorkspace({quiet:true});const story=storyById(form.dataset.story);const asset=story?.media.find(a=>a.id===form.dataset.asset);
-    if(form.isConnected&&asset)openDialog(views.assetDialog(story,asset));
-    toast('Image feedback saved. Rights and selected slides are unchanged.');
-  }catch(error){status.textContent=error.message;}finally{button.disabled=false;}
+    const saved=await api(`/api/stories/${encodeURIComponent(form.dataset.story)}/assets/${encodeURIComponent(form.dataset.asset)}/review`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({expectedVersion:Number(form.dataset.version),sourceRevision:form.dataset.revision,workingVersion:Number(form.dataset.working),previewSha256:form.dataset.previewHash,decision:form.elements.decision.value,reason:form.elements.reason.value,...(form.elements.basis?{basis:form.elements.basis.value}:{})})});
+    if(!Number.isSafeInteger(saved.review?.version))throw new Error('The Studio did not confirm the saved review version. Your note remains here.');
+    const cachedAsset=storyById(form.dataset.story)?.media.find(a=>a.id===form.dataset.asset);if(cachedAsset)cachedAsset.localReview=saved.review;
+    imageReviewDrafts.delete(key);let refreshFailed=false;try{await loadWorkspace({quiet:true});}catch{refreshFailed=true;}
+    const story=storyById(form.dataset.story),asset=story?.media.find(a=>a.id===form.dataset.asset);
+    imageReviewSaving.delete(key);if(form.isConnected&&asset)showInspection(story,asset);
+    toast(refreshFailed?'Image feedback saved. The latest workspace could not be refreshed; your confirmed review is retained.':'Image feedback saved. Rights and selected slides are unchanged.',{error:refreshFailed});
+  }catch(error){status.textContent=error.message;}finally{imageReviewSaving.delete(key);for(const {control,disabled}of controls)control.disabled=disabled;}
 });
 
 document.addEventListener('submit', async event => {
@@ -662,7 +706,7 @@ document.addEventListener('submit', async event => {
         'X-Mildincident-Preview-Declaration': 'private_review_only', 'X-Mildincident-Filename': encodeURIComponent(file.name) }, body: file });
     await loadWorkspace({ quiet: true });
     const story = storyById(form.dataset.story); const asset = story?.media.find(a => a.id === form.dataset.asset);
-    if (form.isConnected && asset) openDialog(views.assetDialog(story, asset));
+    if(form.isConnected&&asset)showInspection(story,asset);
     toast('Private preview saved. Source identity and publication rights remain unverified.');
   } catch (error) { status.textContent = error.message; }
   finally { button.disabled = false; }
@@ -670,6 +714,7 @@ document.addEventListener('submit', async event => {
 
 document.addEventListener('keydown', event => {
   const input = event.target.closest('input,textarea,select,[contenteditable="true"]');
+  if(!input&&document.querySelector('#asset-dialog[open] [data-inspector]')&&!event.metaKey&&!event.ctrlKey&&!event.altKey&&['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();document.querySelector('#asset-dialog [aria-label="'+(event.key==='ArrowRight'?'Next':'Previous')+' photograph"]:not(:disabled)')?.click();return;}
   if (!input && document.querySelector('#asset-dialog[open] [data-rehearsal]') && rehearsal && !event.metaKey && !event.ctrlKey && !event.altKey && ['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) {
     event.preventDefault();
     const story = storyById(rehearsal.storyId);
@@ -692,7 +737,7 @@ document.querySelector('#asset-dialog').addEventListener('click', event => {
   if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) event.currentTarget.close(); }
 });
 window.addEventListener('hashchange', () => { document.querySelector('#asset-dialog').close(); render({ focusMain: true }); window.scrollTo({ top: 0, behavior: 'instant' }); });
-window.addEventListener('beforeunload', event => { if (pending.size || saving.size || Object.keys(state.editorialSetupDrafts||{}).length || Object.keys(state.musicIntentDrafts||{}).length || state.researchDraft?.prompt?.trim()) { event.preventDefault(); event.returnValue = ''; } });
+window.addEventListener('beforeunload', event => { if (pending.size || saving.size || imageReviewDrafts.size || Object.keys(state.editorialSetupDrafts||{}).length || Object.keys(state.musicIntentDrafts||{}).length || state.researchDraft?.prompt?.trim()) { event.preventDefault(); event.returnValue = ''; } });
 
 render();
 loadWorkspace().catch(() => {});
