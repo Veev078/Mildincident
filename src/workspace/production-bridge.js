@@ -1,3 +1,4 @@
+import {captionIsInternalTest} from '../n8n/draft-guards.js';
 import {createHash} from 'node:crypto';
 import {canonical} from '../package.js';
 const array=value=>{try{const v=typeof value==='string'?JSON.parse(value):value;return Array.isArray(v)?v:[];}catch{return [];}};
@@ -42,12 +43,14 @@ export function projectProduction({row,records,buffer,observedAt,safeUrl}){
 export function prepareProductionPacket(story){
  const local=story.localDraft;const draft=local||{};const effective={...story,...draft};const bridge=story.production||{};const pkg=bridge.package;
  const selected=effective.selectedAssetIds||[];
- const media=selected.map((id,index)=>{const matches=story.media.filter(m=>m.id===id);const m=matches.length===1?matches[0]:{};return {position:index+1,assetId:id,identityConfirmed:matches.length===1,sourceUrl:m.sourceUrl||'',fileUrl:m.fileUrl||'',creator:m.creator||'',credit:m.attribution||m.sourceCredit||'',license:m.license||'',licenseUrl:m.licenseUrl||'',rightsStatus:m.rightsStatus||'unknown',privatePreviewAvailable:Boolean(m.localPreview),productionFileVerified:false};});
+ const media=selected.map((id,index)=>{const matches=story.media.filter(m=>m.id===id);const m=matches.length===1?matches[0]:{};return {position:index+1,assetId:id,identityConfirmed:matches.length===1,sourceUrl:m.sourceUrl||'',fileUrl:m.fileUrl||'',creator:m.creator||'',credit:m.attribution||m.sourceCredit||'',license:m.license||'',licenseUrl:m.licenseUrl||'',rightsStatus:m.rightsStatus||'unknown',privatePreviewAvailable:Boolean(m.localPreview),productionFileVerified:false,rightsEvidenceBasis:'native_media_review_state_not_independent_permission_verification',role:effective.creativeBrief?.sequenceRoles?.find(r=>r.assetId===id)?.role||null};});
  const blockers=[...(bridge.blockers||[]),...(story.blockers||[])];
+ const fresh=at=>Number.isFinite(Date.parse(at))&&Date.now()-Date.parse(at)>=-60000&&Date.now()-Date.parse(at)<=900000;
+ if(!fresh(bridge.observedAt))blockers.push('SOURCE_SNAPSHOT_STALE');if(!fresh(bridge.providerObservedAt)||bridge.providerSnapshotComplete!==true)blockers.push('PROVIDER_SNAPSHOT_STALE_OR_INCOMPLETE');
  if(local?.stale)blockers.push('STALE_LOCAL_REVISION');if(!selected.length)blockers.push('NO_SELECTED_MEDIA');
  if(new Set(selected).size!==selected.length||media.some(m=>!m.identityConfirmed))blockers.push('AMBIGUOUS_OR_MISSING_MEDIA');
  if(media.some(m=>m.rightsStatus!=='cleared'))blockers.push('PER_IMAGE_RIGHTS_PENDING');if(media.some(m=>!m.fileUrl))blockers.push('PRODUCTION_FILE_REFERENCE_MISSING');
- if(!effective.caption?.trim())blockers.push('CAPTION_REQUIRED');if(/INTERNAL[\s\S]{0,60}TEST|DO\s+NOT\s+PUBLISH/iu.test(effective.caption||''))blockers.push('INTERNAL_TEST_MATERIAL');
+ if(!effective.caption?.trim())blockers.push('CAPTION_REQUIRED');if(captionIsInternalTest(effective.caption))blockers.push('INTERNAL_TEST_MATERIAL');
  if((effective.format==='single_image'?1:effective.targetSlideCount)!==selected.length)blockers.push('FORMAT_SEQUENCE_MISMATCH');
  const captionApproved=!!pkg&&pkg.finalApprovalStatus==='approved'&&!!pkg.finalCaption&&pkg.finalCaption===effective.caption;
  if(!captionApproved)blockers.push('WORKING_CAPTION_NOT_FINAL_APPROVED');
@@ -56,5 +59,5 @@ export function prepareProductionPacket(story){
  editorial:{title:effective.title,hook:effective.hook,format:effective.format,targetSlideCount:effective.targetSlideCount,caption:effective.caption,captionApproval:{recorded:captionApproved,basis:'exact_current_native_final_caption'},decision:story.developmentDecision||null,orderedMedia:media,claims:story.research,humanFactReview:{recorded:pkg?.sourceClaimsReviewed===true,scope:'native_package_record',notes:pkg?.sourceReviewNotes||'',reviewedAt:pkg?.sourceReviewDate||null},soundtrack:effective.musicSelection||null,soundDirection:effective.creativeBrief?.soundBrief||null},
  production:{authority:'existing_n8n_production',package:pkg||null,exports:bridge.exports||[],archives:bridge.archives||[],proofs:bridge.proofs||[],handoffs:bridge.handoffs||[],provider:bridge.provider||[],observedAt:bridge.observedAt||null,providerObservedAt:bridge.providerObservedAt||null},
  readiness:{status:blockers.length?'needs_review':'ready_for_native_preflight',blockers:[...new Set(blockers)],nextAction:bridge.handoffs?.some(h=>h.state!=='abandoned')?'Reconcile existing provider IDs and history before any new handoff.':local?.stale?'Resolve source changes while preserving this working revision.':!pkg?'Review this development story and create its canonical production record only through the existing approved n8n process.':'Review this packet against the current n8n package and its existing approval/export process.'},productionApplied:false,publicationApproved:false,rightsGranted:false,bufferCreateEnabled:false};
- return {...packet,digest:createHash('sha256').update(canonical(packet)).digest('hex')};
+ const serialized=JSON.parse(JSON.stringify(packet));return {...serialized,digest:createHash('sha256').update(canonical(serialized)).digest('hex')};
 }

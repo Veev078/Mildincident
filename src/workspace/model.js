@@ -1,3 +1,4 @@
+import {captionIsInternalTest} from '../n8n/draft-guards.js';
 import {projectProduction} from './production-bridge.js';
 import { createHash } from 'node:crypto';
 import { canonical } from '../package.js';
@@ -109,6 +110,6 @@ export function buildWorkspace(snapshot, drafts = new Map()) {
     analytics: calculateAnalytics({ posts: buffer.posts, stories, performanceRows: records.performance || [], observedAt: snapshot.observedAt }),
     intelligence: { duplicates: findDuplicateStories(stories) },
     publishingPosts: buffer.posts.map(p => ({ id: p.id, channelId: p.channelId, status: p.status,
-      imageCount: p.assets?.length || 0, sentAt: p.sentAt, dueAt: p.dueAt, externalLink: browserUrl(p.externalLink), instagramVerified: false })),
+      internalTest:captionIsInternalTest(p.text), imageCount: p.assets?.length || 0, sentAt: p.sentAt, dueAt: p.dueAt, externalLink: browserUrl(p.externalLink), instagramVerified: false })),
   };
 }

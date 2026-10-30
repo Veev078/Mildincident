@@ -97,6 +97,7 @@ try {
     assert.ok((await page.locator('h1').innerText()).length > 0);
   }
   checks.push('seven product-wide views render without JavaScript errors');
+  const id = snapshot.records.stories[0].concept_id;
   await page.goto(`${origin}/#/story/${id}/publishing`);
   await page.getByRole('heading',{name:'Existing production package',exact:true}).waitFor();
   await page.getByText('Recorded handoff history · 1',{exact:true}).click();
@@ -112,7 +113,6 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.pipeline-row').length === 1);
   checks.push('global search filters existing story rows and has an honest empty state');
 
-  const id = snapshot.records.stories[0].concept_id;
   await page.goto(`${origin}/#/story/${id}/overview`);
   await page.getByRole('heading', { name: 'Existing n8n notes', exact: true }).waitFor();
   assert.ok((await page.locator('.existing-source-notes').textContent()).includes('synthetic test fixture'));
