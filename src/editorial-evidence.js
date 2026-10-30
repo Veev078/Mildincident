@@ -27,12 +27,13 @@ export function photoEvidenceTools(publicReference) {
     const captionText=value=>decode(String(value||'').replace(/<[^>]+>/g,' ')).replace(/\s+/g,' ').trim().slice(0,2000);
     const figures=[...body.matchAll(/<figure\b[^>]*>[\s\S]*?<\/figure>/gi)].slice(0,260).map(m=>({start:m.index,end:m.index+m[0].length,html:m[0],images:[...m[0].matchAll(/<img\b/gi)].length,caption:captionText((m[0].match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/i)||[])[1]||'')}));
     const referencedCaptions=new Map();for(const m of [...body.matchAll(/<(figcaption|p|span)\b([^>]*)>([\s\S]*?)<\/\1>/gi)].slice(0,500)){const a=attrs(m[2]);if(a.id)referencedCaptions.set(a.id,captionText(m[3]));}
-    const add=(url,caption,isCover,width,height,captionBasis='image_alt')=>{url=resolve(url,page);if(!url||/\/(?:logo|favicon|avatar|icon|sprite|pixel|spinner)[._/-]/i.test(url)||/\.svg(?:[?#]|$)/i.test(url))return;
+    const add=(url,caption,isCover,width,height,captionBasis='image_alt',researchLinks=[])=>{url=resolve(url,page);if(!url||/\/(?:logo|favicon|avatar|icon|sprite|pixel|spinner)[._/-]/i.test(url)||/\.svg(?:[?#]|$)/i.test(url))return;
       const key=fileKey(url);const previous=candidates.get(key);const referenceVariants=[...new Set([...(previous?.referenceVariants||[]),url])];if(previous&&!previous.isCover){previous.referenceVariants=referenceVariants;previous.duplicateBasis=referenceVariants.length>1?'source_file_reference_variant':'none';return;}
-      candidates.set(key,{url,referenceVariants,duplicateBasis:referenceVariants.length>1?'source_file_reference_variant':'none',sameImageVerified:false,caption:String(caption||'').trim().slice(0,2000),captionBasis,isCover,reportedWidth:width||null,reportedHeight:height||null});};
+      candidates.set(key,{url,referenceVariants,duplicateBasis:referenceVariants.length>1?'source_file_reference_variant':'none',sameImageVerified:false,caption:String(caption||'').trim().slice(0,2000),captionBasis,researchLinks,isCover,reportedWidth:width||null,reportedHeight:height||null});};
     for(const tag of [...body.matchAll(/<meta\b[^>]*>/gi)].slice(0,250)){const a=attrs(tag[0]);if(['og:image','og:image:secure_url','twitter:image','twitter:image:src'].includes((a.property||a.name||'').toLowerCase()))add(a.content,'Page cover / social preview',true);}
     const bestResponsive=value=>String(value||'').split(',').map(part=>{const [url,size]=part.trim().split(/\s+/);return {url,width:/^\d+w$/.test(size||'')?parseInt(size,10):/^\d+(?:\.\d+)?x$/.test(size||'')?Number.parseFloat(size)*100:0};}).filter(x=>resolve(x.url,page)).sort((a,b)=>b.width-a.width)[0]?.url;
-    for(const tag of [...body.matchAll(/<img\b[^>]*>/gi)].slice(0,260)){
+    const imageTags=[...body.matchAll(/<img\b[^>]*>/gi)];
+    for(const tag of imageTags.slice(0,260)){
       const a=attrs(tag[0]);const figure=figures.find(f=>tag.index>=f.start&&tag.index<f.end);let picture='';
       if(figure?.images===1){const source=[...figure.html.matchAll(/<source\b[^>]*>/gi)].map(m=>attrs(m[0])).find(s=>!s.type||/^image\/(jpeg|png|webp)$/i.test(s.type));if(source)picture=bestResponsive(source.srcset||source['data-srcset']);}
       const width=parseInt(a.width||'0',10)||0,height=parseInt(a.height||'0',10)||0;
@@ -43,21 +44,38 @@ export function photoEvidenceTools(publicReference) {
       const nearby=referenced||(figure?.images===1?figure.caption:'');const alt=a.alt||a.title||'';
       let caption=alt,basis=a.alt?'image_alt':a.title?'image_title':'missing';
       if(nearby){caption=/^(?:©|copyright|photo(?:graph)?(?: by|:))/i.test(nearby)?[alt,nearby].filter(Boolean).join(' '):nearby;basis=referenced?'linked_caption':'figure_caption';}
-      add(url,caption,false,width,height,basis);
-      if(picture&&resolve(url,page)&&fileKey(resolve(picture,page))===fileKey(resolve(url,page)))add(picture,caption,false,width,height,basis);
+      // Follow only explicitly labeled links in this image's single-figure caption, never an article byline or shared gallery caption.
+      const researchLinks=[];const captionHtml=figure?.images===1?(figure.html.match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/i)||[])[1]||'':'';
+      for(const link of captionHtml.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)){
+        const label=captionText(link[2]).slice(0,200),before=captionText(captionHtml.slice(Math.max(0,link.index-160),link.index));
+        const kind=/(?:photograph(?:y|s)?|photos?|images?)\s*(?:by|:)\s*$/i.test(before)?'photographer':/(?:from|in|of)\s+(?:the\s+)?(?:series|project|book)\s*[:—-]?\s*$/i.test(before)?'series':null;
+        const target=resolve(attrs(link[1]).href,page);if(kind&&target&&label&&researchLinks.length<6)researchLinks.push({kind,label,url:target,basis:'single_figure_caption_link',verified:false});
+      }
+      add(url,caption,false,width,height,basis,researchLinks);
+      if(picture&&resolve(url,page)&&fileKey(resolve(picture,page))===fileKey(resolve(url,page)))add(picture,caption,false,width,height,basis,researchLinks);
     }
     const images=[...candidates.values()];const subject=tokens(`${story.subject||''} ${story.title||''}`).filter(t=>!stop.has(t));
     const captionTokens=images.map(m=>tokens(m.caption.replace(/©[\s\S]*$/,'')));
     const frequency=new Map(subject.map(t=>[t,captionTokens.filter(ts=>ts.includes(t)).length]));
     const distinctive=subject.filter(t=>(frequency.get(t)||0)>0&&(frequency.get(t)||0)<=Math.max(1,Math.floor(images.length/3)));
     const storyYears=[...new Set(String(story.subject||'').match(/\b(?:18|19|20)\d{2}\b/g)||[])].map(Number);
-    return images.map((m,index)=>{const terms=captionTokens[index];const matched=subject.filter(t=>terms.includes(t));const anchors=distinctive.filter(t=>terms.includes(t));
-      const related=!m.isCover&&distinctive.length>0&&anchors.length>=Math.min(2,distinctive.length);
-      const courtesy=(m.caption.match(/(?:Photo(?:graph)?\s*:\s*)?Courtesy\s+[^.]+/i)||[])[0]||'';const credit=(m.caption.match(/©\s*(.+)$/)||[])[1]?.trim().replace(/[.\s]+$/,'')||'';const credited=credit.split(/\s*\/\s*/)[0].trim();const creator=/mus[ée]e|museum|foundation|archive|collection|library/i.test(credited)?'':credited;
+    const inspected=images.map((m,index)=>{const terms=captionTokens[index];const matched=subject.filter(t=>terms.includes(t));const anchors=distinctive.filter(t=>terms.includes(t));
+      const completeSubjectTerms=subject.length>=2&&matched.length===subject.length;
+      const related=!m.isCover&&(completeSubjectTerms||distinctive.length>0&&anchors.length>=Math.min(2,distinctive.length));
+      const courtesy=(m.caption.match(/(?:Photo(?:graph)?\s*:\s*)?Courtesy\s+[^.]+/i)||[])[0]||'';const credit=(m.caption.match(/©\s*(.+)$/)||[])[1]?.trim().replace(/[.\s]+$/,'')||'';const photographer=(m.caption.match(/\b(?:photograph(?:y|s)?|photos?|images?)\s*(?:by|:)\s*([^©|;]+?)(?=\s+(?:courtesy|copyright)|\.\s|\.$|$)/i)||[])[1]?.trim()||'';
+      const explicit=photographer&&!/^(?:courtesy|unknown|not recorded)\b/i.test(photographer)?photographer:'';
+      const creator=explicit||m.researchLinks.find(l=>l.kind==='photographer')?.label||'';
+      const creatorBasis=creator?'explicit_source_photo_credit':credit?'copyright_holder_only':courtesy?'courtesy_only':'not_recorded';
+      const seriesReference=m.researchLinks.find(l=>l.kind==='series')||null;
       const years=[...new Set(m.caption.match(/\b(?:18|19|20)\d{2}\b/g)||[])].map(Number);
-      return {...m,id:`${story.id||'source'}-${m.isCover?'og':'img'}-${hash(page+'|'+m.url)}`,creator,credit:credit?'© '+credit:courtesy,sourceUrl:page,years,storyYears,dateContext:years.length&&storyYears.length&&!years.some(y=>storyYears.includes(y))?'different_year_context':'not_established',
-        materialType:/croquis|sketch|drawing|costume design/i.test(m.caption)?'design_documentation':'photograph_reference',relation:m.isCover?'page_cover':related?'subject_caption_match':'context_only',matchedTerms:matched,distinctiveTerms:anchors,matchingBasis:'source_caption_metadata_only',pixelAnalysisPerformed:false,rightsGranted:false};
-    }).slice(0,16);
+      return {...m,id:`${story.id||'source'}-${m.isCover?'og':'img'}-${hash(page+'|'+m.url)}`,creator,creatorBasis,creatorVerified:false,copyrightHolder:credit,seriesReference,credit:credit?'© '+credit:courtesy,sourceUrl:page,years,storyYears,dateContext:years.length&&storyYears.length&&!years.some(y=>storyYears.includes(y))?'different_year_context':'not_established',
+        materialType:/croquis|sketch|drawing|costume design/i.test(m.caption)?'design_documentation':'photograph_reference',relation:m.isCover?'page_cover':related?'subject_caption_match':'context_only',matchedTerms:matched,distinctiveTerms:anchors,matchingBasis:completeSubjectTerms?'complete_subject_terms_in_source_caption':'source_caption_metadata_only',pixelAnalysisPerformed:false,rightsGranted:false};
+    });
+    // Bound payloads without silently dropping a related frame late in the source page. This is metadata priority, not taste ranking.
+    const priority=m=>m.relation==='subject_caption_match'?0:m.isCover?2:1;
+    const retained=new Set([...inspected].sort((a,b)=>priority(a)-priority(b)).slice(0,40));
+    const captureCoverage={scannedCharacters:Math.min(html.length,300000),pageTruncated:html.length>300000,imageTagsFound:imageTags.length,imageTagsConsidered:Math.min(imageTags.length,260),referenceCount:images.length,retainedCount:retained.size,referenceLimit:40,completeShootVerified:false,pixelAnalysisPerformed:false};
+    return inspected.filter(m=>retained.has(m)).map(m=>({...m,captureCoverage}));
   }
   return {inspect,decode};
 }
@@ -86,7 +104,7 @@ export function captureEditorialEvidence(execution,{workerId,jobId,requestHash,c
   for(let index=0;index<requests.length;index++){if(sources[index]?.access!=='source_text_captured')continue;const response=responses[index]||{};for(const image of inspectPhotoSource(response.body??response.data??'',requests[index].url,context)){if(!images.some(existing=>existing.url===image.url))images.push(image);}}
   const additionalMedia=[];
   for(const image of images){const existing=candidate.media.find(m=>m.previewUrl===image.url);if(existing)image.assetId=existing.id;
-    else if(image.relation==='subject_caption_match'&&additionalMedia.length<7){image.assetId=image.id;image.additionalSourceReference=true;additionalMedia.push({id:image.id,title:image.caption.slice(0,180)||'Source image reference',creator:image.creator,sourceUrl:image.sourceUrl,previewUrl:image.url,provider:'captured_source_page_image',rightsStatus:'preview_unreviewed',license:'UNKNOWN — source visibility is not publication permission',width:null,height:null});}}
+    else if(image.relation==='subject_caption_match'&&additionalMedia.length<Math.max(0,40-candidate.media.length)){image.assetId=image.id;image.additionalSourceReference=true;additionalMedia.push({id:image.id,title:image.caption.slice(0,180)||'Source image reference',creator:image.creator,sourceUrl:image.sourceUrl,previewUrl:image.url,provider:'captured_source_page_image',rightsStatus:'preview_unreviewed',license:'UNKNOWN — source visibility is not publication permission',width:null,height:null});}}
 
   const models=['Research Candidates','Draft Editorial Concept'].map(name=>{const runs=data[name]||[];const usages=runs.map(r=>r.metadata?.tokenUsage);const measurable=runs.length>0&&usages.every(u=>Number.isFinite(u?.inputTokens)&&Number.isFinite(u?.outputTokens));const output=nodeItems(data,name)[0];const fullResponse=Boolean(output?.usage||output?.object==='response');
     return {node:name,runs:runs.length,inputTokens:measurable?usages.reduce((n,u)=>n+u.inputTokens,0):null,outputTokens:measurable?usages.reduce((n,u)=>n+u.outputTokens,0):null,toolCalls:providerWebSearchUsage(fullResponse?output:null).calls,toolExecutionEvidence:providerWebSearchUsage(fullResponse?output:null),usageSource:measurable?'n8n_execution_metadata':'unavailable'};});

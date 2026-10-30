@@ -381,6 +381,7 @@ try {
   fixtureCandidate.sourceEvidence=[{claimIndex:0,url:'https://example.org/source',title:'Synthetic captured source',httpStatus:200,access:'source_text_captured',textExcerpt:'A labeled source-text fixture, not real editorial research.'}];
   fixtureCandidate.story.format='single_image';fixtureCandidate.proposedAssetIds=['dev-photo-1'];
   Object.assign(fixtureCandidate.media[0],{source_caption:'Synthetic fixture photograph, 1974.',credit_at_source:'Fixture generator',source_years:[1974],source_relation:'subject_caption_match',material_kind:'photograph_reference'});
+  Object.assign(fixtureCandidate.media[0],{creator_basis:'copyright_holder_only',copyright_holder:'Fixture owner',source_research_links:[{kind:'series',label:'Synthetic series trail',url:'https://example.org/project',verified:true}],capture_coverage:{referenceCount:55,retainedCount:40,referenceLimit:40,pageTruncated:true}});
   for(const name of ['drawing','trench'])fixtureCandidate.media.push({asset_id:'dev-'+name,thumb_url:'https://example.org/'+name+'.jpg',source_page_url:'https://example.org/source',source_caption:'Synthetic fixture costume document, 1967.',credit_at_source:'Fixture museum',source_years:[1967],source_relation:'subject_caption_match',material_kind:'design_documentation'});
   engineFixture.candidates.push({job_id:queued.job_id,candidate_id:fixtureCandidate.id,status:'ready_to_review',candidate_json:JSON.stringify(fixtureCandidate)});
   await page.getByRole('button',{name:'Refresh engine results',exact:true}).first().click();
@@ -391,6 +392,15 @@ try {
   await page.getByText('Read the recorded source excerpt',{exact:true}).click();
   await page.getByText('A labeled source-text fixture, not real editorial research.',{exact:true}).waitFor();
   checks.push('native captured-source packet opens in Studio research without another fetch or asserting human verification');
+  await page.goto(`${origin}/#/story/${devStoryId}/images`);
+  await page.locator('[data-action="inspect"]').first().click();
+  await page.getByRole('dialog').getByText('Copyright holder recorded; the photographer is not established by that credit.',{exact:true}).waitFor();
+  await page.getByRole('dialog').getByRole('link',{name:'Series / project: Synthetic series trail'}).waitFor();
+  assert.ok((await page.getByRole('dialog').textContent()).includes('40 of 55 image references retained'));
+  await page.getByRole('button',{name:'Close image details',exact:true}).click();
+  await page.goto(`${origin}/#/story/${devStoryId}/research`);
+  checks.push('source photograph inspection distinguishes copyright, explicit series trails and incomplete page coverage');
+
   await page.getByRole('heading',{name:'Editorial selection reasoning',exact:true}).waitFor();
   await page.getByText('Research leads compared · 2',{exact:true}).click();
   assert.ok((await page.locator('.story-workspace').textContent()).includes('Fixture institutional identification puzzle'));
@@ -422,6 +432,11 @@ try {
   await candidateReview.getByRole('button',{name:'Save development decision'}).click();
   await page.getByText('Your development decision: approved',{exact:true}).waitFor();
   assert.equal(research.engineJob(queued.job_id).reviewDecisions[fixtureCandidate.id].decision,'approved');
+  await page.goto(`${origin}/#/story/${devStoryId}/images`);
+  await page.locator('[data-action="inspect"]').first().click();
+  // Original source context remains available alongside later captured image captions.
+  await page.getByRole('dialog').getByText('Caption recorded at the source',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Close image details',exact:true}).click();
   const savedVersion=drafts.get(devStoryId).version;
   await page.goto(`${origin}/#/story/${devStoryId}/overview`);
   const inlineReview=page.locator('[data-engine-review]');

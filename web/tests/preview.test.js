@@ -24,3 +24,7 @@ test('editorial image filters keep human decisions separate from rights clearanc
  assert.equal(matchesEditorialReview(asset,'reject'),true);assert.equal(matchesEditorialReview(asset,'shortlist'),false);assert.equal(matchesEditorialReview(asset,'unreviewed'),false);assert.equal(matchesEditorialReview({rightsStatus:'pending'},'unreviewed'),true);assert.equal(matchesEditorialReview(asset,'<unsafe>'),false);
  assert.ok(!editorialReviewFilter('<unsafe>').includes('<unsafe>'));
 });
+test('source inspection exposes photographer uncertainty, reported series trails and bounded scan coverage safely',()=>{
+ const html=assetDialog({id:'CON-1',title:'Story'}, {id:'asset-1',sourceCaption:'A recorded frame',creatorBasis:'copyright_holder_only',sourceResearchLinks:[{kind:'series',label:'<unsafe series>',url:'https://example.org/project'},{kind:'photographer',label:'Unsafe link',url:'javascript:alert(1)'}],captureCoverage:{retainedCount:40,referenceCount:55,pageTruncated:true,imageTagsFound:55,imageTagsConsidered:55}});
+ assert.ok(html.includes('the photographer is not established'));assert.ok(html.includes('40 of 55 image references retained'));assert.ok(html.includes('&lt;unsafe series&gt;'));assert.ok(!html.includes('href="javascript:'));assert.ok(html.includes('full-series coverage and rights have not been verified'));
+});
