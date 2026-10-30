@@ -1,6 +1,7 @@
 import {buildWorkspace,WORKSPACE_TABLES} from './model.js';
 import {possibleVariants} from '../photography/fingerprint.js';
 import {PhotographyService} from '../photography/service.js';
+import {FounderReviewStore} from './founder-review.js';
 import {productionDecisions} from './production-decisions.js';
 import {validatePacketImport} from '../production-packet-contract.js';
 import {prepareProductionPacket} from './production-bridge.js';
@@ -54,7 +55,7 @@ async function imageBody(request) {
   return Buffer.concat(chunks);
 }
 
-export function createWorkspaceServer({ source, drafts, previews, research, engine, photography=research?new PhotographyService(research):null, webRoot = WEB_ROOT }) {
+export function createWorkspaceServer({ source, drafts, previews, research, engine, photography=research?new PhotographyService(research):null, founderReviews=research?new FounderReviewStore(research):null, webRoot = WEB_ROOT }) {
   const view = () => {
     const workspace = source.snapshot?source.view(drafts.all()):buildWorkspace({records:Object.fromEntries(Object.keys(WORKSPACE_TABLES).map(k=>[k,[]])),buffer:{posts:[],complete:false,observedAt:null},observedAt:new Date().toISOString(),warnings:[]});
     if(!source.snapshot)workspace.source={...workspace.source,kind:'disconnected',observedAt:null,bufferObservedAt:null,stale:true,unavailable:true,warnings:['No authoritative production snapshot is available. Private photographic research remains usable; connect n8n/Buffer or restore your private backup to inspect existing stories.'],refreshError:{code:'SOURCE_UNAVAILABLE',message:'Production observations unavailable; no example stories were substituted.'}};
@@ -64,11 +65,13 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       const story = developmentCandidateStory(candidate,{soundtrack:source.snapshot?.records?.soundtrack || [],drafts:drafts.all(),decision:request.engineJob.reviewDecisions?.[candidate.id]||null,evidence:request.engineJob.evidence?.[candidate.id]||null});
       requireThat(!workspace.stories.some(s=>s.id===story.id),'AMBIGUOUS_ENGINE_RESULT','Development story identity collides with an existing record.');
       story.engineReviewVersion=request.engineJob.version;
+      story.recoveredHistory=request.engineJob.recoveredHistory===true;
       workspace.stories.push(story);
     }
     attachLocalPreviews(workspace,previews);
     for (const story of workspace.stories) { story.visualVariants=possibleVariants(story.media);story.sourceSequencePlan = buildSourceSequencePlan(story); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity}; }
     workspace.photoHunts=photography?.all()||[];
+    workspace.founderReviews=founderReviews?.all()||{};
     workspace.discovery = buildDiscoveryDesk(workspace.stories);
     workspace.researchHandoffAvailable = Boolean(research);
     return workspace;
@@ -92,6 +95,8 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       if (url.pathname === '/api/health' && request.method === 'GET') {
         json(response, 200, { status: 'ok', mode: 'local_editorial_workspace', productionMutationsEnabled: false, sourceAvailable: Boolean(source.snapshot), refreshing: Boolean(source.inflight) }); return;
       }
+      const founderRoute=url.pathname.match(/^\/api\/editorial\/reviews\/([^/]+)$/);
+      if(founderRoute&&request.method==='POST'){requireThat(founderReviews,'RESEARCH_UNAVAILABLE','Private review is unavailable.');const workspace=view(),story=workspace.stories.find(s=>s.id===decodeURIComponent(founderRoute[1]));let followUp=null;const review=founderReviews.record(story,await body(request),{afterSave:value=>{if(!['explore','alternatives'].includes(value.decision))return;const photo=story.media?.[0];followUp=research.create({kind:'brief',prompt:((value.decision==='alternatives'?'Find alternative photographs and related frames':'Deepen evidence and develop a grounded editorial angle')+' for the existing story: '+story.subject+'. Preserve its identity and existing working revisions. Founder context: '+(value.reason||'No note supplied')+'. Treat existing sources and credits as research leads; do not infer rights or photographic quality.').slice(0,2000),sourceUrl:photo?.sourceUrl||''},workspace.stories);}});json(response,200,{review,followUp,productionApplied:false,publicationApproved:false});return;}
       if(url.pathname==='/api/photography/hunts'&&request.method==='POST'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request);photography.indexNative(source.snapshot);const hunt=photography.create(input);json(response,201,{hunt,productionApplied:false});return;}
       if(url.pathname==='/api/photography/references'&&request.method==='POST'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');json(response,201,photography.saveReference(await body(request)));return;}
       const nativePhotoRoute=url.pathname.match(/^\/api\/photography\/hunts\/([a-f0-9-]{36})\/n8n-packet$/);
@@ -231,7 +236,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const previews = new LocalPreviewStore('.local/workspace/previews');
   const research = new LocalResearchStore('.local/workspace/research.sqlite');
   let engine=null;
-  try { const client=await loadEditorialEngineClient(); if(client){engine=new EditorialEngineService({research,client});engine.inspect().catch(()=>{});} } catch(error) { console.error(`Development engine unavailable: ${error.code || 'CONFIGURATION_ERROR'}`); }
+  try { const client=await loadEditorialEngineClient(); if(client){engine=new EditorialEngineService({research,client});engine.refresh().catch(error=>console.error(`Read-only engine refresh unavailable: ${error.code||'LOCAL_ERROR'}`));} } catch(error) { console.error(`Development engine unavailable: ${error.code || 'CONFIGURATION_ERROR'}`); }
   const server = createWorkspaceServer({ source, drafts, previews, research, engine });
   const port = Number(process.env.PORT || 4174);
   requireThat(Number.isSafeInteger(port) && port > 0 && port <= 65535, 'INVALID_PORT', 'PORT must be from 1 to 65535.');

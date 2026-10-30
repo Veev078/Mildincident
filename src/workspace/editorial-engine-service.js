@@ -8,13 +8,14 @@ export class EditorialEngineService {
   constructor({research,client}){this.research=research;this.client=client;this.inspection={configured:Boolean(client),generationAvailable:false,generationApproved:false,workerActive:false};this.refreshing=null;}
   status(){return {...this.inspection};}
   async inspect(){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');this.inspection=await this.client.inspect();return this.status();}
-  async queue(id){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');const request=this.research.get(id);requireThat(request,'RESEARCH_REQUEST_NOT_FOUND','Research request is unavailable.');const scoped=this.requestForEngine(request);if(!request.engineJob){const context=this.editorialContext();if(context.feedback.length)scoped.editorialContext=context;}const claim=this.research.claimEngineQueue(id,requestFingerprint(scoped));if(!claim.claimed)return claim.job;
+  async queue(id){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');requireThat(!this.client.readOnly,'ENGINE_READ_ONLY','This connection observes existing results; native queueing is disabled.');const request=this.research.get(id);requireThat(request,'RESEARCH_REQUEST_NOT_FOUND','Research request is unavailable.');const scoped=this.requestForEngine(request);if(!request.engineJob){const context=this.editorialContext();if(context.feedback.length)scoped.editorialContext=context;}const claim=this.research.claimEngineQueue(id,requestFingerprint(scoped));if(!claim.claimed)return claim.job;
     if(scoped.editorialContext)this.research.recordEngineState(id,'queueing',{editorialContext:scoped.editorialContext});
     try{const row=await this.client.queue(scoped);requireThat(REMOTE_STATES.has(row.status),'INVALID_ENGINE_RESULT','Remote job status is unknown.');return this.research.recordEngineState(id,row.status,{remoteRowId:String(row.id),executionId:String(row.execution_id||''),lastError:null});}
     catch(error){this.research.recordEngineState(id,'queue_uncertain',{lastError:error.code||'ENGINE_REQUEST_FAILED'});throw error;}
   }
   async refresh(){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');if(this.refreshing)return this.refreshing;
     this.refreshing=(async()=>{await this.inspect();const jobs=await this.client.rows(this.client.connection.jobsTableId);const candidates=await this.client.rows(this.client.connection.candidatesTableId);const {sanitizeDevelopmentCandidate}=await import('./editorial-engine-client.js');
+      if(this.client.readOnly)await this.adoptObservedResults(jobs,candidates,sanitizeDevelopmentCandidate);
       for(const request of this.research.all()){const local=request.engineJob;if(!local)continue;const matches=jobs.filter(row=>row.job_id===request.id);requireThat(matches.length<=1,'AMBIGUOUS_ENGINE_JOB','Multiple remote rows share a request identity.');const row=matches[0];if(!row)continue;
         requireThat(row.request_hash===requestFingerprint(this.requestForEngine(request))&&REMOTE_STATES.has(row.status),'INVALID_ENGINE_RESULT','Remote request identity or status does not match.');
         const result=candidates.filter(c=>c.job_id===request.id).map(sanitizeDevelopmentCandidate);requireThat(result.length<=1,'AMBIGUOUS_ENGINE_RESULT','Development job produced more than its one-candidate budget.');
@@ -31,6 +32,18 @@ export class EditorialEngineService {
         const data={nativeStatus:row.status,remoteRowId:String(row.id),executionId,candidates:result,resultPending,resultMissingSince,lastError:failure};
         if(local.state!==observedState||local.nativeStatus!==row.status||local.lastError!==data.lastError||JSON.stringify(local.candidates||[])!==JSON.stringify(result)||local.executionId!==data.executionId||Boolean(local.resultPending)!==resultPending||local.resultMissingSince!==resultMissingSince)this.research.recordEngineState(request.id,observedState,data);
       }return this.status();})();try{return await this.refreshing;}finally{this.refreshing=null;}
+  }
+  async adoptObservedResults(jobs,candidates,sanitize){
+    let imported=0,unlinked=0;
+    for(const row of jobs){if(this.research.engineJob(row.job_id))continue;if(jobs.filter(j=>j.job_id===row.job_id).length!==1){unlinked++;continue;}const results=candidates.filter(c=>c.job_id===row.job_id);if(results.length!==1||!COMPLETED_STATES.has(row.status)){unlinked++;continue;}
+      let context;try{context=row.editorial_context_json?JSON.parse(row.editorial_context_json):null;}catch{unlinked++;continue;}
+      const request={kind:row.kind,prompt:row.prompt,sourceUrl:row.source_url||'',...(context?{editorialContext:context}:{})};
+      if(requestFingerprint(request)!==row.request_hash){unlinked++;continue;}
+      const candidate=sanitize(results[0]);requireThat(candidate.provenance.executionId===String(row.execution_id)&&candidate.provenance.kind===row.kind,'INVALID_ENGINE_RESULT','Observed candidate does not match its native job.');
+      const local=this.research.create({kind:row.kind,prompt:row.prompt,sourceUrl:row.source_url||'',idempotencyKey:row.job_id},[]);this.research.claimEngineQueue(local.id,row.request_hash);
+      this.research.recordEngineState(local.id,row.status,{readOnlyObserved:true,recoveredHistory:(this.client.connection.historyJobIds||[]).includes(row.job_id),...(context?{editorialContext:context}:{}),remoteRowId:String(row.id),executionId:String(row.execution_id),candidates:[candidate]});imported++;
+    }
+    this.inspection={...this.inspection,observedImports:imported,unlinkedNativeJobs:unlinked};
   }
   async captureEvidence(id){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The development connection is unavailable.');const request=this.research.get(id);const job=request?.engineJob;requireThat(job?.executionId&&job.candidates?.length===1,'INVALID_ENGINE_RESULT','Reconcile one completed candidate before inspecting its execution.');
     const execution=await this.client.executionDetails(job.executionId);const candidate=job.candidates[0];const evidence=captureEditorialEvidence(execution,{workerId:this.client.connection.editorialWorkerId,jobId:id,requestHash:job.requestHash,candidate});

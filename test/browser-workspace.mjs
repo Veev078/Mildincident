@@ -44,9 +44,11 @@ try {
   page.on('dialog', dialog => dialog.accept());
   await page.route('https://example.org/**', route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350"><rect width="1080" height="1350" fill="#e1dfd2"/><text x="70" y="600" font-size="64" fill="#42463b">SYNTHETIC UI TEST</text><text x="70" y="700" font-size="40" fill="#42463b">No archival photograph</text></svg>' }));
   await page.goto(origin);
-  await page.locator('.stats-row').waitFor();
+  await page.locator('.founder-inbox').waitFor();
   assert.ok((await page.locator('.source-bar').textContent()).includes('Test fixture'));
   checks.push('frontend loads from actual local API with explicitly labeled test fixtures');
+
+
   await page.goto(`${origin}/#/discovery`);
   await page.getByRole('heading', {name:'Find the next extraordinary story.'}).waitFor();
   await page.getByLabel('Creative direction', {exact:true}).fill('Find unusual connections between portrait photography and cinema');
@@ -98,7 +100,7 @@ try {
     assert.ok((await page.locator('h1').innerText()).length > 0);
   }
   checks.push('seven product-wide views render without JavaScript errors');
-  await page.goto(`${origin}/#/discovery`);await page.getByRole('heading',{name:'Follow the photograph.',exact:true}).waitFor();
+  await page.goto(`${origin}/#/discovery`);await page.getByText('Explore photographs and source trails',{exact:true}).click();await page.getByRole('heading',{name:'Follow the photograph.',exact:true}).waitFor();
   await page.locator('[data-photo-hunt] input[name="query"]').fill('Archive photograph');await page.getByRole('button',{name:'Explore photographs',exact:true}).click();
   await page.getByLabel('Research trail',{exact:true}).waitFor();await page.getByRole('heading',{name:'Archive photograph 1',exact:true}).waitFor();
   const photoForm=page.locator('[data-photo-decision]').first();await photoForm.locator('[name="reason"]').fill('Inspect adjacent frames and photographer credits');await photoForm.getByRole('button',{name:'Save photo decision',exact:true}).click();
@@ -438,6 +440,10 @@ try {
   checks.push('inline editorial feedback retains native research and local revisions without a false stale-source conflict');
 
   checks.push('correlated development results open and save in existing Studio tools with clear provenance and local approval, without inserting production records');
+  await page.goto(`${origin}/#/home`);const reviewBaseline=research.all().length;
+  await page.getByRole('button',{name:'Existing stories',exact:true}).click();const reviewCard=page.locator('[data-review-card]').first();const reviewId=await reviewCard.getAttribute('data-review-card');await reviewCard.getByRole('button',{name:'Save',exact:true}).click();await page.locator('[data-review-card="'+reviewId+'"] .review-receipt').filter({hasText:'Saved'}).waitFor();await page.reload();await page.getByRole('button',{name:'Existing stories',exact:true}).click();await page.locator('[data-review-card="'+reviewId+'"] .review-receipt').filter({hasText:'Saved'}).waitFor();
+  const restoredCard=page.locator('[data-review-card="'+reviewId+'"]');await restoredCard.getByRole('button',{name:'Find alternatives',exact:true}).click();await page.getByText('Review and follow-up brief saved. No AI execution was started.',{exact:true}).waitFor();assert.equal(research.db.prepare('SELECT COUNT(*) n FROM founder_review_events WHERE target_id=?').get(reviewId).n,2);assert.equal(research.all().length,reviewBaseline+1);
+  checks.push('review-first home persists one-click founder decisions and atomically prepares alternatives without publishing or running AI');
   assert.deepEqual(errors, []);
   const result = { passed: true, checks, fixtureOnly: true, productionWrites: 0, browserErrors: errors };
   await fs.writeFile(path.join(artifactRoot, 'report.json'), JSON.stringify(result, null, 2), { mode: 0o600 });

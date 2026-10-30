@@ -3726,3 +3726,23 @@ dialog::backdrop {
 .photo-native { margin: 20px 0; padding: 16px; border: 1px solid var(--line); }
 .photo-native summary { color: var(--accent); cursor: pointer; font-weight: 700; }
 .photo-native form { margin: 16px 0; }
+.founder-inbox { margin: 40px 0; }
+.founder-inbox .filter-chips { flex-wrap: wrap; margin: 20px 0; }
+.proposal-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 26px; }
+.proposal-card { min-width: 0; background: var(--surface); border: 1px solid var(--line); }
+.proposal-image { display: block; background: var(--accent-soft); }
+.proposal-image .photo { aspect-ratio: 4/5; }
+.proposal-image .photo img { object-fit: contain; }
+.proposal-copy { padding: 24px; overflow-wrap: anywhere; }
+.proposal-copy h3 { font: 32px/1.15 var(--serif); margin: 12px 0; }
+.proposal-copy p { line-height: 1.6; }
+.review-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 14px; }
+.proposal-copy :is(select,textarea) { display: block; width: 100%; max-width: 100%; background: #fff; border: 1px solid var(--line); padding: 10px; font: inherit; }
+.proposal-copy .field { display: block; margin: 12px 0; }
+.taste-tags { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; font-size: 12px; }
+.taste-tags label { display: flex; align-items: center; gap: 6px; }
+.review-receipt { color: var(--accent); border-left: 2px solid var(--accent); padding-left: 12px; }
+.existing-workspace-summary { margin: 24px 0; }
+@media(max-width:800px) { .proposal-grid { grid-template-columns: 1fr; } .proposal-copy { padding: 18px; } }
+.photo-desk-toggle, .existing-research-material { margin: 24px 0; }
+.photo-desk-toggle > summary, .existing-research-material > summary { color: var(--accent); padding: 16px 0; cursor: pointer; font-weight: 700; }
