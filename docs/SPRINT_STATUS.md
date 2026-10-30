@@ -1,3 +1,15 @@
+# Recovered private workspace portability — 2026-10-30 (America/New_York)
+
+Continued verified remote `ffe4024`; interrupted edits preserved under ignored `.local/recovery/canonical-foundation/` before repairs. Added `npm run workspace:restore -- "extracted-backup-folder"`: inventory/checksum validation, disposable-copy SQLite integrity checks, private staging, complete previous-workspace preservation and conservative open-journal refusal. Portable inventory paths use `/` on Windows as well as Linux. Backing up restored state excludes the old manifest. No credentials, native workflow, production data or environment configuration changed.
+
+Quiescent real backup `.local/backups/2026-10-30T17-31-07-049Z-1f3c2bc3` verified (four files). Restored into a separate proof workspace:18 native stories,2 recovered development results, previous unfinished marker preserved. Source workspace was not replaced. Private ZIP `.local/exports/MILDINCIDENT-private-workspace-20261030.zip` verified against every manifest digest; it stays ignored and private. It does not contain missing older private working revisions/media or credential/dispatch configuration. There are no cached photo blobs in this checkpoint; source previews still require accessible URLs.
+
+Founder path: Node24.17..<25, current branch checkout, `npm ci`, `npm run workspace:restore -- "path/to/MILDINCIDENT-private-workspace"`, `npm run studio:open`. The same computer opens localhost4174. See LOCAL_START.md / PRIVATE_BACKUP.md. Review queue gains read-only **Sync research results** using the existing guarded refresh action.
+
+Validation:246 automated tests /38 fixture browser workflows /syntax pass, zero browser errors or production writes. Real-data restore proof is distinct from fixture tests; Windows launch has not been exercised on an actual Windows machine. Next: establish the newly approved canonical product foundation, then improve scoped photographic feedback and the existing research path without claiming new live discoveries. Current source-network and paid-execution restrictions still apply.
+
+---
+
 # Review-first founder Studio — 2026-10-30 (America/New_York)
 
 Continued clean `6cc9921` under the new founder direction: usable review-first Studio, broad/current photographic sources and n8n orchestration. Existing examples are regression/history material. No source access, paid call, production mutation, credential binding, hosting or environment change was made.

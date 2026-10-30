@@ -6,6 +6,10 @@ Verify a copy with `npm run workspace:backup -- --verify .local/backups/<backup-
 
 Each database snapshot is consistent. The databases and cached source file are not one global transaction; stop the app before backup when a fully quiescent copy is needed. Immutable media are copied after database snapshots. Failed copies remain available for investigation and do not replace earlier backups.
 
-For recovery, stop the app, verify the chosen backup, and rename the current `.local/workspace` to a preserved sibling directory. Copy the verified backup contents into a new `.local/workspace`, then restart using `npm run workspace:local`. Keep the previous directory until the recovered drafts, decisions and previews have been inspected. The manifest may remain beside the restored files. Do not copy old WAL/SHM files into the restored workspace.
+This backs up private local state, not production n8n or Buffer. Environment credentials and `.local/engine-build/development-connection.json` are separate and are not included. Keep that existing private configuration separately if moving machines; never put it or these backups in GitHub. Backups can contain sensitive source references and must remain private.
 
-This backs up private local state, not production n8n or Buffer. Environment credentials and `.local/engine-build/development-connection.json` are separate and are not included. Keep that existing private configuration separately if moving machines; never put it or these backups in GitHub. No automatic restore or overwriting command is provided.
+## Verified restore command
+
+Stop all Studio processes, extract a private backup to a separate folder, then run `npm run workspace:restore -- "path/to/backup-folder"`. The folder must contain `backup-manifest.json`. The command verifies the inventory/hashes, copies to private staging, checks SQLite integrity on disposable copies (avoiding WAL changes to verified bytes), and verifies staging again. Existing work is renamed to a preserved sibling directory before the verified copy takes its place. No old workspace is automatically deleted.
+
+Possibly open/unrecovered WAL/SHM files block restore; a source backup inside the destination workspace is rejected. Each database is consistent, but the complete workspace is not a cross-database transaction. Backups of restored work exclude the old manifest so it cannot accidentally include/checksum itself. Keep private bundles and source data out of GitHub.
