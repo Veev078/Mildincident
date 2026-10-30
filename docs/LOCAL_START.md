@@ -1,3 +1,20 @@
+# Open the current Studio
+
+On your own computer, with Node **24.17+ within Node 24**, open the project folder in a terminal:
+
+```sh
+npm ci
+npm run studio:open
+```
+
+The launcher uses the verified `workspace:local` command, waits for the private Studio health check, and opens your default browser at **http://localhost:4174/**. Keep the terminal open; Ctrl+C stops it. On a computer without a desktop browser, it prints the URL instead. `npm run studio:open -- --no-open` starts without attempting to open a browser. `npm run workspace:local` remains supported.
+
+This URL works on the computer running the command. It is not an externally accessible Codex cloud preview. No public hosting was deployed. First-run source data may be absent: the app then shows honest empty states, never example stories. Restore your verified private workspace backup to review cached research/drafts without n8n credentials; see [private backup/recovery](PRIVATE_BACKUP.md). Existing credentials stay server-side. Launching does not mutate production n8n/Buffer or authorize model calls. The recovered cloud connection is explicitly read-only and never queues/dispatches generation.
+
+The new home screen opens the founder review queue. Choose **Existing stories** or **Recovered history** for older material; these are not newly discovered proposals. **Develop** opens the existing editor; **Save**, **Pass**, **Explore** and **Find alternatives** store private decisions. Alternatives/research actions prepare a brief, not a paid run.
+
+---
+
 # Open MILDINCIDENT on your computer
 
 1. Install **Node.js 24.19.0** from https://nodejs.org/download/release/v24.19.0/ (Windows/macOS installer for your computer). It includes npm. Restart your terminal after installation. Confirm `node --version` prints `v24.19.0`.
