@@ -94,6 +94,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       }
       if(url.pathname==='/api/photography/hunts'&&request.method==='POST'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request);photography.indexNative(source.snapshot);const hunt=photography.create(input);json(response,201,{hunt,productionApplied:false});return;}
       const photoRoute=url.pathname.match(/^\/api\/photography\/(hunts|decisions)\/([^/]+)$/);
+      if(photoRoute&&photoRoute[1]==='hunts'&&request.method==='GET'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');json(response,200,{hunt:photography.get(decodeURIComponent(photoRoute[2]),Number(url.searchParams.get('offset')||0))});return;}
       if(photoRoute&&request.method==='POST'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request),id=decodeURIComponent(photoRoute[2]);if(photoRoute[1]==='decisions'){json(response,200,photography.decide(id,input));return;}const hunt=await photography.resume(id,input.pages??1);json(response,200,{hunt,productionApplied:false,rightsGranted:false});return;}
       if (url.pathname === '/api/workspace' && request.method === 'GET') { json(response, 200, view()); return; }
       if (url.pathname === '/api/research/requests' && request.method === 'POST') {

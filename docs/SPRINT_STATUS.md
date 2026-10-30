@@ -1,3 +1,23 @@
+# MILDINCIDENT 2.0 photographic research — 2026-10-30 UTC
+
+Resumed the clean, verified remote `16cd1f5` on `development/photography-review-20261029`. Both supplied master TXT and Muse PDF were read; the master governs. There were no recoverable interrupted edits or private `.local` files in this environment. Baseline was **205 passing tests**, not the previously reported 210. Do not claim earlier private Wendy/Deneuve working revisions/photos are restored. Their native records/workflow history were not modified; restoring older local revisions requires the founder's private backup.
+
+Pushed `358d64c`: reconstructed the necessary native rights compatibility from read-only active workflow code. Native package review is `reviewed`; per-image human review markers/exception fields must agree with native status. Generic `cleared` alone is insufficient. Parsing never grants rights or changes a production row. Derived evidence is excluded from the historical source-revision hash.
+
+Pushed `ebca1fd`: private photographic research extends the existing research SQLite database and Discovery desk. Seven exploration modes, resumable source pages, exact source IDs, append-only metadata/decision history, parent trails, 24-hour successful-page cache, separate uncertainty dimensions and existing creative-brief handoff. Specific-photo taste feedback informs future local job context without blacklisting its entire subject. Actual private uploads receive versioned dHash/pHash fingerprints; resemblance warnings never merge, reject or establish identity, taste or rights. No visual AI was called.
+
+Current pagination increment exposes every saved page (100 records/contact sheet) rather than stranding records after the first 100. Switching trails rehydrates the selected page. Disconnected Studio opens private research with no invented stories. **216 automated tests, 35 Chromium workflows and syntax checks passed**; browser errors and production writes: zero. Fixtures are explicitly labeled. Pixel tests use generated images, not editorial photographs.
+
+One authorized read-only source refresh recovered a current cache of **18 native stories / 264 media records / 11 Buffer records**. Private demonstrations in `.local/recovery/photographic-demo-v2.json`: Nicholson/1969 dossier context (21 references, including LIFE/TIME), Batcave (21), New York (10), and Shoichi Aoki (one FRUiTS No. 002 source record). These are existing native references, not newly fetched complete shoots or verified depictions. Credits remain unknown/unverified where applicable. Native discovery dates are not photograph dates. No claim of better photographic quality can be made without inspecting the actual frames.
+
+Public-source retrieval is **blocked by the current environment network policy** (LOC request rejected at proxy tunnel with 403). Commons, LOC and AIC adapters are schema/fixture-tested but NOT live-verified coverage. LOC general photographs API is explicitly partial, not complete PPOC. No policy bypass or environment changes were made. Source APIs/image hosts need reviewed network access before live retrieval tests. n8n and Buffer remain the sole production authority; no paid calls, workflow edits/activation, remote data mutations, scheduling, hosting or publication occurred.
+
+Launch: Node 24.17+ (<25), `npm ci`, then `npm run workspace:local`; existing private loopback Studio uses port 4174. Credentials stay server-side. The runtime command can refresh fixed read-only n8n/Buffer sources; without credentials/cache the research desk still opens. A localhost address is not a cloud browser-accessible preview; use an explicitly supported forwarded preview or run locally. No deployment was authorized.
+
+Next: verify live archive retrieval only after network access is available; inspect real frames and credits with founder taste decisions; restore older private working state from a verified backup if available. Production rights/approvals, shared native atomic claim semantics and native import activation remain separate, unapproved work (see PRODUCTION_BRIDGE.md / PRODUCTION_REVIEW.md). Do not rerun consumed paid generation approvals.
+
+---
+
 # Production integration checkpoint — 2026-10-29 (America/New_York)
 
 Continued7467b6c. First incrementa1e082e adds exact-ID production projection, Publishing package/approval/export/proof/handoff view, guarded/manual provider references and local production-review JSON download. Contract: PRODUCTION_BRIDGE.md; implementation production-bridge.js. Existing n8n tables remain authoritative; development candidates cannot acquire a native package merely through the virtual Studio adapter. No production importer or competing release coordinator exists.
