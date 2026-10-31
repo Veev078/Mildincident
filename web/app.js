@@ -1,3 +1,4 @@
+import {DEFAULT_DISCOVERY_PROMPT} from './discovery-request.js';
 import { esc, date, human, storyUrl, effective, mediaFor, proposalContent } from './components.js';
 import * as views from './views.js';
 import {sourceResearchBrief} from './sources.js';
@@ -404,7 +405,7 @@ document.addEventListener('click', event => {
     case 'rehearse-step': if (rehearsal) showRehearsal(storyById(rehearsal.storyId), rehearsal.index + Number(button.dataset.step), rehearsal.fit); break;
     case 'prepare-discovery':
       button.disabled = true;
-      createResearchRequest({kind:'discovery',prompt:'Discover fresh photographic cultural proposals under the actual n8n editorial preset. Explore independent photographers, contemporary editorial publications, fashion, music, nightlife, youth culture and original photographic series across current and historical contexts. Compare distinct source-supported leads. Do not recycle prior demonstration subjects or default to institutional archives; use archives selectively. Preserve source provenance, uncertainty and specific cultural payoff.',sourceUrl:''}).catch(error=>toast(error.message,{error:true})).finally(()=>{button.disabled=false;}); break;
+      createResearchRequest({kind:'discovery',prompt:DEFAULT_DISCOVERY_PROMPT,sourceUrl:''}).catch(error=>toast(error.message,{error:true})).finally(()=>{button.disabled=false;}); break;
     case 'reload': loadWorkspace().catch(() => {}); break;
     case 'refresh': refreshSource(); break;
     case 'close-toast': document.querySelector('#toast').hidden = true; break;
@@ -641,11 +642,12 @@ async function createResearchRequest(input) {
   state[keyField] = null;
   if (input.kind==='brief') state.researchDraft = {};
   if(route().view==='home')location.hash='#/discovery';
-  if (!state.workspace.researchRequests.some(r=>r.id===result.request.id)) state.workspace.researchRequests.unshift(result.request);
+  const reused=state.workspace.researchRequests.some(r=>r.id===result.request.id);
+  if (!reused) state.workspace.researchRequests.unshift(result.request);
   render();
   await loadWorkspace({quiet:true}).catch(()=>{});
-  toast('Direction saved. Research has not started.');
-  document.querySelector(`[data-request-id="${result.request.id}"]`)?.scrollIntoView({block:'center'});
+  toast(reused?'Existing unstarted direction retained. Research has not started.':'Direction saved. Research has not started.');
+  document.querySelector(`[data-request-id="${result.request.id}"]`)?.closest('.research-activity-row')?.scrollIntoView({block:'center'});
 }
 document.addEventListener('click', async event=>{
   const button=event.target.closest('[data-engine-action]');if(!button||button.disabled)return;

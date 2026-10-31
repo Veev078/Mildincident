@@ -1,3 +1,13 @@
+# V11 — Discover checkpoint — October 31, 2026 (America/New_York)
+
+Restored the required development branch from GitHub and verified HEAD exactly matched `6e1d3d86299a4120c11467f1fd8bc8320bb5f83d` before implementation. Discover now separates actual proposals from compact Research activity. Equivalent historical unstarted defaults group visually with every record retained. New default saves reuse only opted-in unstarted requests with identical source/local revision context; durable aliases preserve idempotent retries. Native imports, custom briefs, continuations and started/history records keep their identities. Saved, uncertain, queued, running, received, reviewable, failed and recovered outcomes are distinct; saving never queues research.
+
+Validation: 318 automated tests passed with loopback execution permission, five new Chromium Discover workflows at 1366×768 / 1440×900 / 390×844, zero browser errors/remote writes/paid calls. Six historical duplicate cards become one compact row, zero prompts visible by default, all six records retained. Before/after proof is private under `.local/v11/`; synthetic interaction images are explicitly labeled. Plain sandbox denied loopback, causing a Node internal assertion; the authorized network-enabled rerun passed without a package change.
+
+Read-only current source recovery into a separate proof store returned 18 native stories, 264 media references, 13 Buffer records and two recovered historical research results. All 40 selected references have preview URLs; 32 other media lack URLs. External preview hosts are outside this cloud's current allowlist, so no real photograph pixels were inspected. No settings were changed. Existing native worker remains inactive/read-only; generation unavailable. Further V11 workspace/readiness work follows this checkpoint. No deployment, publishing, production mutation or paid call.
+
+---
+
 # Return-to-work continuity — October 30, 2026 (America/New_York)
 
 Verified/pushed photographic refinement0937ba0. Continued with Today: Continue working now orders by actual private draft-save/current founder-decision timestamps, with invalid/missing times left unknown. It does not infer activity from native row order, publication dates or model updates. Saved work can resume the actual story stage visited in this open browser tab; stale drafts still lead to source comparison. This stage preference is memory-only, not cross-browser/restart persistence; underlying drafts/reviews remain durable. Saved/Passed toasts provide direct actions to their persisted review queues. Reported photographer/series trails now remain visible in source details even if the source caption is absent.

@@ -121,7 +121,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       if (url.pathname === '/api/research/requests' && request.method === 'POST') {
         requireThat(research, 'RESEARCH_UNAVAILABLE', 'The private research request store is unavailable.');
         const input = await body(request); const workspace = view();
-        json(response, 201, { request: research.create(input, workspace.stories), scope: 'local_only', productionApplied: false }); return;
+        json(response, 201, { request: research.create(input, workspace.stories, {reuseDefault:true}), scope: 'local_only', productionApplied: false }); return;
       }
       if (url.pathname === '/api/research/engine/refresh' && request.method === 'POST') {
         requireThat(engine,'ENGINE_NOT_CONFIGURED','Private development engine connection is unavailable.');

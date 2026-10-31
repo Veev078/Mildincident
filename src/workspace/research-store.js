@@ -5,6 +5,7 @@ import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {requireThat} from '../errors.js';
 import {browserUrl} from './model.js';
+import {defaultDiscoveryKey} from '../../web/discovery-request.js';
 
 const ORIGIN='https://rickywelch.app.n8n.cloud';
 export class LocalResearchStore {
@@ -12,6 +13,8 @@ export class LocalResearchStore {
     this.db=new DatabaseSync(filename);this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA synchronous=FULL;
       CREATE TABLE IF NOT EXISTS research_requests(id TEXT PRIMARY KEY,kind TEXT NOT NULL,prompt TEXT NOT NULL,source_url TEXT NOT NULL,baseline_json TEXT NOT NULL,created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS research_request_events(request_id TEXT NOT NULL,version INTEGER NOT NULL,event TEXT NOT NULL,story_id TEXT,created_at TEXT NOT NULL,PRIMARY KEY(request_id,version));
+      CREATE TABLE IF NOT EXISTS research_request_equivalence(request_id TEXT PRIMARY KEY,default_key TEXT NOT NULL,baseline_context TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS research_request_aliases(idempotency_key TEXT PRIMARY KEY,request_id TEXT NOT NULL,kind TEXT NOT NULL,prompt TEXT NOT NULL,source_url TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS research_delivery_state(id INTEGER PRIMARY KEY CHECK(id=1),data_json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS research_continuations(request_id TEXT PRIMARY KEY,context_json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS research_engine_jobs(request_id TEXT PRIMARY KEY,request_hash TEXT NOT NULL,state TEXT NOT NULL,version INTEGER NOT NULL,data_json TEXT NOT NULL,updated_at TEXT NOT NULL);
@@ -27,16 +30,42 @@ export class LocalResearchStore {
       continuation:JSON.parse(this.db.prepare('SELECT context_json FROM research_continuations WHERE request_id=?').get(row.id)?.context_json||'null'),engineJob:this.engineJob(row.id),executionConfirmed:false,productionApplied:false};
   }
   all(){return this.db.prepare('SELECT id FROM research_requests ORDER BY rowid DESC LIMIT 100').all().map(row=>this.get(row.id));}
-  create(input,stories){requireThat(input&&Object.keys(input).every(k=>['kind','prompt','sourceUrl','idempotencyKey'].includes(k)),'INVALID_RESEARCH_REQUEST','Unsupported research request fields.');
+  create(input,stories,{reuseDefault=false}={}){requireThat(input&&Object.keys(input).every(k=>['kind','prompt','sourceUrl','idempotencyKey'].includes(k)),'INVALID_RESEARCH_REQUEST','Unsupported research request fields.');
     requireThat(['discovery','brief'].includes(input.kind),'INVALID_RESEARCH_REQUEST','Choose discovery or creative brief.');
     const prompt=String(input.prompt||'').trim();requireThat(prompt.length>=12&&prompt.length<=2000&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(prompt),'INVALID_RESEARCH_REQUEST','Use a direction between 12 and 2000 characters.');
     const sourceUrl=String(input.sourceUrl||'').trim();requireThat(!sourceUrl||browserUrl(sourceUrl),'INVALID_RESEARCH_REQUEST','Use an HTTPS source link without credentials.');
     requireThat(input.idempotencyKey === undefined || typeof input.idempotencyKey === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(input.idempotencyKey), 'INVALID_RESEARCH_REQUEST', 'Use a valid local request identity.');
     const id=input.idempotencyKey || randomUUID();
-    this.db.prepare('INSERT OR IGNORE INTO research_requests VALUES(?,?,?,?,?,?)').run(id,input.kind,prompt,sourceUrl,JSON.stringify(stories.map(s=>s.id)),new Date().toISOString());
-    const result=this.get(id);
-    requireThat(result.kind===input.kind && result.prompt===prompt && result.sourceUrl===sourceUrl, 'EDIT_CONFLICT', 'This request identity belongs to a different brief. Preserve it and create a new request.');
-    return result;
+    // The write lock covers lookup, reuse and alias binding across connections.
+    // Nested callers already own the private review/continuation transaction.
+    const outer=!this.db.isTransaction;
+    this.db.exec(outer?'BEGIN IMMEDIATE':'SAVEPOINT create_research_request');
+    try{
+      const alias=this.db.prepare('SELECT * FROM research_request_aliases WHERE idempotency_key=?').get(id),existing=this.get(id);
+      if(existing||alias){
+        const identity=existing||{kind:alias.kind,prompt:alias.prompt,sourceUrl:alias.source_url};
+        requireThat(identity.kind===input.kind&&identity.prompt===prompt&&identity.sourceUrl===sourceUrl,'EDIT_CONFLICT','This request identity belongs to a different brief. Preserve it and create a new request.');
+        const result=existing||this.get(alias.request_id);
+        requireThat(result,'EDIT_CONFLICT','The original request is unavailable. Preserve this request identity.');
+        this.db.exec(outer?'COMMIT':'RELEASE create_research_request');return result;
+      }
+      const defaultKey=reuseDefault?defaultDiscoveryKey({kind:input.kind,prompt,sourceUrl}):null;
+      const baselineContext=JSON.stringify(stories.map(s=>[s.id,s.revision??null,s.localDraft?.version??0]).sort((a,b)=>a[0].localeCompare(b[0])));
+      const equivalent=defaultKey?this.db.prepare(`SELECT r.id FROM research_requests r JOIN research_request_equivalence q ON q.request_id=r.id
+        WHERE q.default_key=? AND q.baseline_context=?
+        AND NOT EXISTS(SELECT 1 FROM research_request_events e WHERE e.request_id=r.id)
+        AND NOT EXISTS(SELECT 1 FROM research_engine_jobs j WHERE j.request_id=r.id)
+        AND NOT EXISTS(SELECT 1 FROM research_engine_events h WHERE h.request_id=r.id)
+        AND NOT EXISTS(SELECT 1 FROM research_continuations c WHERE c.request_id=r.id)
+        ORDER BY r.rowid DESC LIMIT 1`).get(defaultKey,baselineContext):null;
+      if(equivalent){
+        if(input.idempotencyKey)this.db.prepare('INSERT INTO research_request_aliases VALUES(?,?,?,?,?)').run(id,equivalent.id,input.kind,prompt,sourceUrl);
+        const result=this.get(equivalent.id);this.db.exec(outer?'COMMIT':'RELEASE create_research_request');return result;
+      }
+      this.db.prepare('INSERT INTO research_requests VALUES(?,?,?,?,?,?)').run(id,input.kind,prompt,sourceUrl,JSON.stringify(stories.map(s=>s.id)),new Date().toISOString());
+      if(defaultKey)this.db.prepare('INSERT INTO research_request_equivalence VALUES(?,?,?)').run(id,defaultKey,baselineContext);
+      const result=this.get(id);this.db.exec(outer?'COMMIT':'RELEASE create_research_request');return result;
+    }catch(error){this.db.exec(outer?'ROLLBACK':'ROLLBACK TO create_research_request');if(!outer)this.db.exec('RELEASE create_research_request');throw error;}
   }
   createPhotoContinuation(story,input,stories){
     const {request,continuation}=preparePhotoContinuation(story,input),encoded=JSON.stringify(continuation);
