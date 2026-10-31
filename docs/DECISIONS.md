@@ -1,5 +1,13 @@
 # Consequential product decisions
 
+## 2026-10-31 — V11 editorial activities and preserved native authority
+
+Founder requested an implementation sprint on the verified development branch, superseding the preceding connection-only check. Discover presents actual proposals; research instructions are compact activity records. Reuse only explicitly enrolled, equivalent unstarted defaults with identical observed source/local revisions. Preserve original request records; retry aliases cannot remap authoritative native job identities. Historical imported results remain historical, and uncertain queue/start observations never imply confirmed execution.
+
+Opening a story now joins photographs, sequence, caption, natural-language direction and readiness in one Develop working copy. Three unnumbered activities replace five rigid stages; all eight legacy routes and advanced brief values remain. The founder's optional instruction uses existing creativeBrief.notes, autosaves with optimistic versions/history, and freezes into future exact-photograph continuation context. Continue drains pending saves before acknowledgement. Native prompt changes are local/offline only, not a staged worker or a paid execution.
+
+Today prioritizes current creative work and deduplicates decisions. Readiness groups redundant reported requirements while retaining raw codes/evidence and independent factual, permission and final-native-approval observations. An editorial exception is not displayed as recorded image permission. Preview-bearing existing references improve presentation without altering selected order or claiming loaded pixels. No image proxy, second backend, auth change, production writer, deployment or environment change was introduced. Real source snapshots and labeled synthetic browser proof remain distinct.
+
 ## 2026-10-30 — Canonical direction with implementation evidence kept separate
 
 Founder intent: continue the existing system toward an autonomous cultural editorial Studio; no reset. The supplied constitution's draft/pending footer conflicts with the current explicit approval as strategic direction. Adopt v1 at PRODUCT_CONSTITUTION.md with that approval recorded; retain the architectural targets and boundaries. PRODUCT_MAP.md maps actual owners, native identities, maturity and acceptance evidence; SPRINT_STATUS.md remains the sole live checkpoint. Older audits/research stay dated historical evidence. Owner: repository engineering/founder product direction. No deployment or operational permission follows from document adoption.

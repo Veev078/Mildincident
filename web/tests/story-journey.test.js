@@ -7,12 +7,12 @@ import {workspaceSnapshot} from '../../test/helpers/workspace-fixture.js';
 const state={workspace:{hosted:true},compared:[]};
 const story=()=>buildWorkspace(workspaceSnapshot()).stories[0];
 
-test('five story stages retain every existing deep link and select the appropriate stage',()=>{
+test('three story activities retain every existing deep link without numbered creative assignments',()=>{
  const original=story(),before=JSON.stringify(original);
- for(const [tab,stage] of [['overview','Understand'],['research','Understand'],['images','Images'],['direction','Angle'],['caption','Edit'],['carousel','Edit'],['music','Edit'],['publishing','Check']]){
-  const html=storyWorkspace(state,original,tab),primary=html.match(/<nav class="story-stages"[^>]*>([\s\S]*?)<\/nav>/)[1];
-  assert.equal((primary.match(/<a /g)||[]).length,5);
-  assert.match(primary,new RegExp('aria-current="step"><small aria-hidden="true">0[1-5]</small>'+stage));
+ for(const [tab,stage] of [['overview','Develop'],['research','Review'],['images','Photographs'],['direction','Develop'],['caption','Develop'],['carousel','Develop'],['music','Develop'],['publishing','Review']]){
+  const html=storyWorkspace(state,original,tab),primary=html.match(/<nav class="story-stages story-activities"[^>]*>([\s\S]*?)<\/nav>/)[1];
+  assert.equal((primary.match(/<a /g)||[]).length,3);
+  assert.match(primary,new RegExp('aria-current="page">'+stage));
   assert.ok(html.includes(`href="#/story/${original.id}/${tab}" aria-current="page"`));
  }
  assert.equal(JSON.stringify(original),before);
@@ -21,7 +21,8 @@ test('five story stages retain every existing deep link and select the appropria
 test('story overview leads with actual references and preserves private notes, working caption and source details',()=>{
  const original=story();original.localDraft={version:1,caption:'Working caption stays preserved',notes:'An unfinished angle'};
  const html=storyWorkspace(state,original,'overview');
- assert.ok(html.indexOf('class="story-premise')<html.indexOf('Before publishing</summary>'));
+ assert.ok(html.indexOf('class="develop-visual')<html.indexOf('class="develop-review'));
+ assert.ok(html.includes('aria-label="Local caption draft"'));assert.ok(html.includes('aria-label="Your direction"'));
  assert.match(html,/An unfinished angle/);assert.match(html,/Working caption stays preserved/);
  assert.match(html,/Story details &amp; version history|Story details & version history/);
  assert.match(html,/data-action="draft-history"/);assert.match(html,/data-proposal-for=/);

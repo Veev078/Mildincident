@@ -1,3 +1,18 @@
+# V11: manually update the existing service only
+
+After reviewing the tested SHA supplied with the V11 release:
+
+1. Download a verified private backup from the existing Studio and keep an offsite copy. Preserve the persistent disk, authentication databases, draft/research histories and current environment variables.
+2. Open the **existing** MILDINCIDENT Render Web Service. Confirm the development branch is `development/photography-review-20261029` and auto-deploy remains off.
+3. Choose **Manual Deploy → Deploy a specific commit**, using the exact final verified SHA. If only Deploy latest commit is offered, first confirm the branch still points at that SHA. Do not apply the Blueprint or create another service.
+4. Verify Live/health, sign-in and a separate unauthenticated browser (private API must return 401). Check Discover's honest empty/history views and compact activity; open an existing story, save direction/caption/order, refresh and sign out/in to confirm persistence. Check readiness and existing provider IDs without sending anything.
+5. Preserve n8n read-only delivery and generation-disabled behavior. These local changes do not require workflow activation, new secrets or a Buffer operation. The added research-equivalence tables initialize additively; original records are retained.
+6. If rollback is needed, manually redeploy the prior known working code commit while preserving the disk and histories. Do not restore or overwrite databases against a running process; follow the established stopped-writer restore procedure only if data recovery is separately needed.
+
+This is a manual procedure for the existing service, **not a deployment performed by Codex**. The older initial-provisioning material below is historical setup guidance, not a direction to recreate a service during V11.
+
+---
+
 # Existing Render service: login patch deployment
 
 The founder now reports a running Render service with a login CSRF failure. The section below preserves the earlier pre-deployment assessment as historical context. This patch has been verified with isolated fixtures, not deployed by Codex.

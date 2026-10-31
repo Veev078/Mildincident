@@ -66,7 +66,7 @@ try{
    await page.goto(app.origin+'/#/'+route);await page.locator('h1').waitFor();assert.ok((await page.locator('h1').innerText()).length);
   }
   const id='CON-EXISTING-01';for(const tab of ['overview','research','images','direction','carousel','caption','music','publishing']){
-   await page.goto(app.origin+'/#/story/'+id+'/'+tab);await page.locator('h1').waitFor();assert.equal(await page.getByRole('navigation',{name:'Story stages',exact:true}).locator('a').count(),5);
+   await page.goto(app.origin+'/#/story/'+id+'/'+tab);await page.locator('h1').waitFor();assert.equal(await page.getByRole('navigation',{name:'Story stages',exact:true}).locator('a').count(),3);
   }
   checks.push('modern navigation aliases and every legacy story deep link remain usable');
   await page.goto(app.origin+'/#/story/'+id+'/caption');await page.getByLabel('Local caption draft').fill('Synthetic revision retained after reopening the creative workspace.');

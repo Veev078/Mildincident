@@ -57,6 +57,8 @@ function rememberFocus() {
 }
 
 function render({ focusMain = false } = {}) {
+  state.openDisclosures ||= {};
+  for(const node of document.querySelectorAll('[data-remember-disclosure]')) state.openDisclosures[node.dataset.rememberDisclosure]=node.open;
   const focus = rememberFocus();
   const current = route();
   if(current.view==='story'&&storyById(current.id))state.lastStoryTabs[current.id]=['overview','research','images','direction','caption','carousel','music','publishing'].includes(current.tab)?current.tab:'overview';
@@ -167,9 +169,10 @@ async function flushDraft(id) {
       if (result.musicRecommendations) current.musicRecommendations = result.musicRecommendations;
       if (result.editorialDirection) current.editorialDirection = result.editorialDirection;
       if (result.editorialAudit) { current.editorialAudit=result.editorialAudit;const notice=document.querySelector('[data-editorial-audit]');if(notice&&route().id===id)notice.innerHTML=views.editorialAuditNotice(current); }
-      if (result.readiness) {current.readiness=result.readiness;const panel=document.querySelector('[data-readiness-panel]');if(panel&&route().id===id)panel.innerHTML=views.readinessPanel(current);}
+      if (result.readiness) current.readiness=result.readiness;
       if(result.productionDecisions)current.productionDecisions=result.productionDecisions;
       if(result.productionPreparation){current.productionPreparation=result.productionPreparation;const panel=document.querySelector('[data-production-visibility]');if(panel&&route().id===id)panel.innerHTML=views.productionVisibility(current);}
+      if (result.readiness) {const panel=document.querySelector('[data-readiness-panel]');if(panel&&route().id===id)panel.innerHTML=views.readinessPanel(current);}
       if (result.sourceSequencePlan) current.sourceSequencePlan=result.sourceSequencePlan;
       const sequenceIssues = document.querySelector('[data-direction-sequence-issues]');
       if (sequenceIssues && route().id === id) sequenceIssues.innerHTML = directionSequenceObservations(current);
@@ -461,6 +464,25 @@ document.addEventListener('click', event => {
       editDraft(story.id, { selectedAssetIds: selected }, { rerender: true, immediate: true });
       announce(index >= 0 ? 'Image removed from local sequence.' : 'Image added to local sequence. Rights are unchanged.');
       break;
+    }
+    case 'save-direction': {
+      if(!story||story.localDraft?.stale)break;
+      button.disabled=true;
+      flushAllDrafts().then(saved=>{
+        if(saved){
+          if(route().id===story.id){location.hash=storyUrl(story.id,'overview');render();}
+          toast(effective(story).creativeBrief?.notes?.trim()?'Direction saved privately. No new material was generated.':'Continue editing the photographs and caption. No new material was generated.');
+        }
+      }).finally(()=>{button.disabled=false;});
+      break;
+    }
+    case 'make-opening': {
+      if(!story||story.localDraft?.stale)break;
+      const selected=[...effective(story).selectedAssetIds],index=selected.indexOf(button.dataset.asset);
+      if(index<=0)break;
+      selected.unshift(...selected.splice(index,1));
+      editDraft(story.id,{selectedAssetIds:selected},{rerender:true,immediate:true});
+      announce('Opening photograph changed. Image order saves privately.');break;
     }
     case 'move-slide': {
       if (!story) break;
@@ -796,7 +818,7 @@ document.addEventListener('click',event=>{const button=event.target.closest('[da
 document.addEventListener('submit',async event=>{
  const form=event.target.closest('[data-founder-review]');if(!form)return;event.preventDefault();const decision=event.submitter?.value;if(!decision)return;for(const b of form.querySelectorAll('button'))b.disabled=true;
  try{const fields=new FormData(form);const result=await api('/api/editorial/reviews/'+encodeURIComponent(form.dataset.founderReview),{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({decision,basis:fields.get('basis'),reason:fields.get('reason')||'',dimensions:fields.getAll('dimension'),...(fields.get('basis')==='individual_photograph'?{assetId:form.dataset.asset,previewSha256:form.dataset.previewHash}:{}),expectedVersion:Number(form.dataset.version),sourceRevision:form.dataset.revision,workingVersion:Number(form.dataset.working)})});
-  await loadWorkspace({quiet:true});if(decision==='develop')location.hash='#/story/'+encodeURIComponent(form.dataset.founderReview)+'/direction';toast(result.followUp?'Decision and research direction saved. Research has not started.':({save:'Saved to Discover → Saved / developing.',pass:'Passed. You can reconsider it in Discover → Passed.',develop:'Saved. Continue developing the angle.',reset:'Returned to the review queue.'}[decision]||'Editorial decision saved.'),{reviewFilter:decision==='save'?'saved':decision==='pass'?'passed':null});
+  await loadWorkspace({quiet:true});if(decision==='develop')location.hash='#/story/'+encodeURIComponent(form.dataset.founderReview)+'/overview';toast(result.followUp?'Decision and research direction saved. Research has not started.':({save:'Saved to Discover → Saved / developing.',pass:'Passed. You can reconsider it in Discover → Passed.',develop:'Saved. Continue developing the story.',reset:'Returned to the review queue.'}[decision]||'Editorial decision saved.'),{reviewFilter:decision==='save'?'saved':decision==='pass'?'passed':null});
  }catch(error){toast(error.message,{error:true});}finally{for(const b of form.querySelectorAll('button'))b.disabled=false;}
 });
 

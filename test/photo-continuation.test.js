@@ -44,3 +44,34 @@ test('returned development research links to its exact parent without acquiring 
  const candidate={id:'DEV-418e3861-610b-400a-9cc6-e0635ce6003d-1',jobId:'418e3861-610b-400a-9cc6-e0635ce6003d',title:'Synthetic returned research branch',subject:story.subject,format:'single_image',captionDraft:'Fixture only',claims:[],media:[],gaps:[],provenance:{kind:'brief',executionId:'fixture',generatedAt:'2026-10-30T12:00:00Z'}};
  const before=JSON.stringify(story),returned=developmentCandidateStory(candidate,{continuation});assert.equal(returned.continuationOf.storyId,story.id);assert.equal(returned.continuationOf.assetId,'exact-frame');assert.notEqual(returned.id,story.id);assert.equal(returned.production.relationship,'not_linked');assert.equal(returned.production.package,null);assert.equal(JSON.stringify(story),before);
 });
+
+test('saved natural-language direction freezes with the exact working version, survives restart and reaches future native research without generation',async t=>{
+ const {root,store}=await setup(t),current=structuredClone(story);
+ const direction='Focus more on the unusual location than the movie itself.\nKeep the photographer’s recorded uncertainty.';
+ current.localDraft.creativeBrief={notes:direction};const before=JSON.stringify(current),value=input();
+ const saved=store.createPhotoContinuation(current,value,[current]);
+ assert.equal(saved.continuation.founderDirection,direction);assert.equal(saved.continuation.origin.workingVersion,2);assert.equal(JSON.stringify(current),before);
+ let queued,dispatches=0;const service=new EditorialEngineService({research:store,client:{queue:async request=>(queued=structuredClone(request),{id:1,status:'queued'}),dispatch:async()=>{dispatches++;}},sourceLeads:()=>[]});
+ await service.queue(saved.id);assert.equal(dispatches,0);assert.equal(queued.editorialContext.continuation.founderDirection,direction);
+ const frozenHash=store.engineJob(saved.id).requestHash;assert.equal(requestFingerprint(queued),frozenHash);
+ const branches=[{json:{territory:'photography',instructions:'Native foundation',userPrompt:'Investigate the requested subject',avoid:[],diversity:{selected_seed_preset:'native-photo'}}}];
+ const planned=planDevelopmentResearch(branches,[],{kind:'brief',prompt:saved.prompt,editorial_context_json:JSON.stringify(queued.editorialContext)})[0].json;
+ assert.ok(planned.userPrompt.includes(JSON.stringify(direction)));assert.match(planned.userPrompt,/saved editorial request/);assert.match(planned.userPrompt,/only where the sources support it/);assert.match(planned.userPrompt,/cannot override factual, rights, output or cost gates/);
+ current.localDraft.creativeBrief.notes='A later change must not rewrite an existing research context.';
+ assert.throws(()=>store.createPhotoContinuation(current,value,[current]),{code:'EDIT_CONFLICT'});
+ assert.equal(store.get(saved.id).continuation.founderDirection,direction);
+ const changed=structuredClone(queued);changed.editorialContext.continuation.founderDirection=current.localDraft.creativeBrief.notes;assert.notEqual(requestFingerprint(changed),frozenHash);
+ const reopened=new LocalResearchStore(path.join(root,'research.sqlite'));try{assert.equal(reopened.get(saved.id).continuation.founderDirection,direction);assert.equal(reopened.engineJob(saved.id).requestHash,frozenHash);}finally{reopened.close();}
+});
+
+test('research direction keeps original text and source URL within bounded context, with oversized or stale work rejected before a request is saved',async t=>{
+ const {store}=await setup(t),current=structuredClone(story);current.localDraft.creativeBrief={notes:'A specific source-supported direction. '.repeat(80)};
+ Object.assign(current.media[0],{sourceCaption:'c'.repeat(700),sourceCredit:'x'.repeat(400),sourceUrl:'https://publication.example/'+ 's'.repeat(1300),sourceResearchLinks:Array.from({length:2},(_,i)=>({kind:i?'photographer':'series',label:'l'.repeat(200),url:'https://publication.example/'+String(i).repeat(1300)}))});
+ const {continuation}=preparePhotoContinuation(current,input());assert.ok(JSON.stringify(continuation).length<=7000);assert.equal(continuation.founderDirection,current.localDraft.creativeBrief.notes);assert.equal(continuation.photograph.sourceUrl,current.media[0].sourceUrl);
+ const oversized=structuredClone(current);oversized.localDraft.creativeBrief.notes='📷'.repeat(4000);const original=JSON.stringify(oversized);
+ assert.throws(()=>store.createPhotoContinuation(oversized,input(),[oversized]),{code:'INVALID_PHOTO_CONTINUATION'});assert.equal(JSON.stringify(oversized),original);assert.equal(store.all().length,0);
+ const stale=structuredClone(current);stale.localDraft.stale=true;assert.throws(()=>store.createPhotoContinuation(stale,input(),[stale]),{code:'EDIT_CONFLICT'});assert.equal(store.all().length,0);
+ const branches=[{json:{instructions:'Native',userPrompt:'Native',avoid:[],diversity:{selected_seed_preset:'native'}}}];
+ for(const invalid of [true,{},'x'.repeat(4001),'bad\u0000direction'])assert.throws(()=>planDevelopmentResearch(branches,[],{kind:'brief',prompt:'Research this photograph',editorial_context_json:JSON.stringify({schemaVersion:1,feedback:[],continuation:{...continuation,founderDirection:invalid}})}),/INVALID_PHOTO_CONTINUATION/);
+ const legacy=preparePhotoContinuation(story,input()).continuation;assert.ok(!Object.hasOwn(legacy,'founderDirection'));assert.ok(planDevelopmentResearch(branches,[],{kind:'brief',prompt:'Existing legacy direction',editorial_context_json:JSON.stringify({schemaVersion:1,feedback:[],continuation:legacy})}));
+});

@@ -54,9 +54,16 @@ export function previewUrl(value) {
   if (typeof value === 'string' && /^\/api\/stories\/CON-[A-Za-z0-9_-]{1,120}\/assets\/[^/?#\\\s]+\/preview\?hash=[a-f0-9]{64}$/.test(value)) return value;
   return safeUrl(value);
 }
+// A cover reference, not a sequence edit or proof that the browser loaded pixels.
+// Prefer private preview references within each group before external references.
+export function leadPhoto(story) {
+  const selected=mediaFor(story),candidates=story.media||[];
+  const available=assets=>assets.find(asset=>previewUrl(asset.previewUrl).startsWith('/api/stories/'))||assets.find(asset=>previewUrl(asset.previewUrl));
+  return available(selected)||available(candidates)||selected[0]||candidates[0];
+}
 export function image(asset, { className = '', index, storyId, eager = false, compact = false } = {}) {
   const url = previewUrl(asset?.previewUrl);
-  return `<div class="photo ${compact?'compact-preview':''} ${esc(className)} ${url ? '' : 'no-preview'}">${url ? `<img src="${esc(url)}" alt="${esc(asset.title || 'Archival image candidate')}" loading="${eager ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer"><span class="preview-status" role="status">Loading preview…</span><button type="button" class="preview-retry small-button" data-action="retry-preview" hidden>${compact?'Retry':'Retry preview'}</button>` : `<span class="photo-placeholder"><span aria-hidden="true">◫</span><small>No preview available</small></span>`}${index !== undefined ? `<span class="photo-number">${String(index + 1).padStart(2, '0')}</span>` : ''}${storyId && asset ? `<button class="photo-expand" data-action="inspect" data-story="${esc(storyId)}" data-asset="${esc(asset.id)}" aria-label="Review provenance: ${esc(asset.title || 'image')}">↗</button>` : ''}</div>`;
+  return `<div class="photo ${compact?'compact-preview':''} ${esc(className)} ${url ? '' : 'no-preview'}">${url ? `<img src="${esc(url)}" alt="${esc(asset.title || 'Photographic reference')}" loading="${eager ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer"><span class="preview-status" role="status">Loading preview…</span><button type="button" class="preview-retry small-button" data-action="retry-preview" hidden>${compact?'Retry':'Retry preview'}</button>` : `<span class="photo-placeholder"><span aria-hidden="true">◫</span><small>No preview available</small></span>`}${index !== undefined ? `<span class="photo-number">${String(index + 1).padStart(2, '0')}</span>` : ''}${storyId && asset ? `<button class="photo-expand" data-action="inspect" data-story="${esc(storyId)}" data-asset="${esc(asset.id)}" aria-label="Review provenance: ${esc(asset.title || 'image')}">↗</button>` : ''}</div>`;
 }
 export function empty(title, message, action = '') { return `<div class="empty-state"><span aria-hidden="true">↳</span><h3>${esc(title)}</h3><p>${esc(message)}</p>${action}</div>`; }
 export function external(url, label, className = '') {
@@ -66,10 +73,10 @@ export function external(url, label, className = '') {
 export function sectionHeading(title, detail = '', action = '') { return `<div class="section-heading"><div><h2>${esc(title)}</h2>${detail ? `<p>${esc(detail)}</p>` : ''}</div>${action}</div>`; }
 export function storyCard(story, { compact = false, continueTab = null, savedAt = null } = {}) {
   const status = stateLabel(story);
-  const candidate = mediaFor(story)[0] || story.media?.[0];
+  const candidate = leadPhoto(story);
   const resume={overview:'Continue story',research:'Continue research',images:'Continue reviewing images',direction:'Continue the angle',caption:'Continue the caption',carousel:'Continue the sequence',music:'Continue sound direction',publishing:'Continue required checks'};
   const action={...nextAction(story),...(!story.localDraft?.stale&&Object.hasOwn(resume,continueTab)?{label:resume[continueTab],tab:continueTab}:{})};
-  return `<article class="story-card ${compact ? 'compact' : ''}"><a class="story-image-link" href="${storyUrl(story.id)}" aria-label="Open ${esc(story.title)}">${image(candidate, { eager: !compact })}</a><div class="story-card-copy"><div class="card-kicker"><span>${esc(story.subject || story.format || 'Editorial story')}</span>${badge(status.label, status.tone)}</div><h3><a href="${storyUrl(story.id)}">${esc(story.title)}</a></h3><p>${esc(story.hook || action.reason)}</p>${savedAt&&Number.isFinite(Date.parse(savedAt))?`<p class="story-saved-at">Saved ${esc(date(savedAt))} ET</p>`:''}<div class="card-foot"><span>${effective(story).selectedAssetIds.length} selected · ${esc(story.media?.length || 0)} candidates</span><a href="${storyUrl(story.id, action.tab)}">${esc(action.label)} <span aria-hidden="true">→</span></a></div></div></article>`;
+  return `<article class="story-card ${compact ? 'compact' : ''}"><a class="story-image-link" href="${storyUrl(story.id)}" aria-label="Open ${esc(story.title)}">${image(candidate, { eager: !compact })}</a><div class="story-card-copy"><div class="card-kicker"><span>${esc(story.recoveredHistory?'Recovered research · existing result':story.subject || story.format || 'Editorial story')}</span>${badge(status.label, status.tone)}</div><h3><a href="${storyUrl(story.id)}">${esc(story.title)}</a></h3><p>${esc(story.hook || action.reason)}</p>${savedAt&&Number.isFinite(Date.parse(savedAt))?`<p class="story-saved-at">Saved ${esc(date(savedAt))} ET</p>`:''}<div class="card-foot"><span>${effective(story).selectedAssetIds.length} selected · ${esc(story.media?.length || 0)} candidates</span><a href="${storyUrl(story.id, action.tab)}">${esc(action.label)} <span aria-hidden="true">→</span></a></div></div></article>`;
 }
 export function blockers(story) {
   return (story.blockers || []).length ? `<ul class="blocker-list">${story.blockers.map(item => `<li><span aria-hidden="true">○</span>${esc(human(typeof item === 'string' ? item : item.message || item.code))}</li>`).join('')}</ul>` : '<p class="muted">No additional package blockers reported. Publication approval and image rights still require review.</p>';

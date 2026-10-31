@@ -43,6 +43,9 @@ export class LocalResearchStore {
     try{
       const alias=this.db.prepare('SELECT * FROM research_request_aliases WHERE idempotency_key=?').get(id),existing=this.get(id);
       if(existing||alias){
+        // Native observations own their exact IDs. Only the opted-in Studio save
+        // may resolve an alias created by an earlier equivalent default save.
+        requireThat(!alias||reuseDefault,'EDIT_CONFLICT','This identity is a private save retry, not an authoritative research job. Preserve the original request.');
         const identity=existing||{kind:alias.kind,prompt:alias.prompt,sourceUrl:alias.source_url};
         requireThat(identity.kind===input.kind&&identity.prompt===prompt&&identity.sourceUrl===sourceUrl,'EDIT_CONFLICT','This request identity belongs to a different brief. Preserve it and create a new request.');
         const result=existing||this.get(alias.request_id);

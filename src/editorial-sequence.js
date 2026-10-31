@@ -3,8 +3,10 @@ export function buildSourceSequencePlan(story) {
   const selected=story.localDraft?.selectedAssetIds??story.selectedAssetIds??[];
   const related=(story.media||[]).filter(m=>m.sourceRelation==='subject_caption_match'&&m.sourceCaption&&m.localReview?.decision!=='reject');
   related.sort((a,b)=>{
-    const order=id=>selected.includes(id)?selected.indexOf(id):100;
-    return order(a.id)-order(b.id)||Number(a.materialType==='design_documentation')-Number(b.materialType==='design_documentation');
+    const order=id=>selected.includes(id)?selected.indexOf(id):Number.MAX_SAFE_INTEGER;
+    const preference=asset=>asset.localReview?.decision==='shortlist'?0:asset.localReview?.decision==='hold'?2:1;
+    // An explicit sequence remains the founder’s order. Feedback ranks only remaining eligible references.
+    return order(a.id)-order(b.id)||(selected.includes(a.id)?0:preference(a)-preference(b))||Number(a.materialType==='design_documentation')-Number(b.materialType==='design_documentation');
   });
   const seen=new Set();const distinct=related.filter(m=>{const key=m.sourcePreviewUrl||m.previewUrl||m.id;if(seen.has(key))return false;seen.add(key);return true;}).slice(0,6);
   const slide=(m,index,total)=>({assetId:m.id,caption:m.sourceCaption,credit:m.sourceCredit||m.creator||'',years:m.sourceYears||[],material:m.materialType||'source_reference',role:index===0?'question':index===total-1?'payoff':'context',note:`Source-caption proposal: ${m.sourceCaption}`.slice(0,500)});

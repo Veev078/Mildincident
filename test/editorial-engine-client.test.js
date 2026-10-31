@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';
 import {EditorialEngineClient,sanitizeDevelopmentCandidate,requestFingerprint} from '../src/workspace/editorial-engine-client.js';import {EditorialEngineService} from '../src/workspace/editorial-engine-service.js';import {LocalResearchStore} from '../src/workspace/research-store.js';import {WORKSPACE_TABLES} from '../src/workspace/model.js';
+import {DEFAULT_DISCOVERY_PROMPT} from '../web/discovery-request.js';
 const json=value=>new Response(JSON.stringify(value),{headers:{'Content-Type':'application/json'}});
 function fake(){const connection={jobsTableId:'devjobs',candidatesTableId:'devresults',editorialWorkerId:'devworker',headerName:'X-Mildincident-Development-Key',token:'synthetic-token-not-a-real-credential-123456',generationEnabled:false};
  const state={jobs:[],candidates:[],posts:0,dispatches:0,loseResponse:false,dispatchError:false,workerActive:false,wrongTables:false,executionStatus:'success'};
@@ -122,6 +123,17 @@ test('read-only inbox adopts correlated native results without JSON transfer and
  for(const id of [old,fresh]){const request={kind:'discovery',prompt:'Explore a new photographic cultural project',sourceUrl:''};f.state.jobs.push({id:f.state.jobs.length+1,job_id:id,kind:request.kind,prompt:request.prompt,source_url:'',status:'ready_to_review',execution_id:'1000',request_hash:requestFingerprint(request)});f.state.candidates.push({job_id:id,candidate_id:'DEV-'+id+'-1',status:'ready_to_review',candidate_json:JSON.stringify({id:'DEV-'+id+'-1',jobId:id,story:{subject:'Synthetic test — a new photographic project'},provenance:{kind:'discovery',executionId:'1000',generatedAt:new Date().toISOString()}})});}
  const client=new EditorialEngineClient({connection:{...f.connection,mode:'read_only',historyJobIds:[old]},apiKey:'synthetic-api-key',fetchImpl:f.client.fetchImpl});const service=new EditorialEngineService({research:f.research,client});await service.refresh();assert.equal(f.research.all().length,2);assert.equal(f.research.engineJob(old).recoveredHistory,true);assert.equal(f.research.engineJob(fresh).recoveredHistory,false);await service.refresh();assert.equal(f.research.all().length,2);assert.equal(f.state.posts,0);assert.equal(f.state.dispatches,0);await assert.rejects(service.queue(old),{code:'ENGINE_READ_ONLY'});
  f.state.jobs[1].request_hash='wrong';await assert.rejects(service.refresh(),{code:'INVALID_ENGINE_RESULT'});assert.equal(f.research.engineJob(fresh).candidates.length,1);
+});
+
+test('read-only native import quarantines an authoritative ID that collides with a Studio retry alias',async t=>{
+ const f=await setup(t),original='418e3861-610b-400a-9cc6-e0635ce6003d',alias='418e3861-610b-400a-9cc6-e0635ce6003e';
+ const request={kind:'discovery',prompt:DEFAULT_DISCOVERY_PROMPT,sourceUrl:''};
+ f.research.create({...request,idempotencyKey:original},[],{reuseDefault:true});
+ assert.equal(f.research.create({...request,idempotencyKey:alias},[],{reuseDefault:true}).id,original);
+ f.state.jobs.push({id:1,job_id:alias,kind:request.kind,prompt:request.prompt,source_url:'',status:'queued',execution_id:'',request_hash:requestFingerprint(request)});
+ const client=new EditorialEngineClient({connection:{...f.connection,mode:'read_only'},apiKey:'synthetic-api-key',fetchImpl:f.client.fetchImpl}),service=new EditorialEngineService({research:f.research,client});
+ const result=await service.refresh();assert.equal(result.unlinkedNativeJobs,1);assert.equal(result.observedImports,0);
+ assert.equal(f.research.get(alias),null);assert.equal(f.research.engineJob(original),null);assert.equal(f.research.all().length,1);assert.equal(f.state.posts,0);assert.equal(f.state.dispatches,0);
 });
 
 test('publication context freezes with the queued native request and does not become a generated story or mutable retry input',async t=>{

@@ -77,6 +77,14 @@ test('reuse and alias bindings participate in the existing private transaction',
  assert.equal(store.create(input,[],reuse).id,input.idempotencyKey);assert.equal(store.all().length,2);
 });
 
+test('authoritative native identities cannot resolve a Studio retry alias to a different request',async t=>{
+ const {store}=await setup(t),first=store.create(defaultInput(),[],reuse),aliasInput=defaultInput();
+ assert.equal(store.create(aliasInput,[],reuse).id,first.id);
+ assert.throws(()=>store.create(aliasInput,[]),{code:'EDIT_CONFLICT'});
+ assert.equal(store.get(aliasInput.idempotencyKey),null);assert.equal(store.all().length,1);assert.equal(store.get(first.id).engineJob,null);
+ assert.equal(store.create(aliasInput,[],reuse).id,first.id);
+});
+
 test('simultaneous default saves across separate processes produce one request and durable retry aliases',{timeout:15000},async t=>{
  const {filename,store}=await setup(t),moduleUrl=new URL('../src/workspace/research-store.js',import.meta.url).href;
  const script=`import {LocalResearchStore} from ${JSON.stringify(moduleUrl)};

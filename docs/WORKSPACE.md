@@ -1,3 +1,13 @@
+# V11 daily workflow — October 31, 2026
+
+The five primary destinations remain Today · Discover · Stories · Production · Library. Discover leads with actual proposals, then a direction form and compact Research activity. Saving a direction never executes research. Equivalent unstarted default saves reuse a private request only while the observed source and working revisions match; prior identities/history remain.
+
+Open a story to Develop: photographs and sequence alongside the caption, one optional Your direction field, then readiness. Make opening image and move controls save the existing selection. Photographs and Review remain direct activities; More story tools preserves every legacy route, focused writing, music, source research, advanced angle tools and history. Your direction uses existing creativeBrief.notes and reaches future supported photographic continuation context; it does not rewrite or generate material. Save direction & continue waits for all pending saves, including newer edits made during an in-flight request.
+
+Review shows what is prepared, grouped attention items and the next authorized action. Factual review, image permission and final native approval are independent. Raw codes, evidence, package/provider records and diagnostics remain secondary. Production sends remain in n8n. No Render deployment or worker staging occurred. The sections below retain the implementation's earlier history and operating contracts; earlier seven-tab/five-stage descriptions are superseded by this V11 interaction model.
+
+---
+
 # Product-wide editorial workspace
 
 This sprint adds a functioning local frontend over the **existing n8n and Buffer system**. It is not a new publishing backend and has not replaced the production Founder Studio. Production writes, deployment, scheduling and publication remain disabled.
