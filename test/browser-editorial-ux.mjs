@@ -85,7 +85,7 @@ try{
   const creative=page.getByLabel('Creative direction',{exact:true});
   if(!await creative.isVisible())await page.locator('.discovery-research summary').click();
   await creative.fill('Synthetic private direction; do not dispatch a model.');
-  await page.getByRole('button',{name:'Save discovery direction',exact:true}).click();
+  await page.getByRole('button',{name:'Save general discovery brief',exact:true}).click();
   assert.equal(await creative.inputValue(),'Synthetic private direction; do not dispatch a model.');
   assert.equal(app.research.all().length,1);
   await page.getByRole('button',{name:'Save research direction',exact:true}).click();

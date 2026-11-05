@@ -81,11 +81,11 @@ try{
  await page.setViewportSize({width:1440,height:900});
  const baselineCount=app.research.all().length;
  await page.getByLabel('Creative direction',{exact:true}).fill('Preserve this unsaved specific direction while saving the default.');
- await page.getByRole('button',{name:'Save discovery direction',exact:true}).click();
+ await page.getByRole('button',{name:'Save general discovery brief',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('#toast')?.textContent.includes('Direction saved'));
  const firstDefaultCount=app.research.all().length;
  assert.equal(firstDefaultCount,baselineCount+1);
- await page.getByRole('button',{name:'Save discovery direction',exact:true}).click();
+ await page.getByRole('button',{name:'Save general discovery brief',exact:true}).click();
  await page.waitForTimeout(300);
  assert.equal(app.research.all().length,firstDefaultCount);
  assert.equal(await page.getByLabel('Creative direction',{exact:true}).inputValue(),'Preserve this unsaved specific direction while saving the default.');

@@ -90,7 +90,7 @@ try {
   await page.unroute('**/api/research/requests');
   checks.push('a lost local research-create response can be retried without creating a duplicate ticket');
   await page.getByLabel('Creative direction',{exact:true}).fill('Keep this unsaved creative direction while preparing discovery');
-  await page.getByRole('button',{name:'Save discovery direction',exact:true}).click();
+  await page.getByRole('button',{name:'Save general discovery brief',exact:true}).click();
   await page.waitForFunction(()=>document.querySelectorAll('[data-request-id]').length===3);
   assert.equal(await page.getByLabel('Creative direction',{exact:true}).inputValue(),'Keep this unsaved creative direction while preparing discovery');
   const discoveryLink=await page.locator('[data-research-handoff]').first().getAttribute('href');
