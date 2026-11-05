@@ -1,3 +1,60 @@
+# Sprint C — photographic sourcing and creative workflow
+
+Updated November5,2026. Continued from verified `7e41458ff0b405c79e6131d0cee125398846614d`; the interrupted work was preserved, tested and committed first. **The implementation improved; new real-photograph retrieval remains blocked.** No paid calls, n8n mutations/activations, Render changes, publishing or scheduling occurred. No prior permit was reused.
+
+| V1 workstream | Sprint C result |
+| --- | --- |
+| Discovery/research | Existing Marcie2355, Tropicana2351 and Deneuve2254 records reused. The photo action now says **Request more photos** and explicitly distinguishes saving context from authorized retrieval. No expensive research rerun. |
+| Editorial | Generated2355 caption and three hooks retained unchanged; private editing and restart rechecked. No invented visible detail or new model output. |
+| Photography | Added operator-only bounded acquisition of exact recorded asset IDs, image-specific reported credit/terms, durable receipt provenance and decoded-size presentation. Real image access remains unavailable. |
+| Creative editing | Two distinct frames can form a proposed carousel. Identical decoded original hashes cannot pad proposals; explicit founder order/cover is preserved. A rejection tied to replaced pixels cannot silently reject the replacement. Current-preview founder aesthetic judgments are distinguished from absent/stale judgments, without becoming identity or rights approval. |
+| Production/publishing | Existing factual, per-image rights, source-version and native approval gates remain. No production-file, native import or Buffer success is claimed. |
+| Hosting/operations | Preview-schema migration and legacy inspection writes tested; existing private storage reused. Existing Render deployment remains4890c81; no deployment or hosted founder acceptance. |
+
+## Acquisition and evidence
+
+`npm run media:cache-recorded -- private-execution.json job-id asset-id private-data-root` reads an authentic captured development execution, checks the finalized candidate and exact recorded asset, and reuses the existing private preview store. There is **no browser URL-fetch endpoint**. The operator must use the intended private data root; successful previews then attach through the existing Studio projection.
+
+The acquisition checks the supported network-policy snapshot before sending anything. Source page and image hosts must both be granted. A recorded publisher child CDN can qualify locally; unrelated sibling/suffix hosts cannot. No arbitrary redirects, cookies, credential forwarding or proxy fallback. One GET,15-second timeout,8MiB streaming cap, supported JPEG/PNG/WebP MIME and actual decode,40MP decoder limit, preserved original SHA256 and stripped private preview. Missing Content-Length is supported through bounded streaming; oversize streams are cancelled. Native recorded-media inspection retains its default stricter same-host contract.
+
+Direct acquisition receipts retain the original source execution (including inherited2353 lineage for2355), new receipt ID/time, source/image URLs and actual decoded original dimensions. They do not claim that an older research execution downloaded the image. Receipts are retained separately; repeated identical files reuse existing private blobs. Decoding, founder judgment, subject identity and publication rights remain separate.
+
+ImageObject creator, copyright holder, credit text and reported license URL now stay attached to their individual image. Article authors/licenses do not leak into these assertions; a courtesy credit is not turned into a photographer. Creator attribution and rights remain unverified. Captionless structured records can receive the matching image's explicit HTML caption without losing image metadata. These optional fields are prepared in the existing native development extractor, sanitized through Studio and shown concisely inside image details.
+
+## Real examples and deferred checks
+
+| Existing real case | Actual result in this session | Deferred verification |
+| --- | --- | --- |
+| Marcie Docherty,2355/2353 | Two original gallery image references checked against policy. Source/image host `thephotographersgallery.org.uk` absent; **0 source requests,0 decoded files,0 pixel inspections**. Generated caption and hooks preserved. | Grant the source host, run the bounded recorded-asset command, inspect actual frames and their project/date/credit context. |
+| Josh Aronson / Tropicana,2351 | Two BOOOOOOOM references point from `www.booooooom.com` to `cdn.booooooom.com`. This exposed the previous same-host limitation; explicit dual-host CDN handling is now tested. Both hosts remain ungranted; **0 source requests/decoded files**. | Grant both hosts, inspect actual series images, distinguish Tropicana from other projects, establish original creator and terms. |
+| Deneuve / Saint Laurent,2254 | Two retained references from `theviifoundation.org`; host absent, **0 source requests/decoded files**. Source dates and context remain distinct from1967 film attribution. | Grant the source host and inspect the dated documentary photograph separately from costume documents and page covers. |
+
+These are **policy preflights on real records**, not failed photographic-source HTTP calls or proof of source unavailability. The prior attempt to read historical image-inspection execution2257 returned n8n HTTP404; no old pixels could be recovered from it. No permitted alternate original bytes were found. Source metadata and synthetic images are not counted as photographs retrieved.
+
+The environment settings are unavailable in the founder interface. Work continued under the enforced policy as requested. Do not route requests through n8n or another allowed service to evade it. A later supported network-policy change (including any additional actually recorded CDN host) is needed for real-pixel acceptance; no settings change or further approval question is pending in this sprint.
+
+## Native integration and verification
+
+Fresh reads: Studio worker `6CkqfYc4Pyd4k8vi` saved **e6fe10d3-c7a7-482b-9fd1-cd24c681b145**, **inactive**, active version null. Sourcing `Zouc5I3MQwRJhfXG` saved **83023876-09a8-49af-97b1-326fb04f2678**, active **75efdc48-8cdf-467d-983a-fc164524867d**. Neither was modified. Do not activate the sourcing saved graph over its different active version.
+
+Prepared development-worker graph SHA256 **4accb9e0bcabb6bb79b60aa3eeeb6c2b0d91e7a089d23493a0c29d5ad38af64e** carries optional image-specific metadata through the existing extractor/candidate contract; all Code nodes compile. Offline extraction replay retains4 references from2353 and40 from2351, with0 source calls. This is prepared code, **not an installed native increment or new execution**. Native installation/activation remains separately authorized.
+
+Validation: **374 unit/integration tests**, **40 main Chromium checks**, **11 HTTPS fixture checks**, and **3 historical-real-result browser journeys** pass. Tests cover bounded chunked decoding with synthetic pixels, stream cancellation, publisher-host constraints, persistent receipts/migration, metadata sanitization, exact-byte duplicates, two-frame recommendations and stale-pixel feedback. Generated fixture images are never editorial replacements. Desktop/mobile checks fit; browser JavaScript errors0. Real2355 caption/hooks, manual caption edit, exact reference cover/order, preview, refresh and cold restart pass in disposable stores; original research digest/AI caption unchanged. Actual photograph pixels and real-host acceptance remain unverified.
+
+Private evidence remains under `.local/v12-c/`: recorded-source preflight per asset, retained candidate snapshot, prepared native graph/replay, source/worker versions, test logs and desktop/mobile copied-real-record screenshots. No credentials, private source outputs or images are committed.
+
+## GitHub and manual release
+
+- Preserved checkpoint: **8ca277e38c377f51822d0d7a953db14c4fb89b0f**.
+- Tested photographic/creative increment: **8407a773183338049a5e670060eb38f2f597ab27**.
+- Status checkpoint: the commit containing this section; final pushed SHA reported at completion. All use `[skip render]` on `development/photography-review-20261029`.
+
+Render was independently read again: existing service `srv-dbih0du1egvs73er26kg` remains live on **4890c8174635dd787f877e93601d819092d04c18**, deploy `dep-dbm8dedbedkc73bhlhn0`. No deploy occurred. After separate authorization: download/verify an offsite private backup; use **existing service → Manual Deploy → Deploy a specific commit →8407a773183338049a5e670060eb38f2f597ab27** or its documentation-only descendant. Preserve disk, secrets, sessions and history; keep auto-deploy off. Verify login/private401, result delivery, preview/edit persistence and restart on the actual host. Rollback code to4890c8174635dd787f877e93601d819092d04c18 while preserving disk/history; never reset claims. See [existing procedure](../PRIVATE_HOSTING.md).
+
+Three remaining blockers, ranked: **(1)** legitimate original-image network access, actual pixel relevance/quality, attribution and image-specific rights; **(2)** separately approved native installation plus real hosted founder acceptance; **(3)** approved exact-media production/package and existing Buffer handoff. No V1 completion or real-photo sourcing success is claimed.
+
+---
+
 # V12 / V1 living status
 
 Updated **November 5, 2026, America/New_York**. **Real preliminary editorial drafting is verified.** Native execution **2355** generated a source-grounded Marcie Docherty caption and three distinct, source-linked hooks from captured execution2353 evidence, with **zero research calls, web searches or source fetches**. The result appeared in Studio and survived editing, refresh and cold restart. Photographic verification, publication permission, hosted founder acceptance and publishing handoff remain incomplete; no V1 completion percentage is claimed.
