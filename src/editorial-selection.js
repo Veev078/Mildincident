@@ -36,6 +36,21 @@ export function editorialSelectionTools(){
   const rationale=decision==='advance'?[{code:phase==='sources'?'SOURCE_LED_CASE_READY_FOR_DRAFT':'CASE_READY_FOR_SOURCE_REVIEW',message:phase==='sources'?'The cultural case has captured claim sources and its specific visual detail corresponds to an image-specific source caption. Advance provisionally to drafting for human review; identity, aesthetic quality and rights remain unverified.':'A specific cultural/visual case and claim references are supplied. Advance only to source review; this is still a model proposal.'}]:[];
   return {decision,reasons,rationale,dimensions,basis:phase==='sources'?'source_text_and_image_context_correspondence':'model_case_completeness_only',visualSupport,pixelInspectionPerformed:false,tasteVerified:false,rightsGranted:false,primaryAppeal:clean(ec.primary_appeal)||'unexplained'};
  }
+ function draftReadiness(candidate,{sources=[],photos=[],feedback=[]}={}){
+  const editorial=assess(candidate,{feedback}),visual=assess(candidate,{phase:'sources',sources,photos,feedback});
+  const reasons=[],claims=candidate.claims||[],eligible=[],excluded=[];
+  const core=caseOf(candidate).supporting_claim_indices||[];
+  for(let i=0;i<claims.length;i++){
+   const c=claims[i],packet=sources.find(s=>s.claimIndex===i&&s.url===(c.source_url||c.url)&&s.access==='source_text_captured'),passage=clean(packet?.textExcerpt),terms=words(c.claim);
+   const photoDependent=/\b(?:this|the selected|the pictured|in this)\s+(?:photograph|photo|image|frame|portrait)|\b(?:photograph|photo|image|frame)\s+(?:shows|depicts|proves)/i.test(c.claim||'');
+   const overlap=[...terms].filter(w=>words(passage).has(w)).length;
+   if(c.claim_type==='verified_fact'&&passage.length>=120&&overlap>=3&&!photoDependent)eligible.push(i);else excluded.push(i);
+  }
+  if(editorial.decision!=='advance')reasons.push(...editorial.reasons.map(r=>r.code));
+  if(!eligible.length||!core.some(i=>eligible.includes(i)))reasons.push('EDITORIAL_SOURCE_PASSAGE_NEEDED');
+  if(sources.some(s=>s.contradiction===true))reasons.push('CONTRADICTORY_SOURCE_EVIDENCE');
+  return {canDraft:reasons.length===0,status:reasons.length?'held':'ready_for_preliminary_draft',supportedClaimIndices:eligible,excludedClaimIndices:excluded,reasons:[...new Set(reasons)],photographicStatus:visual.decision==='advance'?'caption_correspondence_only':'needs_research',photographicReasons:visual.reasons,sourceSupportBasis:'claim_bound_passage_correspondence_not_entailment_or_human_verification',factsVerifiedByHuman:false,rightsGranted:false,pixelInspectionPerformed:false};
+ }
  function select(candidates,context={}){
   const bounded=candidates.slice(0,3);const considered=bounded.map((candidate,index)=>({candidate,index,review:assess(candidate,context)}));const priority={advance:0,hold:1,reject:2};
   const counts=new Map();for(const territory of context.recentTerritories||[])counts.set(territory,(counts.get(territory)||0)+1);
@@ -52,7 +67,7 @@ export function editorialSelectionTools(){
   }catch{return [];}
  }
 
- return {assess,select,responseCandidates};
+ return {assess,select,responseCandidates,draftReadiness};
 }
 export const assessEditorialSelection=(candidate,context)=>editorialSelectionTools().assess(candidate,context);
 

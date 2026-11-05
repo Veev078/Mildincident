@@ -78,3 +78,8 @@ test('bounded source scans retain late related frames, disclose truncation and d
  const series=inspectPhotoSource(Array.from({length:28},(_,i)=>'<img src="/series-'+i+'.jpg" alt="Night Market study">').join(''),page,{subject:'Night Market study'});assert.equal(series.length,28);assert.ok(series.every(m=>m.relation==='subject_caption_match'));assert.equal(series[0].pixelAnalysisPerformed,false);
  const [truncated]=inspectPhotoSource('<img src="/one.jpg">'+' '.repeat(300001),page,{});assert.equal(truncated.captureCoverage.pageTruncated,true);
 });
+
+test('individual structured image captions retain dimensions without borrowing article headlines, bylines or pixel proof',()=>{
+ const html='<script type="application/ld+json">'+JSON.stringify({'@type':'NewsArticle',headline:'Night Market study','author':{'@type':'Person',name:'Article Author'},image:[{'@type':'ImageObject',contentUrl:'/frame.jpg',caption:'Night Market study, handwritten shop signs beside club participants.',width:2400,height:1600},{'@type':'ImageObject',url:'/generic.jpg'}]})+'</script>';
+ const images=inspectPhotoSource(html,'https://example.org/project',{subject:'Night Market study'});const frame=images.find(m=>m.url.endsWith('frame.jpg')),generic=images.find(m=>m.url.endsWith('generic.jpg'));assert.equal(frame.captionBasis,'structured_image_caption');assert.equal(frame.relation,'subject_caption_match');assert.equal(frame.reportedWidth,2400);assert.equal(frame.creator,'');assert.equal(frame.pixelAnalysisPerformed,false);assert.equal(frame.rightsGranted,false);assert.equal(generic.relation,'context_only');assert.equal(generic.caption,'');
+});
