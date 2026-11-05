@@ -60,6 +60,7 @@ Node 24.19.0 / system Chromium:
 | Check | Final result |
 | --- | --- |
 | Automated unit/integration tests | **356 pass**, zero failures/skips |
+| Focused changed contracts | **74 pass**: presets/identity/retry/restart, hook/evidence/gate/photo relevance and existing launch/delivery boundaries |
 | Syntax / whitespace | pass |
 | Existing Chromium workflows | **42 pass** |
 | Hosted HTTPS fixtures | **11 pass**: authentication/CSRF, read-only native boundary, private uploads, automatic delivery, backup and cold restart |
@@ -85,7 +86,8 @@ Reproduce with `npm run check`, `npm test`, `npm run test:browser`, `npm run tes
 
 - Sprint A: `a533038100dc6e7a5d2a47537ea02c068bc27f54`, `934342f8c1827f32e63a046ee5c318673b08e3a4`, `70dd9b6bd3ed25de346c702bf049bb10534f5a63`.
 - Sprint B1: `5dcf7e7` — durable recorded-theme briefs, exact direction into Develop and compatible catalog reads.
-- Sprint B2–B4: code checkpoint recorded in this branch's `[skip render]` history; final validation/status commit follows. Exact pushed SHAs are in the completion response. No force push or deployment.
+- Sprint B2–B5 implementation: `f51ad72` — optional source-bound hooks, caption/gate/photo relevance, compatible request provenance, founder access, historical evaluation and passing browser/contract suites.
+- Final verification/status: the commit containing this update; exact pushed SHA is in the completion response. All Sprint B checkpoints use `[skip render]`. No force push or deployment.
 
 **Existing-service update:** code is ready for a separately authorized manual Render update retaining native read-only behavior. Preserve the persistent private disk, backup and histories. The private preset table is created additively on startup; no native schema change, new credential, environment toggle, dependency, service or Blueprint is required. Use `docs/PRIVATE_HOSTING.md` and verify actual-host login/unauthenticated access, blocked discovery saves, catalog reads, delivered history, caption/direction/hook persistence and safe source refresh after deployment. This session did not deploy or validate the live host as Sprint B.
 
