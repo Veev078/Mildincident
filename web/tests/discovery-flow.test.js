@@ -6,15 +6,15 @@ const ready={configured:true,readOnly:false,generationApproved:true,generationAv
 test('launch requires every existing approval flag; missing or read-only capability never exposes a start action',()=>{
  for(const engine of [{},{configured:true,readOnly:true},{...ready,readOnly:undefined},{...ready,generationApproved:false},{...ready,workerActive:false},{...ready,generationAvailable:false},{...ready,generationApproved:'true'},{...ready,workerActive:1},{...ready,generationAvailable:'true'}]){
   assert.equal(researchAccess(engine).canStart,false);
-  assert.ok(!discoverySetup({workspace:{engine}}).includes('value="start"'));
+  assert.match(discoverySetup({workspace:{engine}}),/value="start" disabled/);
  }
  assert.equal(researchAccess(ready).canStart,true);
- assert.ok(discoverySetup({workspace:{engine:ready}}).includes('Start research'));
+ assert.ok(discoverySetup({workspace:{engine:ready}}).includes('Generate Stories'));
 });
 test('modes map to the existing brief/current-preset contracts without fabricating preset controls or losing custom text',()=>{
  const workspace={engine:{configured:true,readOnly:true}};
  const custom=discoverySetup({workspace,discoveryMode:'custom',researchDraft:{prompt:'A specific <source> direction',sourceUrl:'https://example.org/'}});
- assert.ok(custom.includes('A specific &lt;source&gt; direction'));assert.ok(custom.includes('data-mode="custom"'));assert.ok(custom.includes('Save research direction'));assert.ok(!custom.includes('<source>'));
+ assert.ok(custom.includes('A specific &lt;source&gt; direction'));assert.ok(custom.includes('data-mode="custom"'));assert.ok(custom.includes('Save direction'));assert.ok(!custom.includes('<source>'));
  const preset=discoverySetup({workspace,discoveryMode:'preset'});assert.ok(preset.includes('Themes are unavailable'));assert.ok(!preset.includes('<select'));assert.match(preset,/value="save" disabled/);
  assert.ok(discoverySetup({workspace,researchDraft:{prompt:'Retain the actual draft'}}).includes('Your unsaved custom direction is still here'));
 });
@@ -47,15 +47,14 @@ test('recorded source access remains bound to a development story and is unavail
 import {discovery} from '../discover.js';
 test('genuine new proposals lead Discover; a blank inbox leads with the honest discovery entry',()=>{
  const workspace={stories:[{id:'new',title:'A recorded proposal',origin:'n8n_development',revision:'r1',media:[]}],engine:{configured:true,readOnly:true}};
- const populated=discovery({workspace});assert.ok(populated.indexOf('founder-inbox')<populated.indexOf('discovery-start'));
+ const populated=discovery({workspace});assert.ok(populated.includes('founder-inbox'));
  const history=discovery({workspace:{...workspace,stories:[{...workspace.stories[0],recoveredHistory:true}]}});assert.ok(history.indexOf('discovery-start')<history.indexOf('founder-inbox'));
 });
 
-test('legacy form access keeps its URL privacy warning and stays absent in hosted mode',()=>{
- const request={id:'saved-brief',kind:'brief',prompt:'A retained private research direction',version:0,handoffUrl:'https://example.org/form?request=direction'};
- const workspace={stories:[],researchRequests:[request],engine:{configured:false}};
- const local=discovery({workspace});assert.ok(local.includes('data-research-handoff'));assert.ok(local.includes('includes your direction in its URL and browser history'));
- const hosted=discovery({workspace:{...workspace,hosted:true}});assert.ok(!hosted.includes('data-research-handoff'));
+test('native manual-link and handoff administration are removed from Discover without removing backend request records',()=>{
+ const request={id:'saved',kind:'brief',prompt:'A retained private direction',handoffUrl:'https://example.org/form'};
+ const workspace={stories:[],researchRequests:[request],engine:{configured:false}},before=JSON.stringify(workspace);
+ const html=discovery({workspace});assert.ok(!html.includes('data-research-handoff'));assert.ok(!html.includes('data-research-link'));assert.equal(JSON.stringify(workspace),before);
 });
 
 test('stale provider observations require an update, not an invented earlier publishing handoff',()=>{

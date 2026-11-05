@@ -8,7 +8,7 @@ test('Today separates fresh proposals, historical results and genuinely saved wo
  const workspace={stories:[story('fresh',{origin:'n8n_development'}),story('recovered',{origin:'n8n_development',recoveredHistory:true}),story('saved'),story('passed'),story('existing')],founderReviews:{saved:{decision:'save',sourceRevision:'r1',workingVersion:0},passed:{decision:'pass',sourceRevision:'r1',workingVersion:0}}};
  const model=todaySelection(workspace);assert.deepEqual(model.fresh.map(s=>s.id),['fresh']);assert.deepEqual(model.continuing.map(s=>s.id),['saved']);assert.ok(!model.active.some(s=>s.id==='passed'));
  const html=home({workspace});assert.match(html,/1 new proposal awaiting/);assert.match(html,/Continue working/);assert.ok(!html.includes('data-founder-review'));
- const existing=home({workspace:{stories:[story('existing')]}});assert.match(existing,/No new ideas yet/);assert.match(existing,/On your desk/);assert.ok(!existing.includes('Continue working'));
+ const existing=home({workspace:{stories:[story('existing')]}});assert.match(existing,/What do you want to create/);assert.match(existing,/On your desk/);assert.ok(!existing.includes('Continue working'));
 });
 test('working story revisions stay visible and stale founder decisions return to review rather than silently hiding material',()=>{
  const workspace={stories:[story('changed',{origin:'n8n_development',localDraft:{version:2,title:'Working title'}})],founderReviews:{changed:{decision:'pass',sourceRevision:'r1',workingVersion:1}}};

@@ -47,3 +47,21 @@
 
 .recorded-source-access { margin:18px 0; padding:16px; background:var(--surface); border:1px solid var(--line); }
 .recorded-source-access p { margin:10px 0 0; max-width:680px; line-height:1.6; }
+/* Consolidated generation and post preparation surfaces. */
+.generation-progress { margin:18px 0; display:grid; gap:10px; }
+.generation-progress article { padding:16px; background:var(--surface); border-left:3px solid var(--accent); }
+.generation-progress p { font-size:14px; margin:8px 0; }
+.post-review { padding:22px; background:var(--surface); border:1px solid var(--line); }
+.post-state { font-size:14px; color:var(--quiet); margin:12px 0 22px; }
+.post-review-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:28px; }
+.post-review-layout>div { min-width:0; }
+.post-cover .photo { aspect-ratio:4/3; max-height:440px; }
+.post-cover img,.post-strip img { object-fit:contain; }
+.post-strip { display:flex; gap:8px; overflow:auto; list-style:none; padding:12px 0; }
+.post-strip li { flex:0 0 88px; }
+.post-strip .photo { aspect-ratio:4/5; }
+.post-next { border-top:1px solid var(--line); padding-top:20px; margin-top:20px; }
+.post-next p { max-width:700px; }
+@media(max-width:800px){.post-review-layout{grid-template-columns:minmax(0,1fr)}.post-review{padding:16px}}
+
+.post-strip .preview-status { display:none; }

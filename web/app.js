@@ -3,12 +3,10 @@ import {launchSavedResearch} from './research-launch.js';
 import {DEFAULT_DISCOVERY_PROMPT} from './discovery-request.js';
 import { esc, date, human, storyUrl, effective, mediaFor, proposalContent } from './components.js';
 import * as views from './views.js';
-import {sourceResearchBrief} from './sources.js';
 import {navigation,resolveRoute,destination,libraryNavigation} from './navigation.js';
 import { creativeBriefFor, emptyCreativeBrief, directionReviewSummary, directionSequenceObservations } from './direction.js';
-import {photoComparison,photographicBrief} from './photography.js';
 
-const state = { photoDeskOpen:sessionStorage.getItem('mi-photo-desk-open')==='true', workspace: null, search: '', pipelineGroup: 'all', librarySearch: '', libraryRights: 'all', compared: [], loading: true, error: null };
+const state = { workspace: null, search: '', pipelineGroup: 'all', librarySearch: '', libraryRights: 'all', compared: [], loading: true, error: null };
 const pending = new Map();
 const imageReviewDrafts=new Map(),imageReviewSaving=new Set();
 const imageReviewKey=(story,asset)=>JSON.stringify([story,asset]);
@@ -94,7 +92,7 @@ async function loadWorkspace({ quiet = false } = {}) {
     const workspace = await api('/api/workspace');
     if (!Array.isArray(workspace.stories)) throw new Error('The source response does not contain a story collection.');
     const previous = new Map((state.workspace?.stories || []).map(story => [story.id, { draft: story.localDraft, revision: story.revision }]));
-    state.workspace = workspace;await hydrateActivePhoto();
+    state.workspace = workspace;
     for (const story of workspace.stories) {
       if (!saving.has(story.id)) versions.set(story.id, story.localDraft?.version || 0);
       const changes = { ...(inFlight.get(story.id) || {}), ...(pending.get(story.id) || {}) };
@@ -174,7 +172,7 @@ async function flushDraft(id) {
       if (result.editorialAudit) { current.editorialAudit=result.editorialAudit;const notice=document.querySelector('[data-editorial-audit]');if(notice&&route().id===id)notice.innerHTML=views.editorialAuditNotice(current); }
       if (result.readiness) current.readiness=result.readiness;
       if(result.productionDecisions)current.productionDecisions=result.productionDecisions;
-      if(result.productionPreparation){current.productionPreparation=result.productionPreparation;const panel=document.querySelector('[data-production-visibility]');if(panel&&route().id===id)panel.innerHTML=views.productionVisibility(current);}
+      if(result.productionPreparation)current.productionPreparation=result.productionPreparation;
       if (result.readiness) {const panel=document.querySelector('[data-readiness-panel]');if(panel&&route().id===id)panel.innerHTML=route().tab==='overview'?views.workingReviewSummary(current):views.readinessPanel(current);}
       if (result.sourceSequencePlan) current.sourceSequencePlan=result.sourceSequencePlan;
       const sequenceIssues = document.querySelector('[data-direction-sequence-issues]');
@@ -341,19 +339,9 @@ async function rebaseDraft(story) {
   } catch (error) { toast(error.message, { error: true }); }
 }
 
-async function checkNativePacket(story){
- if(!story)return;
- if((pending.has(story.id)||saving.has(story.id))&&!story.localDraft?.stale)await flushDraft(story.id);
- if(pending.has(story.id)||saving.has(story.id)){toast('Save pending edits before checking the native packet.',{error:true});return;}
- try{const packet=await api(`/api/stories/${encodeURIComponent(story.id)}/production-packet`);const result=await api(`/api/stories/${encodeURIComponent(story.id)}/production-packet/check`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({packet})});const output=route().id===story.id?document.querySelector('[data-native-import-result]'):null;if(output)output.textContent=result.accepted?'Eligible for disposable development proof only. Production import remains disabled.':'Native import blocked: '+result.issues.map(i=>i.message).join(' ');}catch(error){toast(error.message,{error:true});}
-}
 
-async function downloadProductionPacket(story){
- if(!story)return;
- if((pending.has(story.id)||saving.has(story.id))&&!story.localDraft?.stale)await flushDraft(story.id);
- if(pending.has(story.id)||saving.has(story.id)){toast('Save or export your pending edits before preparing the production review packet.',{error:true});return;}
- try{const packet=await api(`/api/stories/${encodeURIComponent(story.id)}/production-packet`);const url=URL.createObjectURL(new Blob([JSON.stringify(packet,null,2)],{type:'application/json'}));const anchor=document.createElement('a');anchor.href=url;anchor.download=`${story.id}-production-review.json`;document.body.append(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Validated review packet downloaded with its import blockers. Production import remains disabled.');}catch(error){toast(error.message,{error:true});}
-}
+
+
 
 async function downloadProposal(story) {
   if (!story) return;
@@ -380,22 +368,14 @@ document.addEventListener('click', event => {
   const proposalLink = event.target.closest('a[href]');
   if (proposalLink) {
     const url = new URL(proposalLink.href, location.origin);
-    const packetMatch=url.origin===location.origin&&url.pathname.match(/^\/api\/stories\/([^/]+)\/production-packet$/);
-    if(packetMatch){event.preventDefault();downloadProductionPacket(storyById(decodeURIComponent(packetMatch[1])));return;}
     const match = url.origin === location.origin && url.pathname.match(/^\/api\/stories\/([^/]+)\/proposal$/);
     if (match) { event.preventDefault(); downloadProposal(storyById(decodeURIComponent(match[1]))); return; }
   }
   const button = event.target.closest('[data-action]');
   if (!button || button.disabled) return;
   const action = button.dataset.action;
-  if(action==='check-native-packet'){checkNativePacket(storyById(button.dataset.story));return;}
   const story = storyById(button.dataset.story);
   switch (action) {
-    case 'open-production-records': {
-      const details=document.querySelector('.production-records');
-      if(details){details.open=true;details.scrollIntoView({block:'start',behavior:'smooth'});details.querySelector('summary')?.focus();}
-      break;
-    }
     case 'retry-preview': {
       const photo = button.closest('.photo'); const img = photo.querySelector('img');
       photo.classList.remove('preview-failed'); button.hidden = true;
@@ -469,7 +449,8 @@ document.addEventListener('click', event => {
       if (index >= 0) selected.splice(index, 1);
       else if (selected.length >= 10) { toast('The local preparation limit is ten slides. Remove an image before adding another.', { error: true }); break; }
       else selected.push(button.dataset.asset);
-      editDraft(story.id, { selectedAssetIds: selected }, { rerender: true, immediate: true });
+      const format=effective(story).format;const adjusted=format==='single_image'&&selected.length>1?'carousel':format==='carousel'&&selected.length===1?'single_image':format;
+      editDraft(story.id, { selectedAssetIds: selected,...(selected.length?{format:adjusted,targetSlideCount:selected.length}: {}) }, { rerender: true, immediate: true });
       announce(index >= 0 ? 'Image removed from local sequence.' : 'Image added to local sequence. Rights are unchanged.');
       break;
     }
@@ -498,7 +479,8 @@ document.addEventListener('click', event => {
       const index = Number(button.dataset.index), destination = index + Number(button.dataset.direction);
       if (index < 0 || destination < 0 || destination >= selected.length) break;
       [selected[index], selected[destination]] = [selected[destination], selected[index]];
-      editDraft(story.id, { selectedAssetIds: selected }, { rerender: true, immediate: true });
+      const format=effective(story).format;const adjusted=format==='single_image'&&selected.length>1?'carousel':format==='carousel'&&selected.length===1?'single_image':format;
+      editDraft(story.id, { selectedAssetIds: selected,...(selected.length?{format:adjusted,targetSlideCount:selected.length}: {}) }, { rerender: true, immediate: true });
       announce(`Slide ${index + 1} moved to position ${destination + 1}.`); break;
     }
     case 'clear-track': editDraft(story.id,{musicSelection:null},{rerender:true,immediate:true});flushDraft(story.id).then(saved=>{if(saved&&route().id===story.id&&route().tab==='music')render();});break;
@@ -685,30 +667,20 @@ async function createResearchRequest(input, {start=false}={}) {
   if(start){try{await launchSavedResearch(result.request,{engine:state.workspace.engine,api});toast('Research start requested once. Progress and resulting ideas appear in Discover.');}catch(error){toast('Your brief is saved. '+error.message+' No automatic retry was made.',{error:true});}await loadWorkspace({quiet:true}).catch(()=>{});}
   else toast(reused?'Existing saved direction retained. Research has not started.':'Direction saved. Research has not started.');
   const observed=state.workspace.researchRequests.find(r=>r.id===result.request.id);
-  const target=start&&observed?.engineJob?.candidates?.length?document.querySelector('.founder-inbox'):document.querySelector(`[data-request-id="${result.request.id}"]`)?.closest('.research-activity-row');target?.scrollIntoView({block:'center'});
+  const target=start&&observed?.engineJob?.candidates?.length?document.querySelector('.founder-inbox'):document.querySelector(`[data-request-id="${result.request.id}"]`);target?.scrollIntoView({block:'center'});
 }
 document.addEventListener('click', async event=>{
   const button=event.target.closest('[data-engine-action]');if(!button||button.disabled)return;
   button.disabled=true;
   try{
-    const action=button.dataset.engineAction;
+    const action=button.dataset.engineAction;if(!['refresh','evidence'].includes(action))return;
     if(action==='evidence'&&!await flushAllDrafts())throw new Error('Save or recover pending edits before reading recorded evidence.');
     await api(action==='refresh'?'/api/research/engine/refresh':`/api/research/requests/${button.dataset.request}/engine/${action}`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(action==='start'?{expectedVersion:Number(button.dataset.version)}:{})});
     await loadWorkspace({quiet:true});toast(action==='queue'?'Queued in isolated n8n development storage. No AI run was started.':action==='evidence'?'Captured execution evidence inspected without a new provider call.':action==='start'?'Bounded generation dispatched once. Refresh results to reconcile its status.':'Research results checked.');
   }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
 });
-document.addEventListener('submit',async event=>{
-  const form=event.target.closest('[data-engine-review]');if(!form)return;event.preventDefault();const button=form.querySelector('button[type="submit"]');button.disabled=true;
-  try{await api(`/api/research/requests/${form.dataset.request}/engine/review`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({candidateId:form.dataset.candidate,expectedVersion:Number(form.dataset.version),decision:form.elements.decision.value,reason:form.elements.reason.value,...(form.elements.basis?{basis:form.elements.basis.value}:{})})});await loadWorkspace({quiet:true});toast('Development editorial decision saved. Production and rights remain unchanged.');}catch(error){form.querySelector('[data-engine-status]').textContent=error.message;}finally{button.disabled=false;}
-});
-
-document.addEventListener('click', event => {
-  const link=event.target.closest('[data-research-handoff]'); if(!link)return;
-  api(`/api/research/requests/${link.dataset.researchHandoff}/events`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({event:'handoff_requested',expectedVersion:Number(link.dataset.version)})})
-    .then(()=>loadWorkspace({quiet:true})).catch(error=>toast(error.message,{error:true}));
-});
 document.addEventListener('submit', async event => {
-  const form=event.target.closest('[data-research-form],[data-research-link]');if(!form)return;
+  const form=event.target.closest('[data-research-form]');if(!form)return;
   event.preventDefault();if(state.discoverySubmitting)return;state.discoverySubmitting=true;const button=form.querySelector('button[type="submit"]');button.disabled=true;
   const status=form.querySelector('[data-research-status]');status.textContent='Saving…';const fields=form.querySelector('[data-discovery-fields]');if(fields)fields.disabled=true;
   try {
@@ -716,10 +688,6 @@ document.addEventListener('submit', async event => {
       const custom=!form.hasAttribute('data-discovery-setup')||form.dataset.mode==='custom';let input=custom?{kind:'brief',prompt:form.elements.prompt.value,sourceUrl:form.elements.sourceUrl.value}:{kind:'discovery',prompt:DEFAULT_DISCOVERY_PROMPT,sourceUrl:''};
       if(form.dataset.mode==='preset'){const option=form.elements.presetKey.selectedOptions[0],preset=state.workspace.researchPresets?.items.find(p=>p.key===option?.value&&p.version===option?.dataset.version);if(!preset)throw new Error('Choose an available recorded theme.');input={kind:'brief',prompt:preset.direction,sourceUrl:'',preset:{key:preset.key,version:preset.version}};}
       const result=await createResearchRequest(input,{start:event.submitter?.value==='start'});if(result===false)status.textContent='Nothing was started or saved.';
-    }
-    else {
-      await api(`/api/research/requests/${form.dataset.request}/events`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({event:'story_linked',storyId:form.elements.storyId.value,expectedVersion:Number(form.dataset.version)})});
-      await loadWorkspace({quiet:true});toast('Existing source story linked locally. Production records are unchanged.');
     }
   }catch(error){const current=document.querySelector('[data-research-status]');if(current)current.textContent=error.message;toast(error.message,{error:true});}finally{state.discoverySubmitting=false;button.disabled=false;const fields=document.querySelector('[data-discovery-fields]');if(fields)fields.disabled=false;}
 });
@@ -791,49 +759,6 @@ window.addEventListener('beforeunload', event => { if (pending.size || saving.si
 render();
 loadWorkspace().catch(() => {});
 
-// Private photographic research, independent of paid generation and publication.
-document.addEventListener('submit',async event=>{const form=event.target.closest('[data-photo-hunt],[data-photo-decision]');if(!form)return;event.preventDefault();const button=form.querySelector('button');button.disabled=true;const fields=Object.fromEntries(new FormData(form));try{if(form.matches('[data-photo-hunt]')){const result=await api('/api/photography/hunts',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({...fields,parent:fields.parent||null,idempotencyKey:state.photoRequestKey||=crypto.randomUUID()})});state.photoRequestKey=null;state.activePhotoHunt=result.hunt.id;state.photoOffset=0;await api('/api/photography/hunts/'+result.hunt.id,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({pages:1})});}else await api('/api/photography/decisions/'+encodeURIComponent(form.dataset.photoDecision),{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(fields)});state.workspace=await api('/api/workspace');await hydrateActivePhoto();render();}catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}});
-document.addEventListener('input',event=>{if(event.target.closest('[data-photo-hunt]'))state.photoRequestKey=null;});
-document.addEventListener('change',async event=>{if(event.target.matches('[data-photo-trail]')){state.activePhotoHunt=event.target.value;state.photoOffset=0;try{await hydrateActivePhoto();render();}catch(error){toast(error.message,{error:true});}}});
-document.addEventListener('click',async event=>{const expand=event.target.closest('[data-photo-expand]');if(expand){state.photoParent=expand.dataset.parent;state.photoRequestKey=null;const form=document.querySelector('[data-photo-hunt]');form.elements.query.value=expand.dataset.photoExpand;form.elements.mode.value=expand.dataset.mode;form.elements.parent.value=state.photoParent;form.scrollIntoView({behavior:'smooth'});return;}const resume=event.target.closest('[data-photo-resume]');if(resume){resume.disabled=true;try{await api('/api/photography/hunts/'+resume.dataset.photoResume,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({pages:1})});state.workspace=await api('/api/workspace');await hydrateActivePhoto();render();}catch(error){toast(error.message,{error:true});}finally{resume.disabled=false;}}});
-
-document.addEventListener('click',event=>{const button=event.target.closest('[data-photo-brief]');if(!button)return;const form=document.querySelector('[data-research-form]');const hunt=state.workspace.photoHunts.find(h=>h.id===state.activePhotoHunt)||state.workspace.photoHunts[0];const photo=hunt?.photos.find(p=>p.id===button.dataset.photoId);if(form&&photo){state.researchDraft=photographicBrief(photo);state.discoveryMode='custom';state.briefRequestKey=null;render();document.querySelector('[data-research-form]')?.scrollIntoView({behavior:'smooth'});toast('Source-bound creative brief prepared for your editing. No AI call was made.');}});
-
-document.addEventListener('change',event=>{if(event.target.matches('[data-photo-blind]')){state.photoBlind=event.target.checked;event.target.closest('.photo-research').dataset.blind=String(event.target.checked);}});
-
-async function hydrateActivePhoto(){if(!state.activePhotoHunt||!state.workspace)return;const result=await api('/api/photography/hunts/'+state.activePhotoHunt+'?offset='+(state.photoOffset||0));if(!result.hunt)return;const index=state.workspace.photoHunts.findIndex(h=>h.id===result.hunt.id);if(index>=0)state.workspace.photoHunts[index]=result.hunt;else state.workspace.photoHunts.unshift(result.hunt);}
-document.addEventListener('click',async event=>{const button=event.target.closest('[data-photo-page]');if(!button)return;state.activePhotoHunt=button.dataset.photoPage;state.photoOffset=Number(button.dataset.offset);try{await hydrateActivePhoto();render();}catch(error){toast(error.message,{error:true});}});
-
-document.addEventListener('input',event=>{const form=event.target.closest('[data-photo-reference]');if(form){state.photoRefRequestKey=null;state.photoReferenceDraft=Object.fromEntries(new FormData(form));}});
-document.addEventListener('submit',async event=>{
- const form=event.target.closest('[data-photo-reference]');if(!form)return;event.preventDefault();const button=form.querySelector('button');button.disabled=true;
- try{const fields=Object.fromEntries(new FormData(form));if(!fields.huntId)delete fields.huntId;
-  const result=await api('/api/photography/references',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({...fields,idempotencyKey:state.photoRefRequestKey||=crypto.randomUUID()})});
-  state.photoRefRequestKey=null;state.photoReferenceDraft=null;state.activePhotoHunt=result.hunt.id;state.photoOffset=Math.floor((result.hunt.totalPhotos-1)/100)*100;
-  await loadWorkspace({quiet:true});toast('Source reference saved privately. Credits, image identity and rights remain unverified.');
- }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
-});
-document.addEventListener('click',event=>{
- const mark=event.target.closest('[data-photo-compare]'),inspect=event.target.closest('[data-photo-inspect]');
- if(mark||inspect){const id=mark?.dataset.photoCompare||inspect.dataset.photoInspect;const hunt=state.workspace.photoHunts.find(h=>h.id===state.activePhotoHunt)||state.workspace.photoHunts[0];const photo=hunt?.photos.find(p=>p.id===id);if(!photo)return;
-  if(inspect){openDialog(photoComparison([photo]));return;}
-  state.photoCompared||=[];const index=state.photoCompared.findIndex(p=>p.id===id);if(index<0)state.photoCompared.push(photo);else state.photoCompared.splice(index,1);render();return;
- }
- if(event.target.closest('[data-photo-open-comparison]')&&(state.photoCompared||[]).length>=2)openDialog(photoComparison(state.photoCompared));
-});
-
-// Explicit file handoff to inactive n8n development research; never an execution or production save.
-document.addEventListener('submit',async event=>{
- const form=event.target.closest('[data-photo-native],[data-photo-native-import]');if(!form)return;event.preventDefault();const button=form.querySelector('button');button.disabled=true;
- try{if(form.matches('[data-photo-native]')){
-  const fields=Object.fromEntries(new FormData(form));const result=await api('/api/photography/hunts/'+fields.huntId+'/n8n-packet',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({source:fields.source,photoIds:(state.photoCompared||[]).map(p=>p.id)})});
-  const blob=new Blob([JSON.stringify(result.packet,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mildincident-private-research-'+result.packet.digest.slice(0,12)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Private research packet downloaded. No n8n execution was started.');
- }else{
-  const file=form.elements.receipt.files[0];if(!file||file.size>512*1024)throw new Error('Choose a returned research JSON file under 512 KiB.');const receipt=JSON.parse(await file.text());const result=await api('/api/photography/n8n-results',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(receipt)});
-  state.activePhotoHunt=result.hunt.id;state.photoOffset=0;await loadWorkspace({quiet:true});toast('Research result imported into a new private branch. Remote execution and image identity remain unverified.');
- }}catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
-});
-
 // Founder review is private editorial preference, never a production approval.
 document.addEventListener('click',event=>{const button=event.target.closest('[data-review-filter]');if(button){state.reviewFilter=button.dataset.reviewFilter;render();}});
 document.addEventListener('submit',async event=>{
@@ -842,10 +767,6 @@ document.addEventListener('submit',async event=>{
   await loadWorkspace({quiet:true});if(decision==='develop')location.hash='#/story/'+encodeURIComponent(form.dataset.founderReview)+'/overview';toast(result.followUp?'Decision and research direction saved. Research has not started.':({save:'Saved to Discover → Saved / developing.',pass:'Passed. You can reconsider it in Discover → Passed.',develop:'Saved. Continue developing the story.',reset:'Returned to the review queue.'}[decision]||'Editorial decision saved.'),{reviewFilter:decision==='save'?'saved':decision==='pass'?'passed':null});
  }catch(error){toast(error.message,{error:true});}finally{for(const b of form.querySelectorAll('button'))b.disabled=false;}
 });
-
-document.addEventListener('toggle',event=>{if(event.target.matches?.('[data-photo-desk]')){state.photoDeskOpen=event.target.open;sessionStorage.setItem('mi-photo-desk-open',String(event.target.open));}},true);
-
-document.addEventListener('click',async event=>{const button=event.target.closest('[data-source-intake]');if(!button)return;button.disabled=true;try{const result=await api('/api/discovery/sources/refresh',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:'{}'});state.workspace.sourceInputs=result.sourceInputs;render();toast('Publication intake updated. Source leads are not generated stories.');}catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}});
 
 // Image-bound research preparation saves context only; dispatch remains a separate approved action.
 document.addEventListener('click',async event=>{
@@ -866,17 +787,6 @@ const researchUiTimer=setInterval(receiveResearchUpdates,15000);window.addEventL
 document.addEventListener('click',async event=>{const button=event.target.closest('[data-hosted-backup]');if(!button)return;button.disabled=true;try{if(!await flushAllDrafts())throw new Error('Save pending edits before creating a backup.');const result=await api('/api/backups',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:'{}'});location.assign('/api/backups/'+encodeURIComponent(result.backup.id)+'/archive');toast('Verified private backup ready. Keep this copy private and off the hosting disk.');}catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}});
 
 document.addEventListener('submit',async event=>{const form=event.target.closest('[data-hosted-logout]');if(!form)return;event.preventDefault();if(await flushAllDrafts())form.submit();else toast('Save or recover pending edits before signing out.',{error:true});});
-
-// A publication entry remains a source lead until researched; preparing its direction makes no request.
-document.addEventListener('click',event=>{
- const button=event.target.closest('[data-source-brief]');if(!button)return;
- const form=document.querySelector('[data-research-form]');if(!form)return;
- if(state.researchDraft?.prompt?.trim()||state.researchDraft?.sourceUrl?.trim()){toast('Your unsaved direction is still here. Save it before preparing another.',{error:true});form.scrollIntoView({block:'center'});return;}
- const lead=state.workspace.sourceInputs?.leads?.find(l=>l.id===button.dataset.sourceBrief),brief=sourceResearchBrief(lead);if(!brief)return;
- state.researchDraft=brief;state.discoveryMode='custom';state.briefRequestKey=null;render();
- const activeForm=document.querySelector('[data-research-form]');activeForm?.scrollIntoView({block:'center'});activeForm?.elements.prompt.focus();toast('Direction prepared from the source. Review and save it; research has not started.');
-});
-
 
 document.addEventListener('click',event=>{
  const choice=event.target.closest('[data-discovery-mode],[data-discovery-entry]');if(!choice)return;

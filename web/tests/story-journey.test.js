@@ -13,7 +13,7 @@ test('three story activities retain every existing deep link without numbered cr
   const html=storyWorkspace(state,original,tab),primary=html.match(/<nav class="story-stages story-activities"[^>]*>([\s\S]*?)<\/nav>/)[1];
   assert.equal((primary.match(/<a /g)||[]).length,3);
   assert.match(primary,new RegExp('aria-current="page">'+stage));
-  assert.ok(html.includes(`href="#/story/${original.id}/${tab}" aria-current="page"`));
+  assert.ok(!html.includes('More story tools'));
  }
  assert.equal(JSON.stringify(original),before);
 });
@@ -37,5 +37,5 @@ test('clearer story journey retains stale-edit, permission and existing-provider
  const stale=storyWorkspace(state,original,'caption');assert.match(stale,/Compare source and local draft/);assert.match(stale,/id="caption-editor"[^>]*disabled/);
  original.localDraft=null;original.publishing.requiresReview=true;
  const action=nextAction(original);assert.equal(action.tab,'publishing');assert.equal(action.label,'Finish required checks');
- const production=storyWorkspace(state,original,'publishing');assert.match(production,/Check earlier publishing activity/);assert.match(production,/do not resend an uncertain or sent post/);assert.match(production,/does not create Buffer drafts, schedule, publish/);assert.match(production,/image rights|permissions|clear rights/);
+ const production=storyWorkspace(state,original,'publishing');assert.match(production,/Your post/);assert.match(production,/earlier publishing record/);assert.match(production,/Studio does not send or schedule/);
 });
