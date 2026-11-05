@@ -7,7 +7,7 @@ Updated **November 5, 2026, America/New_York**. Product consolidation builds on 
 - Render MCP independently verified `mildincident-studio` (`srv-dbih0du1egvs73er26kg`) live on **4890c81**, manual deploy `dep-dbm8dedbedkc73bhlhn0`, November 5 **08:38 AM ET**. Auto-deploy is off. This phase did not deploy or change Render settings.
 - Active production intake `75BYc3JkTnA2eQVc` remains at active version `7240d849-d676-43ef-86ca-9b367d99add5`. Its authenticated founder forms do not supply Studio's stable job/receipt contract. It was not modified or used as a launch fallback.
 - Interactive execution uses **existing** Studio worker `6CkqfYc4Pyd4k8vi`, reusing intake/Brand Brain/sourcing processors and isolated job/candidate tables. No new research workflow or competing engine was created.
-- The founder explicitly authorized one bounded native test and worker/authentication changes during this session. Worker saved version changed from `8b3e1293-5990-451c-8358-2cbe9e752a44` to **23c6777a-5728-4b32-be15-e053a0484be8**. A dedicated header credential was created privately. After the test, the worker was **deactivated**, active version is null, and the test connection permit was revoked. The reviewed new graph remains saved. Chief AI remains inactive. Production intake, global presets, production/approval workflows and Buffer were unchanged.
+- The founder explicitly authorized one bounded native test and worker/authentication changes during this session. Worker saved version changed from `8b3e1293-5990-451c-8358-2cbe9e752a44` to **23c6777a-5728-4b32-be15-e053a0484be8**. A dedicated header credential was created privately. Post-test GET verification at **09:14 AM ET** confirmed the worker was **deactivated**, active version is null, and the test connection permit was revoked. The reviewed new graph remains saved. Chief AI remains inactive. Production intake, global presets, production/approval workflows and Buffer were unchanged.
 - Preset reads still return the four recorded themes; all `is_active=false`, with Original MILDINCIDENT globally selected. Selection uses the existing brief input with frozen native key/content version, never shared-setting writes.
 
 ## Implemented and removed
@@ -61,8 +61,9 @@ Reproduce: `npm run check`, `npm test`, `npm run test:browser`, `npm run test:ho
 ## Commits / deployment
 
 - Baseline: `4890c8174635dd787f877e93601d819092d04c18`.
-- Integration checkpoint: `777f2e8` — explicit hosted connection, expiring single-run authorization and read-only polling/recovery.
-- Consolidation checkpoint: the commit containing this update; exact pushed SHA is reported at completion. Every checkpoint uses `[skip render]`; no force push or Render deploy.
+- Integration checkpoint: `777f2e857b9b3645647f0faa337cb9271cfcabee` — explicit hosted connection, expiring single-run authorization and read-only polling/recovery.
+- Consolidation checkpoint: `f859c3cbc0699eff65f6a7940bee235a44c77788` — actual frontend subtraction, post-first Review, creative continuity and current acceptance tests.
+- Final evidence/status checkpoint: the commit containing this update; exact pushed SHA is reported at completion. Every checkpoint uses `[skip render]`; no force push or Render deploy.
 
 The subtraction/frontend change is ready for a **separately authorized manual update of the existing Render service**, preserving disk, backup, sessions and histories. Default research remains read-only. Live hosted generation additionally needs explicit configuration, worker activation/version verification and a new bounded authorization. Do not reuse the consumed permit or silently enable generation. Rollback graph and private native credential remain available for controlled review; no production schema, dependency or global preset change is needed.
 
