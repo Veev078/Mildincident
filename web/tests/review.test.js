@@ -13,8 +13,8 @@ test('generated photographic continuations remain labeled and linked to their pa
 
 test('Discover has one clear direction form and truthful saved status without exposing operational controls as the main action',()=>{
  const html=discovery({workspace:{stories:[],engine:{configured:true,readOnly:true,generationAvailable:false},researchRequests:[{id:'request-1',kind:'brief',prompt:'An actual saved direction',version:0,createdAt:'2026-10-30T15:00:00Z',baselineIds:[]}]}});
- assert.equal((html.match(/data-research-form/g)||[]).length,1);assert.equal((html.match(/data-action="prepare-discovery"/g)||[]).length,1);
- assert.ok(html.includes('Save research direction'));assert.ok(html.includes('Direction saved · research not started'));assert.ok(html.includes('Research does not start from this action.'));
+ assert.equal((html.match(/data-research-form/g)||[]).length,1);assert.equal((html.match(/data-discovery-setup/g)||[]).length,1);
+ assert.ok(html.includes('Save general discovery brief'));assert.ok(html.includes('Direction saved · research not started'));assert.ok(html.includes('cannot start new research'));
  assert.ok(!html.includes('data-engine-action="queue"'));assert.ok(!html.includes('data-engine-action="start"'));assert.ok(html.includes('<details class="research-system"><summary>System details and research record</summary>'));
  const queued=discovery({workspace:{stories:[],engine:{configured:true,readOnly:true,generationAvailable:false},researchRequests:[{id:'q1',kind:'discovery',prompt:'Already queued elsewhere',version:0,engineJob:{state:'queued',version:1,candidates:[]}}]}});assert.ok(!queued.includes('data-engine-action="start"'));
 });

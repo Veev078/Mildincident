@@ -1,3 +1,9 @@
+# Current V12 continuation status
+
+See [V12 / V1 living status](release/V12_V1_STATUS.md) for current workstreams, evidence, blockers and next tasks. The entries below retain earlier sprint history.
+
+---
+
 # V11 — integrated editorial workspace — October 31, 2026 (America/New_York)
 
 Discover checkpoint `ad59f7a` is pushed. The integrated follow-up replaces the five numbered story stages with Develop / Photographs / Review while keeping the five primary destinations and every legacy story URL. Develop joins existing photographs, opening/sequence controls, rehearsal, caption, optional natural-language direction and readiness. Angle defaults to recorded proposed angle plus one direction field; advanced brief data/tools remain. Continue drains all in-flight/newer pending saves before acknowledging success; failed saves retain the exact instruction. Advanced tools remain open across rerenders. Inline readiness is rendered only after returned preparation/decision fields are applied.

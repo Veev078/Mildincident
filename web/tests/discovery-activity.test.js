@@ -18,8 +18,8 @@ test('equivalent default history groups visually but preserves every record and 
  assert.ok(html.indexOf('founder-inbox')<html.indexOf('research-activity'));
 });
 
-test('Discover explains the two save outcomes and uses plain labels without changing action hooks',()=>{
- const html=discovery({workspace:{stories:[],researchRequests:[],engine:{configured:true}}});
- for(const label of ['Proposals to review','Check for results','Save general discovery brief','keeps what you write above','standard brief instead','Research does not start from this action.','Earlier research and sources'])assert.ok(html.includes(label),label);
- assert.ok(html.includes('data-action="prepare-discovery"'));assert.ok(html.includes('data-research-form'));assert.ok(html.includes('data-engine-action="refresh"'));
+test('Discover gives a truthful entry, retains saved activity and avoids invented presets',()=>{
+ const html=discovery({workspace:{stories:[],researchRequests:[],engine:{configured:true,readOnly:true}}});
+ for(const label of ['Start a new discovery','Surprise Me','Theme / preset','Custom direction','Proposals to review','Save general discovery brief','cannot start new research','Earlier research and sources'])assert.ok(html.includes(label),label);
+ assert.ok(html.includes('data-research-form'));assert.ok(html.includes('data-engine-action="refresh"'));assert.ok(!html.includes('value="start"'));
 });

@@ -1,3 +1,5 @@
+import {researchAccess} from './discovery-flow.js';
+import {launchSavedResearch} from './research-launch.js';
 import {DEFAULT_DISCOVERY_PROMPT} from './discovery-request.js';
 import { esc, date, human, storyUrl, effective, mediaFor, proposalContent } from './components.js';
 import * as views from './views.js';
@@ -172,7 +174,7 @@ async function flushDraft(id) {
       if (result.readiness) current.readiness=result.readiness;
       if(result.productionDecisions)current.productionDecisions=result.productionDecisions;
       if(result.productionPreparation){current.productionPreparation=result.productionPreparation;const panel=document.querySelector('[data-production-visibility]');if(panel&&route().id===id)panel.innerHTML=views.productionVisibility(current);}
-      if (result.readiness) {const panel=document.querySelector('[data-readiness-panel]');if(panel&&route().id===id)panel.innerHTML=views.readinessPanel(current);}
+      if (result.readiness) {const panel=document.querySelector('[data-readiness-panel]');if(panel&&route().id===id)panel.innerHTML=route().tab==='overview'?views.workingReviewSummary(current):views.readinessPanel(current);}
       if (result.sourceSequencePlan) current.sourceSequencePlan=result.sourceSequencePlan;
       const sequenceIssues = document.querySelector('[data-direction-sequence-issues]');
       if (sequenceIssues && route().id === id) sequenceIssues.innerHTML = directionSequenceObservations(current);
@@ -388,6 +390,11 @@ document.addEventListener('click', event => {
   if(action==='check-native-packet'){checkNativePacket(storyById(button.dataset.story));return;}
   const story = storyById(button.dataset.story);
   switch (action) {
+    case 'open-production-records': {
+      const details=document.querySelector('.production-records');
+      if(details){details.open=true;details.scrollIntoView({block:'start',behavior:'smooth'});details.querySelector('summary')?.focus();}
+      break;
+    }
     case 'retry-preview': {
       const photo = button.closest('.photo'); const img = photo.querySelector('img');
       photo.classList.remove('preview-failed'); button.hidden = true;
@@ -657,7 +664,9 @@ document.addEventListener('error', event => {
   const retry = photo.querySelector('.preview-retry'); if (retry) retry.hidden = false;
 }, true);
 
-async function createResearchRequest(input) {
+async function createResearchRequest(input, {start=false}={}) {
+  if(start&&!researchAccess(state.workspace?.engine).canStart)throw new Error(researchAccess(state.workspace?.engine).message);
+  if(start&&!window.confirm('Start one authorized research run? It may use the approved provider budget for one research and one draft call. It will not publish or grant rights.'))return false;
   const keyField = input.kind==='brief' ? 'briefRequestKey' : 'discoveryRequestKey';
   state[keyField] ||= crypto.randomUUID();
   const result = await api('/api/research/requests', {method:'POST', headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({...input,idempotencyKey:state[keyField]})});
@@ -668,7 +677,8 @@ async function createResearchRequest(input) {
   if (!reused) state.workspace.researchRequests.unshift(result.request);
   render();
   await loadWorkspace({quiet:true}).catch(()=>{});
-  toast(reused?'Existing unstarted direction retained. Research has not started.':'Direction saved. Research has not started.');
+  if(start){try{await launchSavedResearch(result.request,{engine:state.workspace.engine,api});toast('Research start requested once. Progress and resulting ideas appear in Discover.');}catch(error){toast('Your brief is saved. '+error.message+' No automatic retry was made.',{error:true});}await loadWorkspace({quiet:true}).catch(()=>{});}
+  else toast(reused?'Existing saved direction retained. Research has not started.':'Direction saved. Research has not started.');
   document.querySelector(`[data-request-id="${result.request.id}"]`)?.closest('.research-activity-row')?.scrollIntoView({block:'center'});
 }
 document.addEventListener('click', async event=>{
@@ -692,15 +702,15 @@ document.addEventListener('click', event => {
 });
 document.addEventListener('submit', async event => {
   const form=event.target.closest('[data-research-form],[data-research-link]');if(!form)return;
-  event.preventDefault();const button=form.querySelector('button[type="submit"]');button.disabled=true;
-  const status=form.querySelector('[data-research-status]');status.textContent='Saving…';
+  event.preventDefault();if(state.discoverySubmitting)return;state.discoverySubmitting=true;const button=form.querySelector('button[type="submit"]');button.disabled=true;
+  const status=form.querySelector('[data-research-status]');status.textContent='Saving…';const fields=form.querySelector('[data-discovery-fields]');if(fields)fields.disabled=true;
   try {
-    if(form.matches('[data-research-form]')) await createResearchRequest({kind:'brief',prompt:form.elements.prompt.value,sourceUrl:form.elements.sourceUrl.value});
+    if(form.matches('[data-research-form]')) {const custom=!form.hasAttribute('data-discovery-setup')||form.dataset.mode==='custom';const result=await createResearchRequest(custom?{kind:'brief',prompt:form.elements.prompt.value,sourceUrl:form.elements.sourceUrl.value}:{kind:'discovery',prompt:DEFAULT_DISCOVERY_PROMPT,sourceUrl:''},{start:event.submitter?.value==='start'});if(result===false)status.textContent='Nothing was started or saved.';}
     else {
       await api(`/api/research/requests/${form.dataset.request}/events`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({event:'story_linked',storyId:form.elements.storyId.value,expectedVersion:Number(form.dataset.version)})});
       await loadWorkspace({quiet:true});toast('Existing source story linked locally. Production records are unchanged.');
     }
-  }catch(error){status.textContent=error.message;}finally{button.disabled=false;}
+  }catch(error){const current=document.querySelector('[data-research-status]');if(current)current.textContent=error.message;toast(error.message,{error:true});}finally{state.discoverySubmitting=false;button.disabled=false;const fields=document.querySelector('[data-discovery-fields]');if(fields)fields.disabled=false;}
 });
 
 document.addEventListener('submit', async event => {
@@ -776,7 +786,7 @@ document.addEventListener('input',event=>{if(event.target.closest('[data-photo-h
 document.addEventListener('change',async event=>{if(event.target.matches('[data-photo-trail]')){state.activePhotoHunt=event.target.value;state.photoOffset=0;try{await hydrateActivePhoto();render();}catch(error){toast(error.message,{error:true});}}});
 document.addEventListener('click',async event=>{const expand=event.target.closest('[data-photo-expand]');if(expand){state.photoParent=expand.dataset.parent;state.photoRequestKey=null;const form=document.querySelector('[data-photo-hunt]');form.elements.query.value=expand.dataset.photoExpand;form.elements.mode.value=expand.dataset.mode;form.elements.parent.value=state.photoParent;form.scrollIntoView({behavior:'smooth'});return;}const resume=event.target.closest('[data-photo-resume]');if(resume){resume.disabled=true;try{await api('/api/photography/hunts/'+resume.dataset.photoResume,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({pages:1})});state.workspace=await api('/api/workspace');await hydrateActivePhoto();render();}catch(error){toast(error.message,{error:true});}finally{resume.disabled=false;}}});
 
-document.addEventListener('click',event=>{const button=event.target.closest('[data-photo-brief]');if(!button)return;const form=document.querySelector('[data-research-form]');const hunt=state.workspace.photoHunts.find(h=>h.id===state.activePhotoHunt)||state.workspace.photoHunts[0];const photo=hunt?.photos.find(p=>p.id===button.dataset.photoId);if(form&&photo){state.researchDraft=photographicBrief(photo);form.elements.prompt.value=state.researchDraft.prompt;form.elements.sourceUrl.value=state.researchDraft.sourceUrl;state.briefRequestKey=null;form.scrollIntoView({behavior:'smooth'});toast('Source-bound creative brief prepared for your editing. No AI call was made.');}});
+document.addEventListener('click',event=>{const button=event.target.closest('[data-photo-brief]');if(!button)return;const form=document.querySelector('[data-research-form]');const hunt=state.workspace.photoHunts.find(h=>h.id===state.activePhotoHunt)||state.workspace.photoHunts[0];const photo=hunt?.photos.find(p=>p.id===button.dataset.photoId);if(form&&photo){state.researchDraft=photographicBrief(photo);state.discoveryMode='custom';state.briefRequestKey=null;render();document.querySelector('[data-research-form]')?.scrollIntoView({behavior:'smooth'});toast('Source-bound creative brief prepared for your editing. No AI call was made.');}});
 
 document.addEventListener('change',event=>{if(event.target.matches('[data-photo-blind]')){state.photoBlind=event.target.checked;event.target.closest('.photo-research').dataset.blind=String(event.target.checked);}});
 
@@ -838,7 +848,7 @@ document.addEventListener('click',async event=>{
 // Background UI reads never flush or replace pending editorial edits/forms.
 let backgroundRead=false;
 async function receiveResearchUpdates(){
- if(backgroundRead||document.hidden||!state.workspace?.engine?.delivery||pending.size||saving.size||document.querySelector('#asset-dialog')?.open||!['home','discovery'].includes(route().view)||document.activeElement?.matches('input,textarea,select')||document.querySelector('details[open]')||[...document.querySelectorAll('form input:not([type=hidden]),form textarea')].some(el=>el.type==='checkbox'?el.checked!==el.defaultChecked:el.value!==el.defaultValue))return;
+ if(state.discoverySubmitting||backgroundRead||document.hidden||!state.workspace?.engine?.delivery||pending.size||saving.size||document.querySelector('#asset-dialog')?.open||!['home','discovery'].includes(route().view)||document.activeElement?.matches('input,textarea,select')||document.querySelector('details[open]')||[...document.querySelectorAll('form input:not([type=hidden]),form textarea')].some(el=>el.type==='checkbox'?el.checked!==el.defaultChecked:el.value!==el.defaultValue))return;
  backgroundRead=true;try{await loadWorkspace({quiet:true});}catch{}finally{backgroundRead=false;}
 }
 const researchUiTimer=setInterval(receiveResearchUpdates,15000);window.addEventListener('pagehide',()=>clearInterval(researchUiTimer));document.addEventListener('visibilitychange',()=>{if(!document.hidden)receiveResearchUpdates();});
@@ -852,6 +862,24 @@ document.addEventListener('click',event=>{
  const form=document.querySelector('[data-research-form]');if(!form)return;
  if(state.researchDraft?.prompt?.trim()||state.researchDraft?.sourceUrl?.trim()){toast('Your unsaved direction is still here. Save it before preparing another.',{error:true});form.scrollIntoView({block:'center'});return;}
  const lead=state.workspace.sourceInputs?.leads?.find(l=>l.id===button.dataset.sourceBrief),brief=sourceResearchBrief(lead);if(!brief)return;
- state.researchDraft=brief;state.briefRequestKey=null;form.elements.prompt.value=brief.prompt;form.elements.sourceUrl.value=brief.sourceUrl;
- form.scrollIntoView({block:'center'});form.elements.prompt.focus({preventScroll:true});toast('Direction prepared from the source. Review and save it; research has not started.');
+ state.researchDraft=brief;state.discoveryMode='custom';state.briefRequestKey=null;render();
+ const activeForm=document.querySelector('[data-research-form]');activeForm?.scrollIntoView({block:'center'});activeForm?.elements.prompt.focus();toast('Direction prepared from the source. Review and save it; research has not started.');
+});
+
+
+document.addEventListener('click',event=>{
+ const choice=event.target.closest('[data-discovery-mode],[data-discovery-entry]');if(!choice)return;
+ if(state.discoverySubmitting){event.preventDefault();return;}
+ const mode=choice.dataset.discoveryMode||choice.dataset.discoveryEntry;
+ if(!['surprise','preset','custom'].includes(mode))return;
+ state.discoveryMode=mode;
+ if(route().view==='discovery'){event.preventDefault();render();document.querySelector('#research-direction')?.scrollIntoView({block:'start'});}
+});
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-start-saved-research]');if(!button||state.discoverySubmitting)return;
+ const request=state.workspace.researchRequests.find(r=>r.id===button.dataset.startSavedResearch);if(!request)return;
+ if(!researchAccess(state.workspace.engine).canStart){toast(researchAccess(state.workspace.engine).message,{error:true});return;}
+ if(!window.confirm('Start one authorized research run for this saved brief? It uses the approved provider budget and does not publish.'))return;
+ state.discoverySubmitting=true;button.disabled=true;
+ try{await launchSavedResearch(request,{engine:state.workspace.engine,api});await loadWorkspace({quiet:true});toast('Research start requested once. Check its recorded progress below.');}catch(error){toast(error.message+' Check results before retrying; no automatic retry was made.',{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}finally{state.discoverySubmitting=false;button.disabled=false;}
 });
