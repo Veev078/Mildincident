@@ -4130,3 +4130,8 @@ dialog:has(>.image-inspector) { padding:24px; max-height:calc(100vh - 40px); }
 /* Discover: proposals lead, research activity is a compact ledger of real outcomes. */
 @media(max-width:700px) {
 }
+
+/* Compact organization controls stay inside the existing story library. */
+.story-organization { display:flex; gap:1rem; flex-wrap:wrap; margin-top:.4rem; }
+.filter-bar > label { display:flex; align-items:center; gap:.45rem; font-size:.85rem; }
+.filter-bar select { max-width:100%; padding:.45rem; border:1px solid var(--line); background:var(--paper,#f5f8fc); color:inherit; }

@@ -7,7 +7,7 @@ export function lastSavedAt(story,reviews={}) {
 }
 
 export function todaySelection(workspace = {}) {
- const stories=(workspace.stories||[]).map(workingStory),reviews=workspace.founderReviews||{};
+ const stories=(workspace.stories||[]).filter(s=>!s.organization?.archived).map(workingStory),reviews=workspace.founderReviews||{};
  const decision=s=>proposalReviewState(s,reviews).decision;
  const active=stories.filter(s=>stateLabel(s).group!=='archive'&&decision(s)!=='pass');
  const fresh=active.filter(s=>s.origin==='n8n_development'&&!s.recoveredHistory&&!s.continuationOf&&decision(s)==='reset');
@@ -28,9 +28,9 @@ export function home(state) {
  ${desk.length?`<div class="today-editorial-lead">${card(desk[0])}${desk.length>1?`<div class="today-desk-rest">${desk.slice(1).map(card).join('')}</div>`:''}</div>`:empty('Your desk is clear',stories.length?'Browse your stories or review a new idea above.':'No stories have been returned by the connected source.','<a class="text-link" href="#/stories">Open Stories →</a>')}</section>
  ${decisions.length?`<section class="today-section today-decisions">${sectionHeading('Decisions to make','One next step for each story.')}<ul class="today-attention-list">${decisions.map(story=>{
   const action=nextAction(story),decision=story.productionDecisions?.find(d=>d.key==='handoff')||story.productionDecisions?.[0];
-  const tab=story.localDraft?.stale?'overview':decision?.tab||action.tab;
-  const title=story.localDraft?.stale?'Source changed — compare your saved edits.':decision?.title||action.reason;
-  return `<li><a href="${storyUrl(story.id,tab)}" aria-label="Review ${esc(story.title)}">${image(leadPhoto(story),{compact:true})}</a><div><a href="${storyUrl(story.id,tab)}"><strong>${esc(effective(story).title)}</strong></a><span>${esc(title)}</span></div><a class="text-link" href="${storyUrl(story.id,tab)}">${story.localDraft?.stale?'Compare changes':decision?.key==='handoff'?'Review existing activity':'Continue review'} →</a></li>`;
+  const creative=story.origin==='n8n_development';const tab=story.localDraft?.stale?'overview':creative?action.tab:decision?.tab||action.tab;
+  const title=story.localDraft?.stale?'Source changed — compare your saved edits.':creative?action.reason:decision?.title||action.reason;
+  return `<li><a href="${storyUrl(story.id,tab)}" aria-label="Review ${esc(story.title)}">${image(leadPhoto(story),{compact:true})}</a><div><a href="${storyUrl(story.id,tab)}"><strong>${esc(effective(story).title)}</strong></a><span>${esc(title)}</span></div><a class="text-link" href="${storyUrl(story.id,tab)}">${story.localDraft?.stale?'Compare changes':decision?.key==='handoff'?'Review existing activity':creative?action.label:'Continue review'} →</a></li>`;
  }).join('')}</ul></section>`:''}
 `;
 }

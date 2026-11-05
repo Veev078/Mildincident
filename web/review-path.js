@@ -1,3 +1,4 @@
+import {creativeProgress} from './story-progress.js';
 import {productionSummary,hasPublishingActivity} from './readiness.js';
 import {effective} from './components.js';
 
@@ -30,6 +31,7 @@ export function storyStep(story,tab='overview'){
  if(tab==='images'||tab==='carousel')return {label:'Edit story & caption',tab:'overview',state:observed==='buffer_sent'?'Buffer reports sent':observed==='buffer_unscheduled_draft'?'Existing Buffer draft':'Choosing photographs'};
  if(story.publishing?.requiresReview&&!hasPublishingActivity(story))return {label:'Review source records',tab:'publishing',state:'Source records need checking'};
  if(story.publishing?.requiresReview||story.publishing?.multipleHandoffs||['buffer_sent','buffer_unscheduled_draft','buffer_scheduled','instagram_posted_verified'].includes(observed))return {label:'Review existing activity',tab:'publishing',state:observed==='buffer_sent'?'Buffer reports sent':'Publishing activity to review'};
+ if(!effective(story).caption.trim()&&story.origin==='n8n_development'){const p=creativeProgress(story);return {label:p.action,tab:p.tab,state:p.label};}
  if(!effective(story).selectedAssetIds.length)return {label:'Choose photographs',tab:'images',state:'Choose photographs'};
  if(!effective(story).caption.trim())return {label:'Write the caption',tab:'caption',state:'Caption needed'};
  return {label:'Review this story',tab:'publishing',state:'Working draft'};

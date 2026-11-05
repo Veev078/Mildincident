@@ -21,6 +21,6 @@ test('Discover has one clear direction form and truthful saved status without ex
 test('saved proposals show their destination and source credit without implying image or rights verification',()=>{
  const story=make('saved-source',{media:[{id:'frame',creator:'Source-reported photographer',sourceUrl:'https://example.org/original'}]});
  const html=founderQueue({workspace:{stories:[story],founderReviews:{'saved-source':{decision:'save',sourceRevision:'r1',workingVersion:0}}},reviewFilter:'saved'});
- assert.ok(html.includes('Continue developing →'));assert.ok(html.includes('Source-reported photographer'));assert.ok(html.includes('Original source'));
+ assert.ok(!html.includes('Continue developing →'));assert.equal((html.match(/value="develop"/g)||[]).length,1);assert.ok(html.includes('Source-reported photographer'));assert.ok(html.includes('Original source'));
  assert.ok(html.includes('aria-pressed="true"'));assert.ok(html.includes('Metadata only · preview unavailable'));assert.ok(html.includes('does not authorize publication'));
 });

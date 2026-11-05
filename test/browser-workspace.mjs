@@ -343,7 +343,7 @@ try {
   for(const name of ['drawing','trench'])fixtureCandidate.media.push({asset_id:'dev-'+name,thumb_url:'https://example.org/'+name+'.jpg',source_page_url:'https://example.org/source',source_caption:'Synthetic fixture costume document, 1967.',credit_at_source:'Fixture museum',source_years:[1967],source_relation:'subject_caption_match',material_kind:'design_documentation'});
   engineFixture.candidates.push({job_id:queued.job_id,candidate_id:fixtureCandidate.id,status:'ready_to_review',candidate_json:JSON.stringify(fixtureCandidate)});
   await page.getByRole('button',{name:'Check for results',exact:true}).first().click();await page.getByText('Research results checked.',{exact:true}).waitFor();
-  await page.getByRole('link',{name:'Develop this story →',exact:true}).click();
+  await page.locator('[data-review-card] h3 a').first().click();
   await page.getByText('Story details & version history',{exact:true}).click();await page.getByText('Research proposal',{exact:true}).waitFor();
   const devStoryId='CON-DEV-'+queued.job_id;
   await page.goto(`${origin}/#/story/${devStoryId}/research`);
@@ -397,7 +397,7 @@ try {
   checks.push('source-caption sequence proposal applies dated real-reference metadata locally with roles/history and no native candidate overwrite');
 
   await page.goto(`${origin}/#/discovery`);
-  await page.locator('[data-review-card]').getByRole('button',{name:'Develop',exact:true}).click();await page.waitForURL('**/overview');checks.push('one founder decision opens the same editable story without a separate research approval form');
+  await page.locator('[data-review-card]').getByRole('button',{name:'Review draft',exact:true}).click();await page.waitForURL('**/overview');checks.push('one founder decision opens the same editable story without a separate research approval form');
   await page.goto(`${origin}/#/story/${devStoryId}/images`);
   await page.locator('[data-action="inspect"]').first().click();
   // Original source context remains available alongside later captured image captions.

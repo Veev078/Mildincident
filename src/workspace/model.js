@@ -63,7 +63,7 @@ export function buildWorkspace(snapshot, drafts = new Map()) {
       posts: buffer.posts, lifecycle, auditComplete: buffer.complete });
     const sound = records.soundSelections.find(s => s.concept_id === row.concept_id);
     const story = {
-      id: String(row.concept_id), title: String(row.title || 'Untitled story'), subject: String(row.subject || ''),
+      id: String(row.concept_id),createdAt:[row.createdAt,row.created_at,row.created_on].find(v=>typeof v==='string'&&Number.isFinite(Date.parse(v)))||null,updatedAt:[row.updatedAt,row.updated_at,row.updated_on].find(v=>typeof v==='string'&&Number.isFinite(Date.parse(v)))||null, title: String(row.title || 'Untitled story'), subject: String(row.subject || ''),
       hook: String(row.hook || ''), format: String(row.format || p?.format || 'carousel'),
       stage: String(row.stage || 'unclassified'), approvalStatus: String(row.approval_status || 'unreviewed'),
       caption: String(p?.caption_draft || row.caption || ''), packageVersion: p?.production_version || null,

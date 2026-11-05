@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {requireThat} from '../errors.js';
 import {editorialSelectionTools} from '../editorial-selection.js';
+import {editorialPrinciples} from '../editorial-principles.js';
 
 export const DRAFT_RECOVERY_BUDGET=Object.freeze({maxResearchCalls:0,maxDraftCalls:1,maxResearchToolCalls:0,maxCandidates:1,maxInputCharactersPerCall:30000,maxDraftOutputTokens:1800,priceVerified:false});
 const sha=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -31,7 +32,8 @@ export function buildCapturedDraftRecovery({worker,execution,jobId,requestHash,e
   const n=node(name);n.type='n8n-nodes-base.code';n.typeVersion=2;delete n.credentials;n.parameters={jsCode:`return ${JSON.stringify(rows)}.map(json=>({json}));`};
  }
  const draft=node('Draft Editorial Concept'),originalMessageSize=JSON.stringify(draft.parameters.responses).length;draft.retryOnFail=false;draft.parameters.options.maxTokens=1800;delete draft.parameters.builtInTools;delete draft.parameters.options.maxToolCalls;delete draft.parameters.options.maxToolsIterations;
- draft.parameters.responses.values[0].content+='\nDRAFT-ONLY RECOVERY: The passages below were captured in an earlier research execution, not fetched today. Generate exactly three supported hook_options, one per declared approach, and recommend one. The visual_cultural option may discuss the project’s social context; it must not describe an uninspected frame. Treat the proposed hook/why_interesting as editorial suggestions, never extra factual evidence. Do not invent facts to distinguish angles. Keep all mandatory fields concise, a 70–110 word source-grounded caption, single_image provisionally, and all three hooks within this same 1800-output-token response. Missing image verification is a visual_direction gap, not a reason to abandon an adequately supported preliminary caption.';
+ const principles=editorialPrinciples();if(!draft.parameters.responses.values[0].content.includes(principles.version))draft.parameters.responses.values[0].content+='\nEDITORIAL PRINCIPLES '+principles.version+': '+principles.drafting+'\nPHOTOGRAPHIC FIT: '+principles.photography;
+ draft.parameters.responses.values[0].content+='\nDRAFT-ONLY RECOVERY: The passages below were captured in an earlier research execution, not fetched today. Generate exactly three supported hook_options, one per declared approach, and recommend one. The visual_cultural option may discuss the project’s social context; it must not describe an uninspected frame. Treat the proposed hook/why_interesting as editorial suggestions, never extra factual evidence. Do not invent facts to distinguish angles. Keep all mandatory fields concise, a source-grounded caption whose length fits its substance, single_image provisionally, and all three hooks within this same 1800-output-token response. Missing image verification is a visual_direction gap, not a reason to abandon an adequately supported preliminary caption.';
  const finalize=node('Finalize Development Candidate');
  finalize.parameters.jsCode=`const rows=(function(){${finalize.parameters.jsCode}\n})();return rows.map(i=>{const c=JSON.parse(i.json.candidate_json);c.recovery=${JSON.stringify(recovery)};i.json.candidate_json=JSON.stringify(c);return i;});`;
  const link=(from,to)=>{workflow.connections[from].main[0]=[{node:to,type:'main',index:0}];};

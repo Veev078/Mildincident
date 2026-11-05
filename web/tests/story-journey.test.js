@@ -36,6 +36,6 @@ test('clearer story journey retains stale-edit, permission and existing-provider
  const original=story();original.localDraft={stale:true,caption:'Keep my work'};
  const stale=storyWorkspace(state,original,'caption');assert.match(stale,/Compare source and local draft/);assert.match(stale,/id="caption-editor"[^>]*disabled/);
  original.localDraft=null;original.publishing.requiresReview=true;
- const action=nextAction(original);assert.equal(action.tab,'publishing');assert.equal(action.label,'Finish required checks');
+ const action=nextAction(original);assert.equal(action.tab,'publishing');assert.equal(action.label,'Review existing activity');
  const production=storyWorkspace(state,original,'publishing');assert.match(production,/Your post/);assert.match(production,/earlier publishing record/);assert.match(production,/Studio does not send or schedule/);
 });

@@ -74,7 +74,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       workspace.stories.push(story);
     }
     attachLocalPreviews(workspace,previews);
-    for (const story of workspace.stories) { story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.sourceSequencePlan = buildSourceSequencePlan(story); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity}; }
+    for (const story of workspace.stories) { story.organization=drafts.organization(story.id);story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.sourceSequencePlan = buildSourceSequencePlan(story); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity}; }
     workspace.photoHunts=photography?.all()||[];
     workspace.founderReviews=founderReviews?.all()||{};
     workspace.sourceInputs={publications:feeds?.status()||[],leads:feeds?.list()||[]};
@@ -190,12 +190,13 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
           }finally{previewUploads--;}
         }
       }
-      const match = url.pathname.match(/^\/api\/stories\/(CON-[A-Za-z0-9_-]{1,120})(?:\/(draft|proposal|production-packet(?:\/check)?|draft\/history|draft\/rebase))?$/);
+      const match = url.pathname.match(/^\/api\/stories\/(CON-[A-Za-z0-9_-]{1,120})(?:\/(organization|draft|proposal|production-packet(?:\/check)?|draft\/history|draft\/rebase))?$/);
       if (match) {
         const [, id, operation] = match;
         const story = view().stories.find(s => s.id === id);
         requireThat(story, 'STORY_NOT_FOUND', 'Existing story was not found in the source snapshot.');
         if (!operation && request.method === 'GET') { json(response, 200, story); return; }
+        if(operation==='organization'&&request.method==='PATCH'){const organization=drafts.organize(story,await body(request));json(response,200,{organization,scope:'local_only',productionApplied:false});return;}
         if (operation === 'draft' && request.method === 'PATCH') {
           const input = await body(request);
           const current = view().stories.find(s => s.id === id);

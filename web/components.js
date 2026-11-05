@@ -1,3 +1,4 @@
+import {creativeProgress} from './story-progress.js';
 export const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 export const human = value => String(value || 'Not recorded').replace(/_/g, ' ').replace(/^\w/, char => char.toUpperCase());
 export const safeUrl = value => {
@@ -36,15 +37,16 @@ export function stateLabel(story) {
   if (observed === 'buffer_scheduled') return { label: 'Scheduled in Buffer', tone: 'quiet', group: 'publishing' };
   if (observed === 'buffer_unscheduled_draft') return { label: 'Buffer draft', tone: 'good', group: 'publishing' };
   if (observed === 'buffer_error' || story.publishing?.multipleHandoffs) return { label: 'Handoff review', tone: 'warn', group: 'publishing' };
+  if(story.origin==='n8n_development'){const p=creativeProgress(story);return {label:p.label,tone:'quiet',group:'research'};}
   if ((story.blockers || []).length) return { label: 'In production', tone: 'quiet', group: 'production' };
   return { label: human(story.stage), tone: '', group: 'research' };
 }
 export function nextAction(story) {
   if (story.localDraft?.stale) return { label: 'Review source changes', tab: 'overview', reason: 'The source revision has changed since this local draft.' };
-  if (story.publishing?.multipleHandoffs || story.publishing?.requiresReview) return { label: 'Finish required checks', tab: 'publishing', reason: 'Check the existing draft or send before preparing another.' };
+  if (story.publishing?.multipleHandoffs || story.publishing?.requiresReview) return { label: 'Review existing activity', tab: 'publishing', reason: 'Check the existing draft or send before preparing another.' };
   if (['buffer_sent', 'instagram_posted_verified', 'buffer_scheduled'].includes(story.publishing?.observed)) return { label: 'Review publication history', tab: 'publishing', reason: 'This story already has provider activity.' };
   if (story.publishing?.observed === 'buffer_unscheduled_draft') return { label: 'Review existing Buffer draft', tab: 'publishing', reason: 'Continue the existing draft; image rights remain a separate decision.' };
-  if (!story.packageVersion) return { label: 'Review research', tab: 'research', reason: 'An existing production package has not been recorded.' };
+  if (!story.packageVersion) {const p=creativeProgress(story);return {label:p.action,tab:p.tab,reason:p.detail};}
   if (!effective(story).selectedAssetIds.length) return { label: 'Choose the photographs', tab: 'images', reason: 'Build the story from its existing image candidates.' };
   if (story.rightsStatus !== 'complete') return { label: 'Review image provenance', tab: 'images', reason: 'Selected images still require per-image permission review.' };
   if (!effective(story).caption.trim()) return { label: 'Develop the caption', tab: 'caption', reason: 'A caption has not been saved.' };

@@ -1,3 +1,4 @@
+import {separateEditorialCopy} from '../editorial-principles.js';
 import {projectProduction} from './production-bridge.js';
 import {browserUrl} from './model.js';
 import {analyzeStory} from '../editorial-intelligence.js';
@@ -21,6 +22,7 @@ export function developmentCandidateStory(candidate,{request=null,soundtrack=[],
   records.packages=[{concept_id:id,caption_draft:candidate.captionDraft,slide_sequence_asset_ids:JSON.stringify(proposed),target_slide_count:target,rights_review_status:'unreviewed',source_claims_reviewed:false,designer_notes:candidate.carouselOutline,source_claims_review_notes:candidate.gaps.join('\n')}];
   const snapshot={records,observedAt:candidate.provenance.generatedAt,buffer:{posts:[],complete:true,observedAt:candidate.provenance.generatedAt},warnings:[]};
   const story=buildWorkspace(snapshot,drafts).stories[0];
+  const copy=separateEditorialCopy({caption:candidate.captionDraft,production_notes:candidate.internalProductionNotes});story.generatedCaptionOriginal=candidate.captionDraft;story.internalProductionNotes=copy.notes;if(!story.localDraft||story.localDraft.caption===undefined)story.caption=copy.caption;
   // Local judgment changes presentation, never the native source revision used by saved drafts.
   if(decision?.decision==='rejected')story.stage='development_rejected';
   if(decision?.decision==='approved'){story.stage='development_approved';story.approvalStatus='development_approved';}

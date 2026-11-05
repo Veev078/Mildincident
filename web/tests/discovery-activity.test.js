@@ -6,7 +6,7 @@ test('activity distinguishes saved, uncertain, queued, running, received, review
  const saved={kind:'brief',prompt:'An actual question to research',version:0};
  assert.equal(researchStatus(saved).label,'Saved · not started');
  assert.equal(researchStatus({...saved,version:1}).label,'Execution unconfirmed');
- for(const [job,label]of [[{state:'queued'},'Queued'],[{state:'generating'},'Running'],[{state:'generating',resultPending:true},'Result received'],[{state:'completed'},'Result received'],[{state:'completed',candidates:[{}]},'Ready for review'],[{state:'failed'},'Needs attention'],[{state:'queued',lastError:'UNCERTAIN'},'Needs attention'],[{state:'completed',candidates:[{}],recoveredHistory:true},'Recovered historical work']])assert.equal(researchStatus({...saved,engineJob:job}).label,label);
+ for(const [job,label]of [[{state:'queued'},'Queued'],[{state:'generating'},'Running'],[{state:'generating',resultPending:true},'Result received'],[{state:'completed'},'Result received'],[{state:'completed',candidates:[{}]},'Caption needed'],[{state:'failed'},'Needs attention'],[{state:'queued',lastError:'UNCERTAIN'},'Needs attention'],[{state:'completed',candidates:[{}],recoveredHistory:true},'Recovered historical work']])assert.equal(researchStatus({...saved,engineJob:job}).label,label);
 });
 test('Discover keeps only bounded current progress, never the historical ledger or photo/source desks',()=>{
  const saved={id:'saved',kind:'brief',prompt:'A saved direction',version:0},requests=[saved,...Array.from({length:20},(_,i)=>({...saved,id:'history'+i,engineJob:{recoveredHistory:true,state:'ready_to_review'}})),...Array.from({length:6},(_,i)=>({...saved,id:'active'+i,engineJob:{state:'generating'}}))];

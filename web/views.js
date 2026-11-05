@@ -1,3 +1,4 @@
+import {creativeProgress,organizeStories} from './story-progress.js';
 import {postReview} from './post-review.js';
 import {reviewPath,storyStep} from './review-path.js';
 import {developWorkspace} from './develop.js';
@@ -8,7 +9,7 @@ import { directionView, creativeBriefSummary } from './direction.js';
 
 const allStories = state => (state.workspace?.stories || []).map(workingStory);
 const filtered = (stories, query) => !query ? stories : stories.filter(s => `${s.title} ${s.subject} ${s.hook} ${s.id}`.toLowerCase().includes(query.toLowerCase()));
-const count = (stories, group) => stories.filter(story => stateLabel(story).group === group).length;
+const count = (stories, group) => stories.filter(story => ['caption','photographs','review'].includes(group)?creativeProgress(story).key===group:stateLabel(story).group===group).length;
 const aggregationLabel = value => ({ mean_of_observed_post_rates: 'Average of measured post rates', sum_of_observed_post_values: 'Total across measured posts' })[value] || 'Reported measurement';
 
 function pageHeader(kicker, title, description, action = '') {
@@ -23,12 +24,12 @@ function existingSourceNotes(story) {
 }
 
 export function pipeline(state) {
-  const stories = filtered(allStories(state), state.search);
-  const groups = [['all', 'All stories'], ['research', 'Research'], ['production', 'In production'], ['publishing', 'Publishing'], ['archive', 'Reported published']];
-  const visible = state.pipelineGroup === 'all' ? stories : stories.filter(s => stateLabel(s).group === state.pipelineGroup);
+  const stories = organizeStories(filtered(allStories(state), state.search),{archived:state.storyArchive==='archived',sort:state.storySort||'updated'});
+  const groups = [['all','All stories'],['caption','Caption needed'],['photographs','Photographs needed'],['review','Working drafts'], ['research', 'Research'], ['production', 'In production'], ['publishing', 'Publishing'], ['archive', 'Reported published']];
+  const visible = state.pipelineGroup === 'all' ? stories : stories.filter(s => ['caption','photographs','review'].includes(state.pipelineGroup)?creativeProgress(s).key===state.pipelineGroup:stateLabel(s).group===state.pipelineGroup);
   return `${pageHeader('Your stories', 'Stories', 'Saved ideas, working drafts and existing editorial work.')}
-    <div class="filter-bar"><div class="filter-chips" aria-label="Filter stories by stage">${groups.map(([key, label]) => `<button class="filter-chip ${state.pipelineGroup === key ? 'active' : ''}" data-action="pipeline-filter" data-value="${key}" aria-pressed="${state.pipelineGroup === key}">${label}<span>${key === 'all' ? stories.length : count(stories, key)}</span></button>`).join('')}</div><span class="small muted">${visible.length} ${visible.length === 1 ? 'story' : 'stories'}</span></div>
-    <div class="pipeline-list">${visible.length ? visible.map((story, index) => { const status = stateLabel(story); const action = nextAction(story); return `<article class="pipeline-row"><span class="row-number">${String(index + 1).padStart(2, '0')}</span><a class="pipeline-thumb" href="${storyUrl(story.id)}" aria-label="Open ${esc(story.title)}">${image(leadPhoto(story),{compact:true})}</a><div class="pipeline-title"><p class="eyebrow">${esc(story.subject || story.format)}</p><h2><a href="${storyUrl(story.id)}">${esc(story.title)}</a></h2><small>${esc(story.id)}${story.localDraft ? ' · draft saved' : ''}</small></div><div class="pipeline-status">${badge(status.label, status.tone)}<span>${effective(story).selectedAssetIds.length} / ${story.targetSlideCount || '—'} slides selected</span><span>${(story.blockers || []).length} checks to review</span></div><a class="row-action" href="${storyUrl(story.id, action.tab)}">${esc(action.label)} <span aria-hidden="true">→</span></a></article>`; }).join('') : empty('No stories in this view', 'Try another editorial stage or clear the search.')}</div>`;
+    <div class="filter-bar"><label>Show <select id="story-archive"><option value="active">Active stories</option><option value="archived" ${state.storyArchive==='archived'?'selected':''}>Archived stories</option></select></label><label>Sort <select id="story-sort">${[['updated','Recently updated'],['newest','Newest'],['oldest','Oldest']].map(([k,v])=>`<option value="${k}" ${(state.storySort||'updated')===k?'selected':''}>${v}</option>`).join('')}</select></label><label>Status <select id="story-status" aria-label="Story status">${groups.map(([key,label])=>`<option value="${key}" ${state.pipelineGroup===key?'selected':''}>${label} (${key==='all'?stories.length:count(stories,key)})</option>`).join('')}</select></label><span class="small muted">${visible.length} ${visible.length === 1 ? 'story' : 'stories'}</span></div>
+    <div class="pipeline-list">${visible.length ? visible.map((story, index) => { const status = stateLabel(story); const action = nextAction(story); return `<article class="pipeline-row"><span class="row-number">${String(index + 1).padStart(2, '0')}</span><a class="pipeline-thumb" href="${storyUrl(story.id)}" aria-label="Open ${esc(story.title)}">${image(leadPhoto(story),{compact:true})}</a><div class="pipeline-title"><p class="eyebrow">${esc(story.subject || story.format)}</p><h2><a href="${storyUrl(story.id)}">${esc(story.title)}</a></h2><small>${story.organization?.pinned?'Pinned · ':''}${story.localDraft?'Private draft saved':''}</small><div class="story-organization"><button class="text-button" data-organize-story="${esc(story.id)}" data-field="pinned">${story.organization?.pinned?'Unpin':'Pin'}</button><button class="text-button" data-organize-story="${esc(story.id)}" data-field="archived">${story.organization?.archived?'Restore':'Archive'}</button></div></div><div class="pipeline-status">${badge(status.label, status.tone)}<span>${effective(story).selectedAssetIds.length} / ${story.targetSlideCount || '—'} slides selected</span></div><a class="row-action" href="${storyUrl(story.id, action.tab)}">${esc(action.label)} <span aria-hidden="true">→</span></a></article>`; }).join('') : empty('No stories in this view', 'Try another editorial stage or clear the search.')}</div>`;
 }
 
 export function editorialAuditNotice(story) {
@@ -130,7 +131,7 @@ export function library(state) {
 }
 
 export function publishing(state) {
-  const stories = filtered(allStories(state), state.search);
+  const stories = organizeStories(filtered(allStories(state), state.search),{archived:state.storyArchive==='archived',sort:state.storySort||'updated'});
   const relevant = stories.filter(s => s.packageVersion || s.production?.package || s.publishing?.postIds?.length || s.publishing?.requiresReview || s.publishing?.multipleHandoffs || s.localDraft);
   const mapped = new Set(allStories(state).flatMap(story => story.publishing?.postIds || []));
   const unmapped = (state.workspace.publishingPosts || []).filter(post => !mapped.has(post.id));

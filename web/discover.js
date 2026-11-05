@@ -2,7 +2,7 @@ import {discoverySetup,researchAccess} from './discovery-flow.js';
 import {founderQueue} from './review.js';
 import {esc,storyUrl} from './components.js';
 export function discovery(state){
- const requests=state.workspace.researchRequests||[],active=requests.filter(r=>r.engineJob&&!r.engineJob.recoveredHistory).sort((a,b)=>Number(Boolean(a.engineJob.candidates?.length))-Number(Boolean(b.engineJob.candidates?.length))).slice(0,3);
+ const requests=state.workspace.researchRequests||[],active=requests.filter(r=>r.engineJob&&!r.engineJob.recoveredHistory&&!r.engineJob.candidates?.some(c=>(state.workspace.stories||[]).some(s=>s.id==='CON-DEV-'+c.jobId))).sort((a,b)=>Number(Boolean(a.engineJob.candidates?.length))-Number(Boolean(b.engineJob.candidates?.length))).slice(0,3);
  const saved=requests.find(r=>!r.engineJob&&!r.linkedStoryId);
  const savedDirection=saved?`<p class="saved-direction">Direction saved.${researchAccess(state.workspace.engine).canStart?` <button class="text-button" data-start-saved-research="${esc(saved.id)}">Generate Stories</button>`:''}</p>`:'';
  const progress=active.length?`<section class="generation-progress" aria-label="Generation progress">${active.map(r=>{const status=researchStatus(r),job=r.engineJob;return `<article data-request-id="${esc(r.id)}"><strong>${esc(status.label)}</strong><p>${esc(status.detail)}</p>${job.candidates?.length?job.candidates.map(c=>`<a class="text-link" href="${storyUrl('CON-DEV-'+c.jobId)}">Develop this story →</a>`).join(''):['queued'].includes(job.state)&&!job.dispatchId&&researchAccess(state.workspace.engine).canStart?`<button class="small-button" data-start-saved-research="${esc(r.id)}">Generate Stories</button>`:''}${job.lastError?'<button class="text-button" data-engine-action="refresh">Check for results</button><p class="small muted">This request will not be resent automatically.</p>':''}</article>`;}).join('')}</section>`:'';
@@ -12,7 +12,7 @@ export function researchStatus(request){
  const job=request.engineJob;
  if(job?.recoveredHistory)return {label:'Recovered historical work',detail:'An earlier result, kept separate from new research.'};
  if(job?.lastError||['failed','blocked','cancelled','queue_uncertain','dispatch_uncertain'].includes(job?.state))return {label:'Needs attention',detail:'Research did not complete normally. Inspect the record before trying again.',tone:'warn'};
- if(job?.candidates?.length)return {label:'Ready for review',detail:`${job.candidates.length} existing result${job.candidates.length===1?'':'s'} available in Studio.`};
+ if(job?.candidates?.length){const captioned=job.candidates.some(c=>c.captionDraft?.trim());return {label:captioned?'Draft received':'Caption needed',detail:captioned?'A preliminary draft is saved; photographs and factual review remain open.':'Research is saved; a usable caption has not been generated.'};}
  if(job?.resultPending||['completed','completed_with_gaps','ready_to_review','approved','rejected','needs_research'].includes(job?.state))return {label:'Result received',detail:'Delivery is being checked; no reviewable proposal is available yet.'};
  if(job?.state==='queueing')return {label:'Queueing',detail:'Saving the job to the research queue; acceptance is not yet confirmed.'};
  if(job?.state==='dispatching')return {label:'Starting · unconfirmed',detail:'A start was requested; execution has not yet been confirmed. Do not submit again.'};
