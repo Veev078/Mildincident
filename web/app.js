@@ -507,6 +507,10 @@ document.addEventListener('click', event => {
       if (track) editDraft(story.id, { musicSelection: { track: track.track || track.title, artist: track.artist } }, { rerender: true, immediate: true });
       break;
     }
+    case 'choose-hook': {
+      const option=story?.hookOptions?.[Number(button.dataset.index)];if(!option)break;
+      editDraft(story.id,{hook:option.text},{rerender:true,immediate:true});break;
+    }
     case 'notes-template': {
       if (!story) break;
       const checklist = 'EDITORIAL REVIEW\n• Original source and the exact passage\n• Facts to verify / interpretation to label\n• Selected image, creator and provenance\n• Per-image permission evidence and credit\n• Opening photograph and narrative sequence\n• Caption edit and sound direction\n• Existing Buffer handoff to reconcile';
@@ -892,5 +896,5 @@ document.addEventListener('click',async event=>{
  if(!researchAccess(state.workspace.engine).canStart){toast(researchAccess(state.workspace.engine).message,{error:true});return;}
  if(!window.confirm('Start one authorized research run for this saved brief? It uses the approved provider budget and does not publish.'))return;
  state.discoverySubmitting=true;button.disabled=true;
- try{await launchSavedResearch(request,{engine:state.workspace.engine,api});await loadWorkspace({quiet:true});toast('Research start requested once. Check its recorded progress below.');}catch(error){toast(error.message+' Check results before retrying; no automatic retry was made.',{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}finally{state.discoverySubmitting=false;button.disabled=false;}
+ try{await launchSavedResearch(request,{engine:state.workspace.engine,api});await loadWorkspace({quiet:true});toast('Research start requested once. Check its recorded progress below.');}catch(error){toast(error.message+' Check results before retrying; no automatic retry was made.',{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}finally{state.discoverySubmitting=false;button.disabled=false;const fields=document.querySelector('[data-discovery-fields]');if(fields)fields.disabled=false;}
 });

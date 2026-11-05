@@ -1,0 +1,16 @@
+import {esc,external,effective,fieldDisabled} from './components.js';
+const labels={discovery:'Discovery',visual_cultural:'Visual / cultural observation',restrained:'Restrained context'};
+export function hookOptionsView(story,{editable=false}={}) {
+ const options=story.hookOptions||[];if(!options.length)return '';
+ return `<details class="hook-options"><summary>Compare editorial angles</summary><p class="small muted">Proposed wording with recorded claim references. Review the sources before using a factual claim.</p>${options.map((option,index)=>{
+  const sources=option.claimIndices.map(i=>story.research?.[i]).filter(Boolean),selected=effective(story).hook===option.text;
+  return `<article><p class="eyebrow">${esc(labels[option.approach]||'Editorial angle')}${option.recommended?' · Recommended':''}</p><p>${esc(option.text)}</p>${option.interpretation?`<p class="small muted">Editorial interpretation: ${esc(option.interpretation)}</p>`:''}<p class="small">${sources.map(source=>external(source.url,source.sourceName||'Claim source')).join(' · ')}</p><p class="small muted">${option.evidenceStatus==='source_passages_recorded'?'Source passages recorded; factual review is still open.':'Source passages need review.'}</p>${editable?`<button class="small-button" data-action="choose-hook" data-story="${esc(story.id)}" data-index="${index}" ${selected||story.localDraft?.stale?'disabled':fieldDisabled(story)}>${selected?'Current angle':'Use this angle'}</button>`:''}</article>`;
+ }).join('')}</details>`;
+}
+
+export function photographicEvidenceSummary(asset) {
+ if(!asset)return '';
+ const relation=asset.sourceRelation==='subject_caption_match'?'The source caption suggests this frame relates to the story.':asset.sourceRelation==='page_cover'?'This is the source page’s cover; its relationship to the story is unconfirmed.':asset.sourceRelation==='context_only'?'This is an image from a related page; the caption does not establish a match to the story.':'The photograph’s relationship to this story has not been checked.';
+ const creator=asset.creatorBasis==='explicit_source_photo_credit'?`The source names ${asset.creator||'a photographer'}; the attribution needs review.`:asset.creatorBasis==='copyright_holder_only'?'A copyright holder is recorded; the photographer is not established.':asset.creatorBasis==='courtesy_only'?'A courtesy credit is recorded; the photographer is not established.':'The photographer has not been established from an image-specific source credit.';
+ return `<div class="photographic-evidence"><p class="small">${esc(relation)} Image identity needs visual review.</p><p class="small muted">${esc(creator)} Publication permission is a separate review.</p></div>`;
+}

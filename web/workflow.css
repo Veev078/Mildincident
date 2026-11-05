@@ -12,6 +12,8 @@
 .discovery-modes span { font-size:12px; line-height:1.6; color:var(--quiet); }
 .discovery-mode-body { padding:18px 0 0; max-width:850px; }
 .discovery-mode-body>p,.preset-availability p { font-size:14px; line-height:1.65; }
+.preset-availability .field { display:block; font-size:14px; margin:0 0 14px; }
+.preset-availability select { display:block; width:100%; max-width:650px; padding:12px; margin-top:8px; background:#fff; border:1px solid var(--line); color:var(--ink); }
 .discovery-mode-body .carousel-actions { flex-wrap:wrap; gap:12px; }
 .discovery-start .field { display:block; margin-bottom:14px; font-size:14px; }
 .discovery-start textarea,.discovery-start input { width:100%; padding:12px; margin-top:8px; font:inherit; border:1px solid var(--line); background:var(--surface); }

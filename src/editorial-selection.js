@@ -23,16 +23,17 @@ export function editorialSelectionTools(){
   if(puzzle&&!meaningful(ec.independent_payoff))add('IDENTIFICATION_WITHOUT_INDEPENDENT_PAYOFF','An identification puzzle alone does not establish cultural or photographic payoff. An archival puzzle can qualify when a separate, evidenced cultural story and specific visual material warrant it.');
   let visualSupport='not_checked';
   if(phase==='sources'){
-   if(indices.some(i=>!sources.some(s=>s.claimIndex===i&&s.access==='source_text_captured')))add('CULTURAL_SOURCE_SUPPORT_OPEN','A source passage for the claims carrying the editorial case is unavailable.');
+   if(indices.some(i=>!sources.some(s=>s.claimIndex===i&&s.url===(c.claims[i].source_url||c.claims[i].url)&&s.access==='source_text_captured')))add('CULTURAL_SOURCE_SUPPORT_OPEN','A matching source passage for the claims carrying the editorial case is unavailable.');
    const related=photos.filter(p=>(p.source_relation||p.relation)==='subject_caption_match');const detail=visualWords;
-   const matching=related.some(p=>{const caption=words((p.source_caption||p.caption||'').replace(/©[\s\S]*$/,''));const page=sources.find(s=>s.url===p.source_page_url&&s.access==='source_text_captured');const context=words(page?.textExcerpt||'');return [...detail].filter(w=>caption.has(w)||context.has(w)).length>=2;});
-   visualSupport=matching?'source_context_detail_correspondence':'not_established';
+   // Article text can establish context, not the identity or composition of one image.
+   const matching=related.some(p=>{const caption=words((p.source_caption||p.caption||'').replace(/©[\s\S]*$/,''));return [...detail].filter(w=>caption.has(w)).length>=2;});
+   visualSupport=matching?'image_caption_detail_correspondence':'not_established';
    if(!matching)add('VISUAL_EVIDENCE_UNKNOWN','The proposed image detail needs human inspection or stronger source evidence. Sparse metadata is unknown evidence, not poor photography; preserve the lead and its references without paid drafting.');
    if(sources.some(s=>s.contradiction===true))add('CONTRADICTORY_SOURCE_EVIDENCE','Recorded conflicting source evidence requires editorial resolution before drafting.');
   }
   const decision=rejection||c.prechecks_passed===false||ec.recommendation==='reject'?'reject':reasons.length?'hold':'advance';
   const dimensions={culturalRelevance:{reason:clean(ec.cultural_payoff),basis:'editorial_proposal'},originality:{reason:clean(ec.familiarity_risk),basis:'editorial_proposal'},visualPotential:{reason:clean(ec.visual_detail),basis:visualSupport},storyImageConnection:{reason:clean(ec.image_story_connection),basis:'editorial_inference'},researchConfidence:{reason:clean(ec.research_uncertainty),basis:phase==='sources'?'captured_sources_not_fact_verification':'model_claim_references'},brandFit:{reason:clean(ec.preset_connection),basis:'preset_proposal'},formatPotential:{reason:clean(ec.format_potential),basis:'provisional_not_asset_verification'}};
-  const rationale=decision==='advance'?[{code:phase==='sources'?'SOURCE_LED_CASE_READY_FOR_DRAFT':'CASE_READY_FOR_SOURCE_REVIEW',message:phase==='sources'?'The cultural case has captured claim sources and its specific visual detail corresponds to captured source context. Advance provisionally to drafting for human review; aesthetic quality remains unverified.':'A specific cultural/visual case and claim references are supplied. Advance only to source review; this is still a model proposal.'}]:[];
+  const rationale=decision==='advance'?[{code:phase==='sources'?'SOURCE_LED_CASE_READY_FOR_DRAFT':'CASE_READY_FOR_SOURCE_REVIEW',message:phase==='sources'?'The cultural case has captured claim sources and its specific visual detail corresponds to an image-specific source caption. Advance provisionally to drafting for human review; identity, aesthetic quality and rights remain unverified.':'A specific cultural/visual case and claim references are supplied. Advance only to source review; this is still a model proposal.'}]:[];
   return {decision,reasons,rationale,dimensions,basis:phase==='sources'?'source_text_and_image_context_correspondence':'model_case_completeness_only',visualSupport,pixelInspectionPerformed:false,tasteVerified:false,rightsGranted:false,primaryAppeal:clean(ec.primary_appeal)||'unexplained'};
  }
  function select(candidates,context={}){

@@ -6,7 +6,8 @@ import {createHash} from 'node:crypto';import {execFileSync} from 'node:child_pr
 import {chromium} from 'playwright';
 import {createWorkspaceServer} from '../src/workspace/server.js';import {WorkspaceSource} from '../src/workspace/data-source.js';
 import {LocalDraftStore} from '../src/workspace/store.js';import {LocalResearchStore} from '../src/workspace/research-store.js';
-const input=path.resolve('.local/v12-live/workspace'),artifacts=path.resolve('.local/v12/real-data');
+const option=(name,fallback)=>process.argv.find(a=>a.startsWith('--'+name+'='))?.slice(name.length+3)||fallback;
+const input=path.resolve(option('input','.local/v12-live/workspace')),artifacts=path.resolve(option('artifacts','.local/v12/real-data')),baselineRef=option('baseline','a772c317cadc2d00a9bdc2a1b083e5f59fcd5a10');
 const root=await fs.mkdtemp(path.join(os.tmpdir(),'mi-v12-real-'));await fs.mkdir(artifacts,{recursive:true,mode:0o700});
 const files=['snapshot.json','research.sqlite'];
 const digest=async file=>createHash('sha256').update(await fs.readFile(file)).digest('hex');
@@ -24,7 +25,7 @@ async function boot(webRoot){
 }
 try{
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
- const baseline=path.join(root,'baseline');await fs.mkdir(baseline);const archive=path.join(root,'baseline.tar');await fs.writeFile(archive,execFileSync('git',['archive','a772c317cadc2d00a9bdc2a1b083e5f59fcd5a10','web']));await extract({cwd:baseline,file:archive});
+ const baseline=path.join(root,'baseline');await fs.mkdir(baseline);const archive=path.join(root,'baseline.tar');await fs.writeFile(archive,execFileSync('git',['archive',baselineRef,'web']));await extract({cwd:baseline,file:archive});
  const modes=process.argv.includes('--before-only')?[['before',path.join(baseline,'web')]]:process.argv.includes('--after-only')?[['after',null]]:[['before',path.join(baseline,'web')],['after',null]],reports=[];
  for(const [label,webRoot]of modes){
   const app=await boot(webRoot),page=await browser.newPage();page.setDefaultTimeout(15000);let externalRequestsBlocked=0,writeRequests=0;
@@ -42,10 +43,21 @@ try{
     await page.screenshot({path:path.join(artifacts,`${label}-${name}-${width}x${height}.png`)});
    }
   }
+  if(label==='after'&&process.argv.includes('--sprint-b')){
+   for(const [width,height]of [[1440,900],[390,844]]){
+    await page.setViewportSize({width,height});await page.goto(app.origin+'/#/discover');await page.getByRole('heading',{name:'Discover',exact:true}).waitFor();
+    for(const [mode,name]of [['surprise','surprise-blocked'],['preset','presets'],['custom','custom-blocked']]){await page.locator('[data-discovery-mode="'+mode+'"]').click();if(mode==='preset')assert.equal(await page.locator('#discovery-preset option:not([disabled])').count(),4);assert.equal(await page.getByRole('button',{name:'Start research',exact:true}).count(),0);await page.screenshot({path:path.join(artifacts,`after-${name}-${width}x${height}.png`),fullPage:true});}
+    await page.locator('[data-review-filter="history"]').click();await page.locator('[data-review-card]').first().waitFor();await page.screenshot({path:path.join(artifacts,`after-historical-proposals-${width}x${height}.png`),fullPage:true});
+    const historical=model.stories.find(s=>s.origin==='n8n_development'&&/Deneuve/.test(s.subject));assert.ok(historical);
+    await page.goto(app.origin+'/#/story/'+historical.id+'/research');await page.locator('h1').waitFor();await page.locator('.captured-source-excerpt>summary').first().click();await page.screenshot({path:path.join(artifacts,`after-captured-source-${width}x${height}.png`),fullPage:true});
+    await page.goto(app.origin+'/#/story/'+historical.id+'/images');await page.locator('[data-action="inspect"]').first().click();await page.locator('[data-inspector]').waitFor();await page.screenshot({path:path.join(artifacts,`after-image-evidence-${width}x${height}.png`),fullPage:true});await page.getByRole('button',{name:'Close image details',exact:true}).click();
+    await page.goto(app.origin+'/#/story/'+historical.id+'/overview');await page.getByLabel('Local caption draft',{exact:true}).waitFor();await page.screenshot({path:path.join(artifacts,`after-editable-history-${width}x${height}.png`),fullPage:true});
+   }
+  }
   assert.equal(writeRequests,0);reports.push({label,stories:model.stories.length,nativeStories:model.stories.filter(s=>s.origin!=='n8n_development').length,recoveredHistory:model.stories.filter(s=>s.recoveredHistory).length,storyId:story.id,externalRequestsBlocked,writeRequests,realPixelsInspected:false});await page.close();
  }
  const afterDigests=Object.fromEntries(await Promise.all(files.map(async file=>[file,await digest(path.join(input,file))])));
  assert.deepEqual(afterDigests,beforeDigests);assert.deepEqual(errors,[]);
- const report={passed:true,source:'existing read-only real snapshots copied to disposable stores',reports,browserErrors:errors,originalStoreDigestsUnchanged:true,sourceDigests:afterDigests,externalPhotoRequestsBlocked:true,noReplacementImages:true,productionWrites:0,paidCalls:0};
+ const report={passed:true,baseline:baselineRef,source:'existing read-only real snapshots copied to disposable stores',reports,browserErrors:errors,originalStoreDigestsUnchanged:true,sourceDigests:afterDigests,externalPhotoRequestsBlocked:true,noReplacementImages:true,productionWrites:0,paidCalls:0};
  await fs.writeFile(path.join(artifacts,process.argv.includes('--before-only')?'before-report.json':process.argv.includes('--after-only')?'after-report.json':'report.json'),JSON.stringify(report,null,2),{mode:0o600});console.log(JSON.stringify(report,null,2));
 }finally{await browser?.close();for(const server of servers)await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});for(const store of stores)store.close();await fs.rm(root,{recursive:true,force:true});}

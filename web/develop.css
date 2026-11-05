@@ -28,6 +28,14 @@
 .develop-premise h2 { font:24px/1.4 var(--serif); margin:7px 0 10px; }
 .develop-premise .small { margin:10px 0; }
 .develop-premise>.text-link { font-size:12px; }
+.hook-options { border-top:1px solid var(--line); padding:14px 0; margin:0 0 16px; }
+.hook-options>summary,.proposal-sources>summary { font-size:13px; cursor:pointer; }
+.hook-options article { border-top:1px solid var(--line); padding:12px 0; margin-top:12px; overflow-wrap:anywhere; }
+.hook-options article p { margin:8px 0; }
+.proposal-sources { margin:14px 0; overflow-wrap:anywhere; }
+.proposal-sources ul { padding-left:18px; }
+.proposal-sources li { margin:12px 0; }
+.photographic-evidence { margin:12px 0; }
 .develop-editor .caption-writing-surface { padding:18px; }
 .develop-editor .caption-editor-heading { align-items:center; margin-bottom:12px; }
 .develop-editor .caption-editor-heading h2 { margin:0; }

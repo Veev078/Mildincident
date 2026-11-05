@@ -26,6 +26,11 @@ test('concurrent local queues create one remote job and preserve native request 
  const {research,service,state}=await setup(t);const request=research.create({kind:'brief',prompt:'Research a distinctive photography scene'},[]);await Promise.all([service.queue(request.id),service.queue(request.id)]);assert.equal(state.posts,1);assert.equal(research.engineJob(request.id).state,'queued');assert.equal(state.jobs[0].job_id,request.id);assert.equal(state.jobs[0].request_hash,requestFingerprint(request));
  await assert.rejects(service.start(request.id,research.engineJob(request.id).version),{code:'GENERATION_NOT_APPROVED'});assert.equal(state.dispatches,0);
 });
+
+test('preset provenance freezes in the existing optional context while the exact direction stays in the native brief input',async t=>{
+ const {research,service,state}=await setup(t),preset={key:'recorded-theme',name:'Recorded native theme',version:'a'.repeat(64)},prompt='Research the exact recorded theme direction.\nRetain this second sentence.';
+ const request=research.create({kind:'brief',prompt,sourceUrl:''},[],{preset});await service.queue(request.id);const context=JSON.parse(state.jobs[0].editorial_context_json);assert.equal(state.jobs[0].kind,'brief');assert.equal(state.jobs[0].prompt,prompt);assert.deepEqual(context.preset,{...preset,selectionMode:'saved_brief'});assert.equal(research.engineJob(request.id).editorialContext.preset.version,preset.version);await service.queue(request.id);assert.equal(state.posts,1);await service.refresh();assert.equal(state.posts,1);
+});
 test('lost remote-create response reconciles without reposting and survives local restart',async t=>{
  const {research,service,state,root}=await setup(t);const request=research.create({kind:'discovery',prompt:'Find one unusual source-led cultural story'},[]);state.loseResponse=true;await assert.rejects(service.queue(request.id),{code:'ENGINE_NETWORK_UNCERTAIN'});assert.equal(research.engineJob(request.id).state,'queue_uncertain');await service.queue(request.id);assert.equal(state.posts,1);await service.refresh();assert.equal(research.engineJob(request.id).state,'queued');
  const restarted=new LocalResearchStore(path.join(root,'research.sqlite'));try{assert.equal(restarted.engineJob(request.id).remoteRowId,'1');assert.ok(restarted.engineHistory(request.id).length>=2);}finally{restarted.close();}
