@@ -32,7 +32,7 @@ export function developmentCandidateStory(candidate,{request=null,soundtrack=[],
   story.editorialDirection=buildEditorialDirection(working,{creativeBrief:story.localDraft?.creativeBrief});
   story.editorialAudit=assessEditorialPackage({...candidate,title:working.title,hook:working.hook,captionDraft:working.caption,format:working.format,targetSlideCount:working.targetSlideCount,proposedAssetIds:working.selectedAssetIds},evidence?{...evidence,selectionProposal:{...evidence.selectionProposal,assetIds:working.selectedAssetIds}}:null);
   story.selectionProposalBasis=proposed.length?'source_caption_metadata_match':'no_automatic_selection';
-  story.hookOptions=candidate.hookOptions||[];story.editorialStage=candidate.editorialStage;story.photographicStage=candidate.photographicStage;
+  story.hookOptions=candidate.hookOptions||[];story.editorialStage=candidate.editorialStage;story.photographicStage=candidate.photographicStage;story.draftRecovery=candidate.recovery||null;
   story.editorialSelection=candidate.editorialSelection||null;story.editorialCase=candidate.editorialCase||null;story.leadComparison=candidate.leadComparison||[];story.selectionProvenance=candidate.selectionProvenance||null;
   story.generationFormat=format;story.generationFormatBasis=candidate.formatBasis;story.discoveryPlan=candidate.discoveryPlan||null;
   story.production=projectProduction({row:{concept_id:id},records:{packages:[],imports:[],archives:[],exports:[],proofs:[],guardedHandoffs:[]},buffer:{posts:[],complete:false,observedAt:candidate.provenance.generatedAt},observedAt:candidate.provenance.generatedAt,safeUrl:browserUrl});
