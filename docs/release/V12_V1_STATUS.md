@@ -1,3 +1,11 @@
+# Native retry investigation — stopped pending deployed-runtime proof
+
+November5,2026. [Focused transport audit](V12_OPENAI_RETRY_AUDIT.md) corrects the SDK assumption: the inspected published OpenAI v2.3 app-node implementation uses n8n requestWithAuthentication/Axios, not the OpenAI SDK. Seven ordinary success/failure simulations make one attempt each; credential-refresh and actual function-tool-continuation negative controls produce two requests. These source-derived tests use real local HTTP/Axios and synthetic configuration, not the deployed Cloud runtime.26 existing permit/dispatch tests pass.
+
+Cloud package/build and effective credential/proxy transport configuration remain inaccessible through available read-only interfaces. Thus deployed zero-retry behavior is not proven; no repair or paid acceptance is declared ready. No graph, node, permit, model/search execution, production state or Render deployment was changed. Fresh readback confirms worker6CkqfYc4Pyd4k8vi inactive, active version null, unchanged saved versione6fe10d3-c7a7-482b-9fd1-cd24c681b145. Original graph hash1ec55f30… is unchanged. Obtain authoritative deployed-runtime/route evidence before any fresh paid approval request. No new sprint was started.
+
+---
+
 # Build G Part 1 — Discover, private themes and status consistency
 
 November5,2026, America/New_York. Verified local/GitHub baseline **81a0ca215cc76db45f658e40073b68b84188ad42** is independently confirmed live on the existing Render service (manual **dep-dbmeofrl550s738uu15g**,3:51PM Eastern). This checkpoint is local implementation, not deployed/native activation.
