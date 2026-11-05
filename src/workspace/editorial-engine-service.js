@@ -3,13 +3,26 @@ import {randomUUID} from 'node:crypto';
 import {requireThat} from '../errors.js';
 import {captureEditorialEvidence} from '../editorial-evidence.js';
 import {requestFingerprint} from './editorial-engine-client.js';
+import {captionGenerationState,validateCaptionBinding} from './caption-generation.js';
 const COMPLETED_STATES=new Set(['ready_to_review','needs_research','approved','rejected']);
 const REMOTE_STATES=new Set(['queued','generating','ready_to_review','needs_research','failed','rejected','approved']);
 export class EditorialEngineService {
   constructor({research,client,imageFeedback=()=>[],sourceLeads=()=>[],prepareSources=async()=>{}}){this.research=research;this.client=client;this.imageFeedback=imageFeedback;this.sourceLeads=sourceLeads;this.prepareSources=prepareSources;this.inspection={configured:Boolean(client),generationAvailable:false,generationApproved:false,workerActive:false};this.refreshing=null;}
   status(){const a=this.client?.connection?.authorization,remaining=a?this.research.authorizationRemaining(a):null;return {...this.inspection,...(a?{generationAvailable:this.inspection.generationAvailable===true&&remaining>0,authorizedRunsRemaining:remaining}:{}),delivery:this.research.deliveryState?.()||null};}
   async inspect(){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');this.inspection=await this.client.inspect();return this.status();}
-  async queue(id){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');requireThat(!this.client.readOnly,'ENGINE_READ_ONLY','This connection observes existing results; native queueing is disabled.');const request=this.research.get(id);requireThat(request,'RESEARCH_REQUEST_NOT_FOUND','Research request is unavailable.');const scoped=this.requestForEngine(request);if(!request.engineJob){if(!request.continuation)await this.prepareSources();const context=this.editorialContext(request);if(context.preset||context.continuation||context.feedback.length||context.sourceLeads?.length)scoped.editorialContext=context;}const claim=this.research.claimEngineQueue(id,requestFingerprint(scoped));if(!claim.claimed)return claim.job;
+  captionStatus(story,requests=this.research.all()){return captionGenerationState(story,requests,this.client?.connection,this.status());}
+  assertExecutionScope(request){if(this.client?.connection?.executionScope==='draft_only'){
+    const b=validateCaptionBinding(this.client.connection.captionRecovery,requestFingerprint);
+    requireThat(request.id===b.request.id&&requestFingerprint(request)===b.requestHash,'CAPTION_SCOPE_MISMATCH','This single-run connection is authorized only for its exact retained-evidence caption request.');
+  }}
+  async generateCaption(story,input){
+    requireThat(input&&Object.keys(input).every(k=>['sourceRevision','workingVersion'].includes(k))&&!story.localDraft?.stale&&input.sourceRevision===story.revision&&input.workingVersion===(story.localDraft?.version||0),'EDIT_CONFLICT','Save and reload this story before requesting its caption.');
+    await this.inspect();requireThat(this.captionStatus(story).state==='available','CAPTION_NOT_AUTHORIZED',this.captionStatus(story).message);
+    const b=validateCaptionBinding(this.client.connection.captionRecovery,requestFingerprint),{id,...request}=b.request,r=this.research.create({...request,idempotencyKey:id},[]);
+    await this.queue(r.id,{captionTarget:{storyId:story.id,sourceRevision:story.revision,workingVersion:input.workingVersion,sourceJobId:b.sourceJobId,sourceCandidateId:b.sourceCandidateId,sourceExecutionId:b.sourceExecutionId,evidenceSha256:b.evidenceSha256}});return this.start(r.id,this.research.engineJob(r.id).version);
+  }
+  async queue(id,{captionTarget}={}){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');requireThat(!this.client.readOnly,'ENGINE_READ_ONLY','This connection observes existing results; native queueing is disabled.');const request=this.research.get(id);requireThat(request,'RESEARCH_REQUEST_NOT_FOUND','Research request is unavailable.');const scoped=this.requestForEngine(request);this.assertExecutionScope(scoped);if(!request.engineJob&&this.client.connection?.executionScope!=='draft_only'){if(!request.continuation)await this.prepareSources();const context=this.editorialContext(request);if(context.preset||context.continuation||context.feedback.length||context.sourceLeads?.length)scoped.editorialContext=context;}const claim=this.research.claimEngineQueue(id,requestFingerprint(scoped));if(!claim.claimed)return claim.job;
+    if(captionTarget)this.research.recordEngineState(id,'queueing',{captionTarget});
     if(scoped.editorialContext)this.research.recordEngineState(id,'queueing',{editorialContext:scoped.editorialContext});
     try{const row=await this.client.queue(scoped);requireThat(REMOTE_STATES.has(row.status),'INVALID_ENGINE_RESULT','Remote job status is unknown.');return this.research.recordEngineState(id,row.status,{remoteRowId:String(row.id),executionId:String(row.execution_id||''),lastError:null});}
     catch(error){this.research.recordEngineState(id,'queue_uncertain',{lastError:error.code||'ENGINE_REQUEST_FAILED'});throw error;}
@@ -80,7 +93,7 @@ export class EditorialEngineService {
       const latest=this.research.engineJob(id);this.research.recordEngineState(id,latest.state,{lastError:'ENGINE_RECONCILIATION_PENDING'});
     }
   }
-  async start(id,expectedVersion){requireThat(Number.isSafeInteger(expectedVersion),'EDIT_CONFLICT','An expected engine-job version is required.');const inspection=await this.inspect();requireThat(inspection.generationAvailable,'GENERATION_NOT_APPROVED','The bounded AI worker is inactive or its exact version/spend has not been approved. Queueing alone does not spend credits.');const request=this.research.get(id);requireThat(request,'RESEARCH_REQUEST_NOT_FOUND','Research request is unavailable.');const dispatchId=randomUUID();const claimed=this.research.claimEngineDispatch(id,expectedVersion,dispatchId,this.client.connection.authorization||null);
+  async start(id,expectedVersion){requireThat(Number.isSafeInteger(expectedVersion),'EDIT_CONFLICT','An expected engine-job version is required.');const inspection=await this.inspect();requireThat(inspection.generationAvailable,'GENERATION_NOT_APPROVED','The bounded AI worker is inactive or its exact version/spend has not been approved. Queueing alone does not spend credits.');const request=this.research.get(id);requireThat(request,'RESEARCH_REQUEST_NOT_FOUND','Research request is unavailable.');this.assertExecutionScope(this.requestForEngine(request));const dispatchId=randomUUID();const claimed=this.research.claimEngineDispatch(id,expectedVersion,dispatchId,this.client.connection.authorization||null);
     // Durable claim precedes the external call. Never automatically redispatch after a timeout or process restart.
     this.client.dispatch(this.requestForEngine(request),dispatchId).then(receipt=>this.acceptReceipt(id,dispatchId,receipt)).catch(error=>{const current=this.research.engineJob(id);if(['dispatching','generating'].includes(current?.state))this.research.recordEngineState(id,'dispatch_uncertain',{lastError:error.code||'ENGINE_DISPATCH_UNCERTAIN'});});
     return claimed;

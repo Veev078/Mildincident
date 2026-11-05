@@ -773,14 +773,14 @@ document.addEventListener('click',async event=>{
  const button=event.target.closest('[data-photo-continuation]');if(!button)return;button.disabled=true;
  button.dataset.requestKey ||= crypto.randomUUID();
  try{if(!await flushAllDrafts())throw new Error('Save pending edits before preparing image research.');const result=await api('/api/stories/'+encodeURIComponent(button.dataset.story)+'/photo-research',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({intent:button.dataset.photoContinuation,assetId:button.dataset.asset,sourceRevision:button.dataset.revision,workingVersion:Number(button.dataset.working),previewSha256:button.dataset.previewHash,idempotencyKey:button.dataset.requestKey})});
- document.querySelector('#asset-dialog').close();location.hash='#/discovery';await loadWorkspace({quiet:true});toast('Photographic research brief prepared. No AI or source request was started.');document.querySelector('[data-request-id="'+result.request.id+'"]')?.scrollIntoView({block:'center'});
+ document.querySelector('#asset-dialog')?.close();await loadWorkspace({quiet:true});toast('Photograph request saved for this story. Retrieval needs separate native authorization; no photographs were fetched.');
  }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
 });
 
 // Background UI reads never flush or replace pending editorial edits/forms.
 let backgroundRead=false;
 async function receiveResearchUpdates(){
- if(state.discoverySubmitting||backgroundRead||document.hidden||!state.workspace?.engine?.delivery||pending.size||saving.size||document.querySelector('#asset-dialog')?.open||!['home','discovery'].includes(route().view)||document.activeElement?.matches('input,textarea,select')||document.querySelector('details[open]:not(.research-activity-row)')||[...document.querySelectorAll('form input:not([type=hidden]),form textarea')].some(el=>el.type==='checkbox'?el.checked!==el.defaultChecked:el.value!==el.defaultValue))return;
+ if(state.discoverySubmitting||backgroundRead||document.hidden||!state.workspace?.engine?.delivery||pending.size||saving.size||document.querySelector('#asset-dialog')?.open||!['home','discovery','story'].includes(route().view)||document.activeElement?.matches('input,textarea,select')||document.querySelector('details[open]:not(.research-activity-row)')||[...document.querySelectorAll('form input:not([type=hidden]),form textarea')].some(el=>el.type==='checkbox'?el.checked!==el.defaultChecked:el.value!==el.defaultValue))return;
  backgroundRead=true;try{await loadWorkspace({quiet:true});}catch{}finally{backgroundRead=false;}
 }
 const researchUiTimer=setInterval(receiveResearchUpdates,15000);window.addEventListener('pagehide',()=>clearInterval(researchUiTimer));document.addEventListener('visibilitychange',()=>{if(!document.hidden)receiveResearchUpdates();});
@@ -812,3 +812,21 @@ document.addEventListener('click',async event=>{
 // Library organization changes no caption, media, native approval or production record.
 document.addEventListener('click',async event=>{const button=event.target.closest('[data-organize-story]');if(!button)return;button.disabled=true;try{if(!await flushAllDrafts())throw new Error('Save pending edits first.');const story=storyById(button.dataset.organizeStory),field=button.dataset.field;const result=await api('/api/stories/'+encodeURIComponent(story.id)+'/organization',{method:'PATCH',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({baseRevision:story.revision,expectedVersion:story.organization?.version||0,[field]:!story.organization?.[field]})});story.organization=result.organization;render();toast(field==='archived'?(result.organization.archived?'Story archived. Restore it from Archived stories.':'Story restored.'):(result.organization.pinned?'Story pinned.':'Story unpinned.'));}catch(error){toast(error.message,{error:true});button.disabled=false;}});
 document.addEventListener('change',event=>{if(event.target.id==='story-status'){state.pipelineGroup=event.target.value;render();}if(event.target.id==='story-sort'){state.storySort=event.target.value;render();}if(event.target.id==='story-archive'){state.storyArchive=event.target.value;render();}});
+
+// Native caption dispatch is bound by a private operator permit; the browser supplies no model input.
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-caption-operation]');if(!button||button.disabled)return;button.disabled=true;
+ try{
+  if(!await flushAllDrafts())throw new Error('Save pending edits before continuing the caption.');
+  const story=state.workspace.stories.find(s=>s.id===button.dataset.story);if(!story)throw new Error('Reload this story before continuing.');
+  const operation=button.dataset.captionOperation;
+  await api('/api/stories/'+encodeURIComponent(story.id)+'/caption/'+operation,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,...(operation==='use'?{candidateId:story.captionGeneration?.result?.candidateId}:{})})});
+  await loadWorkspace({quiet:true});toast(operation==='use'?'Generated caption saved on this story. Photographs, original output and history are preserved.':'One caption request sent. No research was restarted. Check its recorded progress here.');
+ }catch(error){toast(error.message+' No automatic paid retry was made.',{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}finally{button.disabled=false;}
+});
+
+// Download only after all pending edits have saved; this packet does not import or approve anything.
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-approval-packet]');if(!button||button.disabled)return;button.disabled=true;
+ try{if(!await flushAllDrafts())throw new Error('Save pending edits before preparing the review copy.');location.assign('/api/stories/'+encodeURIComponent(button.dataset.approvalPacket)+'/production-packet');toast('Exact review copy prepared. No material was transferred to the approval workflow.');}catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
+});

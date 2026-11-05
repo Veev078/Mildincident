@@ -28,6 +28,7 @@ export function reviewPath(story){
 export function storyStep(story,tab='overview'){
  if(story.localDraft?.stale)return {label:'Compare source changes',tab:'overview',state:'Source changed'};
  const observed=story.publishing?.observed;
+ if((tab==='images'||tab==='carousel')&&!story.publishing?.requiresReview&&!hasPublishingActivity(story)&&effective(story).selectedAssetIds.length&&effective(story).caption.trim())return {label:'Review post',tab:'publishing',state:'Photographs selected'};
  if(tab==='images'||tab==='carousel')return {label:'Edit story & caption',tab:'overview',state:observed==='buffer_sent'?'Buffer reports sent':observed==='buffer_unscheduled_draft'?'Existing Buffer draft':'Choosing photographs'};
  if(story.publishing?.requiresReview&&!hasPublishingActivity(story))return {label:'Review source records',tab:'publishing',state:'Source records need checking'};
  if(story.publishing?.requiresReview||story.publishing?.multipleHandoffs||['buffer_sent','buffer_unscheduled_draft','buffer_scheduled','instagram_posted_verified'].includes(observed))return {label:'Review existing activity',tab:'publishing',state:observed==='buffer_sent'?'Buffer reports sent':'Publishing activity to review'};

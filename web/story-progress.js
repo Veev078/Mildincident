@@ -2,6 +2,7 @@
 export function creativeProgress(story){
  const working={...story,...(!story.localDraft?.stale?story.localDraft||{}:{})};
  if(!String(working.caption||'').trim()){
+  if(story.captionGeneration?.state==='result_available')return {key:'caption',label:'Draft available',action:'Review generated caption',tab:'caption',detail:'The exact retained research has a real recovered draft. Review and use it on this story.'};
   const supported=(story.research||[]).some(c=>c.capturedAccess==='source_text_captured'&&String(c.capturedTextExcerpt||'').length>=120);
   return {key:supported?'caption':'research',label:supported?'Caption needed':'Research needed',action:supported?'Develop the caption':'Explore the sources',tab:supported?'overview':'research',detail:supported?'Source passages are saved. Review them for a separately authorized drafting-only continuation before repeating research.':'A source-supported caption has not been produced. Review the saved evidence before requesting more work.'};
  }

@@ -65,3 +65,13 @@
 @media(max-width:800px){.post-review-layout{grid-template-columns:minmax(0,1fr)}.post-review{padding:16px}}
 
 .post-strip .preview-status { display:none; }
+
+/* Existing story stages: one clear operation and readable feedback. */
+.pipeline-action { border:1px solid var(--line, #d9d7d1); padding:clamp(18px,3vw,32px); margin:20px 0; background:var(--paper, #faf9f6); }
+.pipeline-action h2 { margin-top:0; }
+.pipeline-action .carousel-actions { flex-wrap:wrap; gap:16px; margin-top:20px; }
+.pipeline-action .button, .story-next-step, .post-next .button { min-height:44px; }
+.generated-caption-comparison { margin:20px 0; max-width:760px; }
+.generated-caption-comparison .body-copy { white-space:pre-wrap; }
+.approval-handoff-details { margin:20px 0; }
+.pipeline-row .row-action { white-space:normal; text-align:center; }
