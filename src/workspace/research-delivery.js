@@ -1,7 +1,7 @@
 /** Periodic fixed-resource reads only. Never queues, starts, activates or retries a provider execution. */
 export class ResearchDelivery {
  constructor(engine,{intervalMs=120000,now=()=>Date.now()}={}){
-  if(!engine?.client?.readOnly)throw new Error('READ_ONLY_DELIVERY_REQUIRED');
+  if(!engine?.client)throw new Error('RESEARCH_CLIENT_REQUIRED');
   if(!Number.isInteger(intervalMs)||intervalMs<30000||intervalMs>900000)throw new Error('INVALID_DELIVERY_INTERVAL');
   this.engine=engine;this.intervalMs=intervalMs;this.now=now;this.inflight=null;this.stopped=true;this.timer=null;
  }

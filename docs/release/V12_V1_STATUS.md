@@ -4,6 +4,18 @@ Updated November 4, 2026 (America/New_York). **Sprint B implementation and histo
 
 Branch: `development/photography-review-20261029`. Verified starting local/GitHub HEAD: `70dd9b6bd3ed25de346c702bf049bb10534f5a63`.
 
+## Product consolidation — November 5, 2026
+
+Current implementation starts from verified remote `4890c81`. Render read-only inspection confirms service `srv-dbih0du1egvs73er26kg` is live on that commit (manual deploy `dep-dbm8dedbedkc73bhlhn0`, November 5 08:38 AM ET); auto-deploy is off. Native refresh at 08:52 AM ET confirms intake active, Studio worker inactive at saved version `8b3e1293-5990-451c-8358-2cbe9e752a44`, Chief AI inactive, four recorded themes unchanged.
+
+Execution decision: use the existing Studio worker `6CkqfYc4Pyd4k8vi` for interactive requests, reusing the existing active intake/sourcing processors and Brand Brain. The production form lacks per-request identity/receipts; it is not used as a fallback. No second worker or production orchestrator is created. The reviewed local graph is `.local/v12-consolidation/offline/development-worker.json` with its SHA/budgets in `report.json`; the current native worker is saved privately for rollback.
+
+Repository integration: hosted mode can load an explicitly installed private connection file through `STUDIO_RESEARCH_CONNECTION_FILE`, constrained to the existing worker/tables, exact approved native version, matching header credential and an expiring one-run permit. Without this configuration, hosted mode stays GET-only. A permit is consumed atomically with the durable dispatch claim and never refunded after uncertainty/restart. Polling remains read-only for either connection type; no poll starts/queues research. No browser arming or credentials endpoint exists.
+
+External action pending separate authorization: install the reviewed graph into that existing inactive worker, bind/provision its dedicated header credential privately, activate only that worker, install an expiring one-run permit in a private test Studio and perform exactly one test. Maximum one research call (3500 output tokens, two web-tool calls), one draft call (1800 output tokens), one result; input guards remain 30000 characters/call. Actual provider dollar pricing and SDK retry behavior are unverified, so these are execution limits, not a promised dollar cap. Reconcile execution, source passages, result identity and restart persistence; rollback deactivates/restores the captured worker and revokes the permit. No Render deployment, production-intake/global-preset modification, Buffer write or publishing action is included. A hosted release/configuration requires its own authorization.
+
+The earlier Sprint B record below remains historical evidence; consolidation acceptance is recorded above as implementation proceeds.
+
 ## Implemented / founder access
 
 | Checkpoint / existing capability | Result and limits |

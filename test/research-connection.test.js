@@ -1,0 +1,18 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';import {randomUUID} from 'node:crypto';
+import {researchConnection,OBSERVED_RESEARCH_CONNECTION} from '../src/workspace/research-connection.js';import {LocalResearchStore} from '../src/workspace/research-store.js';
+const permit=()=>({id:randomUUID(),maxRuns:1,expiresAt:new Date(Date.now()+3600000).toISOString()});
+test('hosted launch defaults to native read-only; explicit private exact-worker permit is required',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'mi-connection-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));const config={hosted:true,dataRoot:root},env={N8N_API_KEY:'synthetic'},createClient=x=>x;
+ assert.equal((await researchConnection({env,config,createClient})).connection.mode,'read_only');const filename=path.join(root,'connection.json'),connection={...OBSERVED_RESEARCH_CONNECTION,mode:'standard',generationEnabled:true,approvedWorkerVersion:'version-verified',headerName:'X-Mildincident-Development-Key',token:'synthetic-token-long-enough-for-testing',authorization:permit()};delete connection.historyJobIds;
+ await fs.writeFile(filename,JSON.stringify(connection),{mode:0o600});const activeEnv={...env,STUDIO_RESEARCH_CONNECTION_FILE:filename};assert.equal((await researchConnection({env:activeEnv,config,createClient})).connection.authorization.maxRuns,1);
+ await fs.chmod(filename,0o644);await assert.rejects(researchConnection({env:activeEnv,config,createClient}),{code:'INVALID_RESEARCH_CONNECTION'});await fs.chmod(filename,0o600);
+ for(const change of [{editorialWorkerId:'different-worker'},{authorization:{...permit(),maxRuns:2}},{authorization:{...permit(),expiresAt:'2000-01-01'}}]){await fs.writeFile(filename,JSON.stringify({...connection,...change}));await assert.rejects(researchConnection({env:activeEnv,config,createClient}),{code:'INVALID_RESEARCH_CONNECTION'});}
+ const link=path.join(root,'link.json');await fs.symlink(filename,link);await assert.rejects(researchConnection({env:{...env,STUDIO_RESEARCH_CONNECTION_FILE:link},config,createClient}),{code:'INVALID_RESEARCH_CONNECTION'});
+});
+test('single-run approval and durable dispatch claim commit atomically across connections and restart, including uncertainty',async t=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'mi-run-limit-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));const file=path.join(root,'research.sqlite'),a=permit();let one=new LocalResearchStore(file),two=new LocalResearchStore(file);
+ try{const requests=[one,two].map(store=>{const r=store.create({kind:'brief',prompt:'Synthetic source-grounded direction'},[]);store.claimEngineQueue(r.id,'hash-'+r.id);store.recordEngineState(r.id,'queued');return r;});
+ const first=one.engineJob(requests[0].id);assert.throws(()=>one.claimEngineDispatch(requests[0].id,first.version+1,randomUUID(),a),{code:'EDIT_CONFLICT'});assert.equal(one.authorizationRemaining(a),1);
+ one.claimEngineDispatch(requests[0].id,first.version,randomUUID(),a);assert.equal(two.authorizationRemaining(a),0);assert.throws(()=>two.claimEngineDispatch(requests[1].id,two.engineJob(requests[1].id).version,randomUUID(),a),{code:'RESEARCH_AUTHORIZATION_EXHAUSTED'});assert.equal(two.engineJob(requests[1].id).state,'queued');one.recordEngineState(requests[0].id,'dispatch_uncertain',{lastError:'TIMEOUT'});one.close();one=new LocalResearchStore(file);assert.equal(one.authorizationRemaining(a),0);assert.throws(()=>one.claimEngineDispatch(requests[0].id,one.engineJob(requests[0].id).version,randomUUID(),a),{code:'ENGINE_ALREADY_DISPATCHED'});
+ }finally{one.close();two.close();}
+});

@@ -97,13 +97,20 @@ export class LocalResearchStore {
   recordEngineState(id,state,data={},expectedVersion){
     const allowed=['queueing','queued','queue_uncertain','dispatching','dispatch_uncertain','generating','ready_to_review','needs_research','failed','rejected','approved'];
     requireThat(allowed.includes(state),'INVALID_ENGINE_STATE','Unknown development job state.');
-    this.db.exec('BEGIN IMMEDIATE');try{const previous=this.engineJob(id);requireThat(previous,'RESEARCH_REQUEST_NOT_FOUND','Engine job is unavailable.');requireThat(expectedVersion===undefined||expectedVersion===previous.version,'EDIT_CONFLICT','Engine state changed in another window.');
+    const outer=!this.db.isTransaction;this.db.exec(outer?'BEGIN IMMEDIATE':'SAVEPOINT engine_state');try{const previous=this.engineJob(id);requireThat(previous,'RESEARCH_REQUEST_NOT_FOUND','Engine job is unavailable.');requireThat(expectedVersion===undefined||expectedVersion===previous.version,'EDIT_CONFLICT','Engine state changed in another window.');
       const merged={...previous,...data};for(const key of ['requestId','requestHash','state','version','updatedAt'])delete merged[key];const encoded=JSON.stringify(merged);const now=new Date().toISOString();const version=previous.version+1;
       this.db.prepare('UPDATE research_engine_jobs SET state=?,version=?,data_json=?,updated_at=? WHERE request_id=?').run(state,version,encoded,now,id);
-      this.db.prepare('INSERT INTO research_engine_events VALUES(?,?,?,?,?)').run(id,version,state,encoded,now);this.db.exec('COMMIT');return this.engineJob(id);
+      this.db.prepare('INSERT INTO research_engine_events VALUES(?,?,?,?,?)').run(id,version,state,encoded,now);this.db.exec(outer?'COMMIT':'RELEASE engine_state');return this.engineJob(id);
+    }catch(error){this.db.exec(outer?'ROLLBACK':'ROLLBACK TO engine_state');if(!outer)this.db.exec('RELEASE engine_state');throw error;}
+  }
+  authorizationRemaining(authorization){if(!authorization||authorization.maxRuns!==1||Date.parse(authorization.expiresAt)<=Date.now())return 0;return Math.max(0,1-this.db.prepare("SELECT COUNT(*) AS n FROM research_engine_events WHERE state='dispatching' AND json_extract(data_json,'$.authorization.id')=?").get(authorization.id).n);}
+  claimEngineDispatch(id,version,dispatchId,authorization=null){
+    this.db.exec('BEGIN IMMEDIATE');try{
+      const previous=this.engineJob(id);requireThat(previous?.state==='queued'&&!previous.dispatchId&&!previous.receiptExecutionId&&!previous.executionId,'ENGINE_ALREADY_DISPATCHED','Only an undispatched queued job can start. Reconcile existing work.');
+      if(authorization)requireThat(this.authorizationRemaining(authorization)>0,'RESEARCH_AUTHORIZATION_EXHAUSTED','The approved research run is spent or expired. Check its result; a new run needs separate authorization.');
+      const job=this.recordEngineState(id,'dispatching',{dispatchId,...(authorization?{authorization}: {})},version);this.db.exec('COMMIT');return job;
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
-  claimEngineDispatch(id,version,dispatchId){const previous=this.engineJob(id);requireThat(previous?.state==='queued'&&!previous.dispatchId&&!previous.receiptExecutionId&&!previous.executionId,'ENGINE_ALREADY_DISPATCHED','Only an undispatched queued job can start. Reconcile existing work.');return this.recordEngineState(id,'dispatching',{dispatchId},version);}
   engineHistory(id){return this.db.prepare('SELECT version,state,created_at FROM research_engine_events WHERE request_id=? ORDER BY version DESC LIMIT 30').all(id).map(r=>({version:r.version,state:r.state,createdAt:r.created_at}));}
   founderTasteFeedback(){
     const byCandidate=new Map();
