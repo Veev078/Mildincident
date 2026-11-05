@@ -19,7 +19,7 @@ import { loadEditorialEngineClient } from './editorial-engine-client.js';
 import { EditorialEngineService } from './editorial-engine-service.js';
 import { developmentCandidateStory } from './development-story.js';
 import { LocalResearchStore } from './research-store.js';
-import {captionGenerationState} from './caption-generation.js';
+import {captionGenerationState,captionVersions} from './caption-generation.js';
 import {editorialPresetCatalog,resolvePresetRequest} from './editorial-presets.js';
 import { LocalDraftStore } from './store.js';
 import { HandoffError, requireThat } from '../errors.js';
@@ -77,7 +77,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     for(const story of workspace.stories){
       story.captionGeneration=engine?.captionStatus(story,workspace.researchRequests)||captionGenerationState(story,workspace.researchRequests,null,{});
       if(story.captionGeneration.result&&!story.hookOptions?.length)story.hookOptions=story.captionGeneration.result.hookOptions;
-      story.photoRequests=workspace.researchRequests.filter(r=>r.continuation?.origin?.storyId===story.id).map(r=>({id:r.id,state:'authorization_required',message:'Targeted photograph brief saved. Retrieval is not connected to this action; no images have been fetched.',createdAt:r.createdAt}));
+      story.photoRequests=workspace.researchRequests.filter(r=>r.continuation?.origin?.storyId===story.id).map(r=>({id:r.id,state:['approved','concept_approved'].includes(story.approvalStatus)?'authorization_required':'approval_required',message:['approved','concept_approved'].includes(story.approvalStatus)?'Request saved. A separately authorized native connection is needed before searching.':'Request saved. Native sourcing is waiting for this story’s existing editorial approval; no search has started.',createdAt:r.createdAt}));
     }
     for(const story of workspace.stories){const result=story.captionGeneration?.result;if(result){const version=workspace.stories.find(s=>s.id===result.storyId);if(version)version.recoveryOfStoryId=story.id;}}
     attachLocalPreviews(workspace,previews);
@@ -116,15 +116,19 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       if(backupRoute&&request.method==='GET'){requireThat(access&&backups,'BACKUP_UNAVAILABLE','Hosted backups are unavailable.');const backupId=backupRoute[1]==='latest'?backups.status().id:backupRoute[1];requireThat(backupId,'BACKUP_UNAVAILABLE','No verified backup is available yet.');const stream=await backups.archive(backupId);response.writeHead(200,{'Content-Type':'application/gzip','Content-Disposition':'attachment; filename="mildincident-private-backup-'+backupRoute[1]+'.tar.gz"'});await pipeline(stream,response);return;}
       const continuationRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/photo-research$/);
       if(continuationRoute&&request.method==='POST'){requireThat(research,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request),workspace=view(),story=workspace.stories.find(s=>s.id===decodeURIComponent(continuationRoute[1]));const saved=research.createPhotoContinuation(story,input,workspace.stories);json(response,201,{request:saved,scope:'private_research_only',networkRequests:0,paidCalls:0,productionApplied:false});return;}
-      const captionRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/caption\/(generate|use)$/);
-      if(captionRoute&&request.method==='POST'){
-        const story=view().stories.find(s=>s.id===decodeURIComponent(captionRoute[1]));requireThat(story,'STORY_NOT_FOUND','Open an existing story.');const input=await body(request);
+      const captionRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/caption\/(generate|use|versions)$/);
+      if(captionRoute&&['GET','POST'].includes(request.method)){
+        const story=view().stories.find(s=>s.id===decodeURIComponent(captionRoute[1]));requireThat(story,'STORY_NOT_FOUND','Open an existing story.');if(captionRoute[2]==='versions'){requireThat(request.method==='GET','METHOD_NOT_ALLOWED','Read saved caption versions.');json(response,200,{versions:captionVersions(story,research?.all()||[],drafts)});return;}requireThat(request.method==='POST','METHOD_NOT_ALLOWED','Use the story caption action.');const input=await body(request);
         if(captionRoute[2]==='generate'){requireThat(engine,'ENGINE_NOT_CONFIGURED','Caption generation requires a separately authorized native connection.');const job=await engine.generateCaption(story,input);json(response,202,{job,scope:'draft_only',productionApplied:false});return;}
-        requireThat(input&&Object.keys(input).every(k=>['sourceRevision','workingVersion','candidateId'].includes(k))&&!story.localDraft?.stale&&input.sourceRevision===story.revision&&input.workingVersion===(story.localDraft?.version||0),'EDIT_CONFLICT','The story changed. Reload and review the generated caption before using it.');
-        const result=story.captionGeneration?.result;requireThat(result&&input.candidateId===result.candidateId,'INVALID_ENGINE_RESULT','Choose the exact correlated generated result.');
-        requireThat(!(story.localDraft?.caption??story.caption??'').trim(),'CAPTION_ALREADY_SAVED','Your saved caption is preserved. Compare it with the generated version before editing it manually.');
-        const draft=drafts.save(story,{baseRevision:story.revision,expectedVersion:input.workingVersion,caption:result.caption});
-        json(response,200,{draft,resultIdentity:{candidateId:result.candidateId,executionId:result.executionId,recovery:result.recovery},scope:'local_only',productionApplied:false,publicationApproved:false});return;
+        requireThat(input&&Object.keys(input).every(k=>['sourceRevision','workingVersion','candidateId','versionId','confirm'].includes(k))&&!story.localDraft?.stale&&input.sourceRevision===story.revision&&input.workingVersion===(story.localDraft?.version||0),'EDIT_CONFLICT','The story changed. Reload and review the generated caption before using it.');
+        const result=input.versionId?captionVersions(story,research?.all()||[],drafts).find(v=>v.id===input.versionId):story.captionGeneration?.result;
+        requireThat(result&&(input.versionId||input.candidateId===result.candidateId)&&result.applicable!==false,'INVALID_ENGINE_RESULT','Choose an exact saved version supported by the current source revision.');
+        const current=story.localDraft?.caption??story.caption??'';
+        requireThat(!current.trim()||input.versionId&&input.confirm==='replace_after_review','CAPTION_ALREADY_SAVED','Review the version and explicitly choose to use it. Your current caption remains in history.');
+        // Ensure even an untouched recorded caption remains recoverable before explicit replacement.
+        let expected=input.workingVersion;if(current.trim()&&expected===0){drafts.save(story,{baseRevision:story.revision,expectedVersion:0,caption:current});expected=1;}
+        const draft=drafts.save(story,{baseRevision:story.revision,expectedVersion:expected,caption:result.caption},{captionSource:{kind:result.kind||'generated',versionId:result.id,sourceRevision:story.revision,candidateId:result.candidateId||result.captionSource?.candidateId||null,executionId:result.executionId||result.captionSource?.executionId||null,recovery:result.recovery||result.captionSource?.recovery||null,founderEditedBeforeSelection:result.captionSource?(result.captionSource.founderEditedBeforeSelection===true||result.captionSource.caption!==result.caption):false,caption:result.caption}});
+        json(response,200,{draft,resultIdentity:{versionId:result.id,candidateId:result.candidateId||null,executionId:result.executionId||null,recovery:result.recovery||null},scope:'local_only',productionApplied:false,publicationApproved:false});return;
       }
       const founderRoute=url.pathname.match(/^\/api\/editorial\/reviews\/([^/]+)$/);
       if(founderRoute&&request.method==='POST'){requireThat(founderReviews,'RESEARCH_UNAVAILABLE','Private review is unavailable.');const workspace=view(),story=workspace.stories.find(s=>s.id===decodeURIComponent(founderRoute[1]));let followUp=null;const review=founderReviews.record(story,await body(request),{afterSave:value=>{const direction=founderFollowUp(story,value);if(direction)followUp=research.create(direction,workspace.stories);}});json(response,200,{review,followUp,productionApplied:false,publicationApproved:false});return;}

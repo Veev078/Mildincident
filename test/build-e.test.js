@@ -34,8 +34,8 @@ test('caption dispatch binds one retained-evidence request and consumes a durabl
 
 test('recovery recognition requires exact original job, execution, claims and captured evidence; edited captions are never replaced',()=>{
  const s=story(),b=binding(s),c=recovered(b),requests=[{engineJob:{candidates:[c]}}];assert.equal(captionGenerationState(s,requests,null,{}).state,'result_available');
- for(const change of [{recovery:{...c.recovery,sourceExecutionId:'999'}},{claims:[{...claim,claim:'A different story'}]},{sourceEvidence:[{...c.sourceEvidence[0],textExcerpt:'Different evidence'}]}])assert.notEqual(captionGenerationState(s,[{engineJob:{candidates:[{...c,...change}]}}],null,{}).state,'result_available');
- assert.equal(captionGenerationState(s,[...requests,...requests],null,{}).state,'review_required');assert.equal(captionGenerationState({...s,localDraft:{caption:'Founder copy'}},requests,null,{}).result.originalCaption,c.captionDraft);
+ for(const change of [{sourceEvidence:[]},{recovery:{...c.recovery,sourceExecutionId:'999'}},{claims:[{...claim,claim:'A different story'}]},{sourceEvidence:[{...c.sourceEvidence[0],textExcerpt:'Different evidence'}]}])assert.notEqual(captionGenerationState(s,[{engineJob:{candidates:[{...c,...change}]}}],null,{}).state,'result_available');
+ assert.equal(captionGenerationState(s,[...requests,...requests],null,{}).versions.length,1);assert.equal(captionGenerationState({...s,localDraft:{caption:'Founder copy'}},requests,null,{}).result.originalCaption,c.captionDraft);
  assert.throws(()=>validateCaptionBinding({...b,requestHash:'b'.repeat(64)},requestFingerprint),{code:'INVALID_CAPTION_BINDING'});assert.equal(captionGenerationState({...s,research:[]},[],null,{}).state,'research_needed');
 });
 

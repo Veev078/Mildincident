@@ -1,3 +1,11 @@
+# V12 Build F — existing-service update only
+
+Current verified live baseline is Build E **2301abe04096d696e24612f145a292d1a6255993** on existing service **srv-dbih0du1egvs73er26kg**, automatic deploy off. Build F is prepared locally; deployment requires separate approval. Follow the [Build F release, private-grant and rollback procedure](release/V12_BUILD_F_OPERATIONS.md). Preserve the persistent disk, credentials, login/session databases, selections, captions and all histories. Download and verify an offsite backup first; deploy the exact verified SHA reported at handoff, not an unreviewed latest commit.
+
+Hosted authorization now reloads from the existing explicit `STUDIO_RESEARCH_CONNECTION_FILE` or fixed private `STUDIO_DATA_DIR/research-connection.json`. Missing/invalid/expired grants remain read-only. An authorized operator may replace a reviewed0600 file atomically without a Render restart; the exact native version and one fresh single-run permit are still required. This procedure does not authorize installing that file, activating n8n, spending, or publishing. Rollback to2301abe preserves existing SQLite/JSON history and claims; revoke/deactivate any separately authorized execution first. No database reset or new service is needed.
+
+---
+
 # V11: manually update the existing service only
 
 After reviewing the tested SHA supplied with the V11 release:

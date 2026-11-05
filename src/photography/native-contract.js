@@ -8,7 +8,7 @@ export const photoDigest=value=>createHash('sha256').update(canonical(value)).di
 export function validatePhotoPacket(packet,digestOf,safe) {
  const must=(ok,code)=>{if(!ok)throw new Error(code);};
  must(packet&&packet.schemaVersion===1&&packet.payload&&/^[a-f0-9]{64}$/.test(packet.digest),'INVALID_PHOTO_PACKET');
- const p=packet.payload;must(p.purpose==='private_photographic_research'&&p.productionApplied===false&&p.rightsGranted===false,'INVALID_PHOTO_SCOPE');
+ const p=packet.payload;if(p.target){const t=p.target;must(Object.keys(t).every(k=>['storyId','sourceRevision','workingVersion','assetId','previewSha256'].includes(k))&&/^CON-[A-Za-z0-9_-]{1,120}$/.test(t.storyId)&&typeof t.sourceRevision==='string'&&t.sourceRevision.length>0&&Number.isSafeInteger(t.workingVersion)&&t.workingVersion>=0&&typeof t.assetId==='string'&&t.assetId.length>0&&(t.previewSha256===null||/^[a-f0-9]{64}$/.test(t.previewSha256)),'INVALID_PHOTO_TARGET');}must(p.purpose==='private_photographic_research'&&p.productionApplied===false&&p.rightsGranted===false,'INVALID_PHOTO_SCOPE');
  must(typeof p.requestId==='string'&&/^[a-f0-9-]{36}$/.test(p.requestId),'INVALID_PHOTO_IDENTITY');
  must(p.direction&&typeof p.direction.query==='string'&&p.direction.query.trim().length>=2&&p.direction.query.length<=500&&['story','image','photographer','series','archive','scene','adjacent'].includes(p.direction.mode),'INVALID_PHOTO_DIRECTION');
  must(['commons','loc','aic'].includes(p.direction.source)&&Number.isInteger(p.direction.page)&&p.direction.page>=1&&p.direction.page<=1000,'INVALID_PHOTO_SOURCE');
@@ -27,6 +27,7 @@ export function makePhotoPacket(hunt,photos,{source=hunt.source==='saved'?'commo
 export function validatePhotoReceipt(receipt,packet) {
  const p=validatePhotoPacket(packet,photoDigest,safePhotoReference);
  requireThat(receipt?.schemaVersion===1&&receipt.purpose==='private_photographic_research_result'&&receipt.inputDigest===packet.digest&&receipt.requestId===p.requestId,'INVALID_PHOTO_RECEIPT','This result does not match the exported research packet.');
+ requireThat(JSON.stringify(receipt.target||null)===JSON.stringify(p.target||null),'INVALID_PHOTO_RECEIPT','The returned photograph context differs from the original story.');
  requireThat(receipt.source===p.direction.source&&receipt.query===p.direction.query&&receipt.page===p.direction.page&&receipt.remoteWrites===0&&receipt.paidCalls===0&&receipt.rightsGranted===false,'INVALID_PHOTO_RECEIPT','Research source, page or scope changed.');
  requireThat(['ok','unavailable'].includes(receipt.status)&&Array.isArray(receipt.photos)&&receipt.photos.length<=20&&typeof receipt.hasMore==='boolean'&&Number.isFinite(Date.parse(receipt.observedAt)),'INVALID_PHOTO_RECEIPT','The research result is incomplete.');
  requireThat(receipt.executionId===null||typeof receipt.executionId==='string'&&/^\d{1,30}$/.test(receipt.executionId),'INVALID_PHOTO_RECEIPT','Execution identity is invalid.');
@@ -35,3 +36,9 @@ export function validatePhotoReceipt(receipt,packet) {
  requireThat(new Set(receipt.photos.map(p=>p.id)).size===receipt.photos.length,'INVALID_PHOTO_RECEIPT','Duplicate result identities.');return receipt;
 }
 export {canonical};
+
+export function targetPhotoPacket(packet,continuation){
+ const t=continuation?.origin;requireThat(t,'INVALID_PHOTO_TARGET','Use an exact saved photographic continuation.');
+ const payload={...packet.payload,target:{storyId:t.storyId,sourceRevision:t.sourceRevision,workingVersion:t.workingVersion,assetId:t.assetId,previewSha256:t.previewSha256}};
+ const result={...packet,payload,digest:photoDigest(payload)};validatePhotoPacket(result,photoDigest,safePhotoReference);return result;
+}

@@ -49,7 +49,7 @@ export class LocalDraftStore {
     return new Map(this.db.prepare('SELECT story_id FROM local_editorial_drafts').all().map(r => [r.story_id, this.get(r.story_id)]));
   }
 
-  save(story, input) {
+  save(story, input, {captionSource}={}) {
     const keys = ['baseRevision', 'expectedVersion', 'caption', 'selectedAssetIds', 'notes', 'musicSelection', 'creativeBrief', ...EDITORIAL_FIELDS];
     requireThat(input && typeof input === 'object' && !Array.isArray(input) && Object.keys(input).every(k => keys.includes(k)), 'INVALID_LOCAL_EDIT', 'Unsupported local draft fields.');
     requireThat(input.baseRevision === story.revision, 'STALE_SOURCE', 'The n8n story has changed. Reload and compare the local draft before saving.');
@@ -74,7 +74,7 @@ export class LocalDraftStore {
       requireThat((previous?.version || 0) === input.expectedVersion, 'EDIT_CONFLICT', 'Another tab saved a newer draft. Reload before editing again.');
       const { baseRevision, expectedVersion, ...changes } = input;
       const { version, updatedAt, baseRevision: oldRevision, ...oldData } = previous || {};
-      const data = { ...oldData, ...changes };
+      const data = { ...oldData, ...changes, ...(captionSource?{captionSource}:{}) };
       validateEditorialFields(data, story);
       if (data.creativeBrief !== undefined) data.creativeBrief = validateCreativeBrief(data.creativeBrief, { ...story, selectedAssetIds: data.selectedAssetIds || story.selectedAssetIds });
       const now = new Date().toISOString();

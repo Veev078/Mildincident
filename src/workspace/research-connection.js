@@ -7,10 +7,10 @@ export const OBSERVED_RESEARCH_CONNECTION=Object.freeze({mode:'read_only',genera
 export async function researchConnection({env,config,createClient=options=>new EditorialEngineClient(options)}){
  if(!config.hosted)return loadEditorialEngineClient({apiKey:env.N8N_API_KEY});
  if(!env.N8N_API_KEY)return null;
- if(!env.STUDIO_RESEARCH_CONNECTION_FILE)return createClient({apiKey:env.N8N_API_KEY,connection:{...OBSERVED_RESEARCH_CONNECTION}});
- const filename=path.resolve(env.STUDIO_RESEARCH_CONNECTION_FILE),root=await fs.realpath(config.dataRoot);
- const stat=await fs.lstat(filename);requireThat(stat.isFile()&&!stat.isSymbolicLink()&&(stat.mode&0o077)===0&&stat.size<=16384,'INVALID_RESEARCH_CONNECTION','Research connection must be a private regular file.');
+ const filename=path.resolve(env.STUDIO_RESEARCH_CONNECTION_FILE||path.join(config.dataRoot,'research-connection.json')),root=await fs.realpath(config.dataRoot);
+ let stat;try{stat=await fs.lstat(filename);}catch(error){if(error.code==='ENOENT')return createClient({apiKey:env.N8N_API_KEY,connection:{...OBSERVED_RESEARCH_CONNECTION}});throw error;}requireThat(stat.isFile()&&!stat.isSymbolicLink()&&(stat.mode&0o077)===0&&stat.size<=16384,'INVALID_RESEARCH_CONNECTION','Research connection must be a private regular file.');
  const actual=await fs.realpath(filename);requireThat(actual.startsWith(root+path.sep),'INVALID_RESEARCH_CONNECTION','Research connection must stay on the private persistent disk.');
+ const workspaceRoot=path.resolve(config.workspace||path.join(root,'workspace'));requireThat(!actual.startsWith(workspaceRoot+path.sep),'INVALID_RESEARCH_CONNECTION','Keep execution credentials outside the backed-up editorial workspace.');
  const connection=JSON.parse(await fs.readFile(actual,'utf8')),a=connection.authorization;
  requireThat(Object.keys(connection).every(k=>['mode','generationEnabled','jobsTableId','candidatesTableId','editorialWorkerId','headerName','token','approvedWorkerVersion','authorization','executionScope','captionRecovery'].includes(k))&&connection.mode==='standard'&&connection.generationEnabled===true&&['jobsTableId','candidatesTableId','editorialWorkerId'].every(k=>connection[k]===OBSERVED_RESEARCH_CONNECTION[k])&&typeof connection.approvedWorkerVersion==='string'&&connection.approvedWorkerVersion.length>0,'INVALID_RESEARCH_CONNECTION','Use the existing bounded worker and an explicitly approved version.');
  if(connection.executionScope==='draft_only')validateCaptionBinding(connection.captionRecovery,requestFingerprint);

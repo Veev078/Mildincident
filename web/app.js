@@ -26,6 +26,7 @@ let keyboardPrefix = false;
 let drag = null;
 let rehearsal = null;
 state.lastStoryTabs={};
+state.pendingRouteFocus=true;
 
 function route() { return resolveRoute(location.hash); }
 
@@ -78,12 +79,19 @@ function render({ focusMain = false } = {}) {
   document.querySelector('#app').innerHTML = `<div class="app-shell"><aside class="sidebar"><a class="masthead" href="#/today" aria-label="MILDINCIDENT Today">MILDINCIDENT<span>Independent visual culture</span></a><div class="sidebar-label">Your publication</div><nav class="primary-nav" aria-label="Main navigation">${nav.map(([id,url,label,num])=>`<a href="#/${url}" ${active===id?'aria-current="page"':''}><span>${num}</span>${label}${id==='pipeline'?`<small>${count}</small>`:''}</a>`).join('')}</nav><div class="sidebar-foot"><details class="sidebar-tools"><summary>Studio tools</summary>${state.workspace?.hosted?`<button class="text-button" data-hosted-backup>Download private backup</button><p class="small">${state.workspace.backupStatus?.lastSuccess?'Backup verified '+esc(date(state.workspace.backupStatus.lastSuccess))+' ET':'First backup pending'}${state.workspace.backupStatus?.state==='failed'?' · backup needs attention':''}<br>Keep an offsite copy.</p>${state.workspace.backupStatus?.id?'<a class="text-link" href="/api/backups/latest/archive">Download last verified copy</a>':''}`:''}<div class="keyboard-hints"><kbd>/</kbd> Find a story<br><kbd>G</kbd> <kbd>H</kbd> Today</div><a href="https://rickywelch.app.n8n.cloud/webhook/founder-command-center" target="_blank" rel="noopener noreferrer">Original Founder Studio ↗</a></details>${state.workspace?.backupStatus?.state==='failed'?'<p class="error-text" role="status">Backup needs attention — open Studio tools.</p>':''}<span class="edition-mark">M / I</span></div></aside><div class="workspace-shell"><header class="topbar"><div class="breadcrumb"><span>MILDINCIDENT</span><span aria-hidden="true">/</span><strong>${esc(viewTitle)}</strong></div><label class="global-search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" placeholder="Find a story…" value="${esc(state.search)}" aria-label="Find a story"><kbd>/</kbd></label>${connection}${state.workspace?.hosted?'<form method="post" action="/auth/logout" data-hosted-logout><button class="text-button" type="submit">Sign out</button></form>':''}</header>${libraryNavigation(current.view)}<main id="main-content" tabindex="-1">${body}</main><footer class="workspace-footer"><span>MILDINCIDENT · Independent visual culture</span><span>Editorial work saves privately · publishing requires approval</span></footer></div></div>${state.compared.length?`<div class="compare-tray"><span>${state.compared.length} images to compare</span><button class="button button-dark" data-action="open-comparison" ${state.compared.length<2?'disabled':''}>Compare images →</button><button class="text-button" data-action="clear-comparison">Clear</button></div>`:''}`;
   if(current.view==='discovery'&&state.focusDiscoverySetup){state.focusDiscoverySetup=false;document.querySelector('#research-direction')?.scrollIntoView({block:'start'});}
   document.title = current.view === 'story' && storyById(current.id) ? `${storyById(current.id).title} — MILDINCIDENT` : `${viewTitle} — MILDINCIDENT`;
-  if (focusMain) document.querySelector('#main-content').focus({ preventScroll: true });
+  if ((focusMain||state.pendingRouteFocus)&&!state.loading) {state.pendingRouteFocus=false;focusStoryTask();}
   else if (focus) {
     const next = document.getElementById(focus.id);
     next?.focus({ preventScroll: true });
     if (typeof focus.start === 'number') { try { next?.setSelectionRange(focus.start, focus.end); } catch {} }
   }
+}
+
+function focusStoryTask(){
+ const current=route(),task=current.tab==='caption'||current.tab==='overview'?'caption':current.tab==='publishing'?'review':current.tab==='images'||current.tab==='carousel'?'images':null;
+ const target=current.view==='story'&&task?document.querySelector('[data-story-task="'+task+'"]'):null;
+ if(target){target.setAttribute('tabindex','-1');target.focus({preventScroll:true});const offset=(document.querySelector('.story-stages')?.getBoundingClientRect().height||0)+18;window.scrollTo({top:Math.max(0,window.scrollY+target.getBoundingClientRect().top-offset),behavior:'instant'});}
+ else {document.querySelector('#main-content')?.focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});}
 }
 
 async function loadWorkspace({ quiet = false } = {}) {
@@ -753,7 +761,7 @@ document.addEventListener('keydown', event => {
 document.querySelector('#asset-dialog').addEventListener('click', event => {
   if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) event.currentTarget.close(); }
 });
-window.addEventListener('hashchange', () => { document.querySelector('#asset-dialog').close(); render({ focusMain: true }); window.scrollTo({ top: 0, behavior: 'instant' }); });
+window.addEventListener('hashchange', () => { document.querySelector('#asset-dialog').close(); state.pendingRouteFocus=true;render({ focusMain: true }); });
 window.addEventListener('beforeunload', event => { if (pending.size || saving.size || imageReviewDrafts.size || Object.keys(state.editorialSetupDrafts||{}).length || Object.keys(state.musicIntentDrafts||{}).length || state.researchDraft?.prompt?.trim()) { event.preventDefault(); event.returnValue = ''; } });
 
 render();
@@ -773,14 +781,14 @@ document.addEventListener('click',async event=>{
  const button=event.target.closest('[data-photo-continuation]');if(!button)return;button.disabled=true;
  button.dataset.requestKey ||= crypto.randomUUID();
  try{if(!await flushAllDrafts())throw new Error('Save pending edits before preparing image research.');const result=await api('/api/stories/'+encodeURIComponent(button.dataset.story)+'/photo-research',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({intent:button.dataset.photoContinuation,assetId:button.dataset.asset,sourceRevision:button.dataset.revision,workingVersion:Number(button.dataset.working),previewSha256:button.dataset.previewHash,idempotencyKey:button.dataset.requestKey})});
- document.querySelector('#asset-dialog')?.close();await loadWorkspace({quiet:true});toast('Photograph request saved for this story. Retrieval needs separate native authorization; no photographs were fetched.');
+ document.querySelector('#asset-dialog')?.close();await loadWorkspace({quiet:true});announce('Photograph request saved on this story. Retrieval awaits authorization.');
  }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
 });
 
 // Background UI reads never flush or replace pending editorial edits/forms.
 let backgroundRead=false;
 async function receiveResearchUpdates(){
- if(state.discoverySubmitting||backgroundRead||document.hidden||!state.workspace?.engine?.delivery||pending.size||saving.size||document.querySelector('#asset-dialog')?.open||!['home','discovery','story'].includes(route().view)||document.activeElement?.matches('input,textarea,select')||document.querySelector('details[open]:not(.research-activity-row)')||[...document.querySelectorAll('form input:not([type=hidden]),form textarea')].some(el=>el.type==='checkbox'?el.checked!==el.defaultChecked:el.value!==el.defaultValue))return;
+ if(state.discoverySubmitting||backgroundRead||document.hidden||!state.workspace?.engine?.delivery||pending.size||saving.size||document.querySelector('#asset-dialog')?.open||!['home','discovery','story'].includes(route().view)||document.activeElement?.matches('input,textarea,select')||document.querySelector('details[open]:not(.research-activity-row):not(.caption-request)')||[...document.querySelectorAll('form input:not([type=hidden]),form textarea')].some(el=>el.type==='checkbox'?el.checked!==el.defaultChecked:el.value!==el.defaultValue))return;
  backgroundRead=true;try{await loadWorkspace({quiet:true});}catch{}finally{backgroundRead=false;}
 }
 const researchUiTimer=setInterval(receiveResearchUpdates,15000);window.addEventListener('pagehide',()=>clearInterval(researchUiTimer));document.addEventListener('visibilitychange',()=>{if(!document.hidden)receiveResearchUpdates();});
@@ -813,16 +821,27 @@ document.addEventListener('click',async event=>{
 document.addEventListener('click',async event=>{const button=event.target.closest('[data-organize-story]');if(!button)return;button.disabled=true;try{if(!await flushAllDrafts())throw new Error('Save pending edits first.');const story=storyById(button.dataset.organizeStory),field=button.dataset.field;const result=await api('/api/stories/'+encodeURIComponent(story.id)+'/organization',{method:'PATCH',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({baseRevision:story.revision,expectedVersion:story.organization?.version||0,[field]:!story.organization?.[field]})});story.organization=result.organization;render();toast(field==='archived'?(result.organization.archived?'Story archived. Restore it from Archived stories.':'Story restored.'):(result.organization.pinned?'Story pinned.':'Story unpinned.'));}catch(error){toast(error.message,{error:true});button.disabled=false;}});
 document.addEventListener('change',event=>{if(event.target.id==='story-status'){state.pipelineGroup=event.target.value;render();}if(event.target.id==='story-sort'){state.storySort=event.target.value;render();}if(event.target.id==='story-archive'){state.storyArchive=event.target.value;render();}});
 
-// Native caption dispatch is bound by a private operator permit; the browser supplies no model input.
+// Existing version selection is a private edit; new model calls use a separately approved binding.
 document.addEventListener('click',async event=>{
  const button=event.target.closest('[data-caption-operation]');if(!button||button.disabled)return;button.disabled=true;
  try{
   if(!await flushAllDrafts())throw new Error('Save pending edits before continuing the caption.');
-  const story=state.workspace.stories.find(s=>s.id===button.dataset.story);if(!story)throw new Error('Reload this story before continuing.');
-  const operation=button.dataset.captionOperation;
-  await api('/api/stories/'+encodeURIComponent(story.id)+'/caption/'+operation,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,...(operation==='use'?{candidateId:story.captionGeneration?.result?.candidateId}:{})})});
-  await loadWorkspace({quiet:true});toast(operation==='use'?'Generated caption saved on this story. Photographs, original output and history are preserved.':'One caption request sent. No research was restarted. Check its recorded progress here.');
- }catch(error){toast(error.message+' No automatic paid retry was made.',{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}finally{button.disabled=false;}
+  const story=storyById(button.dataset.story);if(!story)throw new Error('Reload this story before continuing.');
+  const operation=button.dataset.captionOperation,isVersion=operation==='use-version';
+  await api('/api/stories/'+encodeURIComponent(story.id)+'/caption/'+(isVersion?'use':operation),{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,...(isVersion?{versionId:button.dataset.version,confirm:'replace_after_review'}:operation==='use'?{candidateId:story.captionGeneration?.result?.candidateId}:{direction:button.dataset.direction||'initial'})})});
+  state.captionErrors ||= {};delete state.captionErrors[story.id];state.captionVersionLoaded ||= {};delete state.captionVersionLoaded[story.id];await loadWorkspace({quiet:true});announce(isVersion?'Caption version saved. Your earlier copy remains in history.':'One caption request sent. Your current caption and photographs are preserved.');
+ }catch(error){state.captionErrors ||= {};state.captionErrors[button.dataset.story]=error.message;render();}finally{button.disabled=false;}
+});
+document.addEventListener('toggle',async event=>{
+ const details=event.target;if(!details.matches?.('[data-caption-history]')||!details.open)return;
+ const id=details.dataset.captionHistory,story=storyById(id);if(!story)return;const key=story.revision+':'+(story.localDraft?.version||0)+':'+(story.captionGeneration?.versions?.length||0);
+ state.captionVersionLoaded ||= {};if(state.captionVersionLoaded[id]===key)return;state.captionVersionLoaded[id]=key;
+ try{const result=await api('/api/stories/'+encodeURIComponent(id)+'/caption/versions');state.captionVersions ||= {};state.captionVersions[id]=result.versions;render();}
+ catch(error){delete state.captionVersionLoaded[id];const status=details.querySelector('[data-caption-history-status]');if(status)status.textContent=error.message;}
+},true);
+document.addEventListener('change',event=>{
+ const select=event.target;if(select.matches('[data-caption-choice]')){state.captionChoices ||= {};state.captionChoices[select.dataset.captionChoice]=select.value;render();}
+ if(select.matches('[data-caption-direction]')){state.captionDirections ||= {};state.captionDirections[select.dataset.captionDirection]=select.value;render();}
 });
 
 // Download only after all pending edits have saved; this packet does not import or approve anything.

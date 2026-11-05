@@ -25,6 +25,6 @@ test('existing or uncertain handoff and stale revision remain the first actions 
 test('Today consolidates decisions per story and excludes recovered work from new proposals without inventing recency',()=>{
  const s=story({productionDecisions:[{key:'claims',title:'Review original sources',detail:'Check dates',tab:'research'}],publishing:{requiresReview:true}});
  const history=story({id:'history',origin:'n8n_development',recoveredHistory:true}),fresh=story({id:'new',origin:'n8n_development'});
- const html=home({workspace:{stories:[s,history,fresh]}});assert.equal(todaySelection({stories:[s,history,fresh]}).fresh.length,1);assert.equal((html.match(/Review original sources/g)||[]).length,1);assert.ok(!html.includes('Recent activity'));assert.ok(html.includes('1 new proposal awaiting'));
+ const html=home({workspace:{stories:[s,history,fresh]}});assert.equal(todaySelection({stories:[s,history,fresh]}).fresh.length,1);assert.equal((html.match(/data-today-story="CON-REVIEW"/g)||[]).length,1);assert.ok(!html.includes('Recent activity'));assert.ok(html.includes('1 new proposal awaiting'));
  assert.ok(!html.includes('Latest story'));assert.ok(!html.includes('Ready to publish'));
 });

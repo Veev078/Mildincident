@@ -49,7 +49,7 @@ try {
   page.on('dialog', dialog => dialog.accept());
   await page.route('https://example.org/**', route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350"><rect width="1080" height="1350" fill="#e1dfd2"/><text x="70" y="600" font-size="64" fill="#42463b">SYNTHETIC UI TEST</text><text x="70" y="700" font-size="40" fill="#42463b">No archival photograph</text></svg>' }));
   await page.goto(origin);
-  await page.getByRole('heading',{name:'What do you want to create?',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'What should we work on next?',exact:true}).waitFor();
   assert.ok((await page.locator('.source-bar').textContent()).includes('Test fixture'));
   checks.push('frontend loads from actual local API with explicitly labeled test fixtures');
 
@@ -108,7 +108,7 @@ try {
   checks.push('global search filters existing story rows and has an honest empty state');
 
   await page.goto(`${origin}/#/story/${id}/overview`);
-  await page.getByText('Working notes & earlier direction',{exact:true}).click();await page.getByRole('heading', { name: 'Source notes', exact: true }).waitFor();
+  await page.getByText('Direction, music & working notes',{exact:true}).click();await page.getByRole('heading', { name: 'Source notes', exact: true }).waitFor();
   assert.ok((await page.locator('.existing-source-notes').textContent()).includes('synthetic test fixture'));
   checks.push('existing n8n editorial notes stay visible and separate from local edits');
   await page.goto(`${origin}/#/story/${id}/caption`);
@@ -364,7 +364,7 @@ try {
   const requestsBeforePhotoResearch=research.all().length,jobsBeforePhotoResearch=engineFixture.jobs.length;
   await page.getByText('Explore this photograph further',{exact:true}).click();
   await page.getByRole('button',{name:'Investigate this photograph',exact:true}).click();
-  await page.getByText('Photograph request saved for this story. Retrieval needs separate native authorization; no photographs were fetched.',{exact:true}).waitFor();
+  await page.getByText('Photograph request saved',{exact:true}).waitFor();
   assert.ok(page.url().endsWith('/'+devStoryId+'/images'));await page.getByText('Photograph request saved',{exact:true}).waitFor();const photoRequest=research.all().find(r=>r.continuation);assert.ok(photoRequest);assert.equal(photoRequest.continuation.origin.assetId,'dev-photo-1');assert.equal(photoRequest.continuation.origin.storyId,devStoryId);assert.equal(photoRequest.continuation.routes[0].url,'https://example.org/project');assert.equal(photoRequest.handoffUrl,null);
   assert.equal(research.all().length,requestsBeforePhotoResearch+1);assert.equal(engineFixture.jobs.length,jobsBeforePhotoResearch);
   await page.reload();assert.equal(research.get(photoRequest.id).continuation.routes[0].url,'https://example.org/project');assert.equal(await page.locator('[data-research-handoff]').count(),0);

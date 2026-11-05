@@ -21,7 +21,7 @@ test('three story activities retain every existing deep link without numbered cr
 test('story overview leads with actual references and preserves private notes, working caption and source details',()=>{
  const original=story();original.localDraft={version:1,caption:'Working caption stays preserved',notes:'An unfinished angle'};
  const html=storyWorkspace(state,original,'overview');
- assert.ok(html.indexOf('class="develop-visual')<html.indexOf('class="develop-review'));
+ assert.ok(html.indexOf('class="develop-visual')<html.indexOf('class="develop-editor'));
  assert.ok(html.includes('aria-label="Local caption draft"'));assert.ok(html.includes('aria-label="Your direction"'));
  assert.match(html,/An unfinished angle/);assert.match(html,/Working caption stays preserved/);
  assert.match(html,/Story details &amp; version history|Story details & version history/);

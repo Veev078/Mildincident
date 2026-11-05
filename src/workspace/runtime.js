@@ -1,5 +1,5 @@
 import sharp from 'sharp';import {HostedBackups} from './hosted-backups.js';
-import {researchConnection} from './research-connection.js';
+import {researchConnection,OBSERVED_RESEARCH_CONNECTION} from './research-connection.js';
 import {closeStudioServer} from './shutdown.js';
 import fs from 'node:fs/promises';import path from 'node:path';import {WorkspaceSource,fetchWorkspaceSnapshot} from './data-source.js';import {n8nReader} from '../audit.js';import {BufferReader} from '../buffer-reader.js';import {LocalDraftStore} from './store.js';import {LocalPreviewStore} from './previews.js';import {LocalResearchStore} from './research-store.js';import {PublicationFeeds} from '../discovery/publication-feeds.js';import {EditorialEngineClient,loadEditorialEngineClient} from './editorial-engine-client.js';import {EditorialEngineService} from './editorial-engine-service.js';import {ResearchDelivery} from './research-delivery.js';import {PrivateAccess} from './private-access.js';import {hostingConfig} from './hosting-config.js';
 export async function startWorkspace({createServer,env=process.env,installSignals=true,loadSnapshot=null,createEngineClient=options=>new EditorialEngineClient(options)}={}){
@@ -8,8 +8,9 @@ export async function startWorkspace({createServer,env=process.env,installSignal
  const source=new WorkspaceSource({root:config.workspace,auditRoot:path.join(config.dataRoot,'audits'),loadLive:loadSnapshot||(()=>fetchWorkspaceSnapshot({read:n8nReader(env.N8N_API_KEY),bufferReader:env.BUFFER_ACCESS_TOKEN?new BufferReader({token:env.BUFFER_ACCESS_TOKEN}):null}))});await source.initialize();
  const drafts=new LocalDraftStore(path.join(config.workspace,'drafts.sqlite')),previews=new LocalPreviewStore(path.join(config.workspace,'previews')),research=new LocalResearchStore(path.join(config.workspace,'research.sqlite')),feeds=new PublicationFeeds(research);
  let engine=null,delivery=null;
- try{const client=await researchConnection({env,config,createClient:createEngineClient});
- if(client){engine=new EditorialEngineService({research,client,imageFeedback:()=>previews.tasteFeedback(),sourceLeads:()=>feeds.context(),prepareSources:()=>feeds.refresh()});delivery=new ResearchDelivery(engine,{intervalMs:config.intervalMs});}
+ const loadClient=async()=>{try{return await researchConnection({env,config,createClient:createEngineClient});}catch{if(!env.N8N_API_KEY)return null;return createEngineClient({apiKey:env.N8N_API_KEY,connection:{...OBSERVED_RESEARCH_CONNECTION,connectionIssue:true}});}};
+ try{const client=await loadClient();
+ if(client){engine=new EditorialEngineService({research,client,...(config.hosted?{reloadClient:loadClient}:{}),imageFeedback:()=>previews.tasteFeedback(),sourceLeads:()=>feeds.context(),prepareSources:()=>feeds.refresh()});delivery=new ResearchDelivery(engine,{intervalMs:config.intervalMs});}
  }catch(error){console.error('Research connection unavailable: '+(error.code||'CONFIGURATION_ERROR'));}
  const backups=config.hosted?await new HostedBackups({workspace:config.workspace,destinationRoot:config.backups,stateFile:path.join(config.dataRoot,'backup-state.json')}).initialize():null;
  const server=createServer({source,drafts,previews,research,engine,feeds,access,backups,delivery});

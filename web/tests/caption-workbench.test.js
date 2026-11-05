@@ -4,7 +4,7 @@ const story={id:'CON-CAPTION-FIXTURE',title:'Synthetic caption story',hook:'A so
 test('caption workbench retains the working editor contract and shows actual selected photographs in saved order',()=>{
  const working={...story,localDraft:{version:3,caption:'Working caption\nSecond paragraph',selectedAssetIds:['frame-b','frame-a']}};const before=JSON.stringify(working);
  const html=captionWorkspace({workspace:{hosted:true}},working,{renderChecks:()=>'<p>Existing checks preserved</p>'});
- assert.match(html,/id="caption-editor" aria-label="Local caption draft" data-draft-field="caption"/);assert.match(html,/Working caption\nSecond paragraph/);assert.match(html,/data-action="copy-caption"/);assert.match(html,/Autosaves to your private Studio/);assert.match(html,/Existing checks preserved/);assert.match(html,/Original source caption/);
+ assert.match(html,/id="caption-editor" aria-label="Local caption draft" data-draft-field="caption"/);assert.match(html,/Working caption\nSecond paragraph/);assert.match(html,/data-action="copy-caption"/);assert.match(html,/Autosaves privately/);assert.match(html,/Existing checks preserved/);assert.match(html,/Original source caption/);
  assert.ok(html.indexOf('data-asset="frame-b"')<html.indexOf('data-asset="frame-a"'));assert.match(html,/No preview available/);assert.match(html,/Preview availability does not establish identity or image rights/);assert.equal(JSON.stringify(working),before);
 });
 test('caption context deduplicates safe source links and preserves empty, stale and publication boundaries',()=>{

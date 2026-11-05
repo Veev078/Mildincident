@@ -1,5 +1,7 @@
 # Build E operation and release boundaries
 
+Historical Build E record. [Build F operations](V12_BUILD_F_OPERATIONS.md) supersedes its caption-version controls, connection reload procedure and unapproved draft plans. Do not execute older prepared IDs/graphs from this record.
+
 November 5, 2026, America/New_York. Continues Build D `a505bb0a0ab225a890345682e440b2905655ebdf` on `development/photography-review-20261029`. This is an integration of the existing worker, private connection, stores and approval review packet. No additional engine, agent, workflow, dashboard or Brand Brain was created.
 
 ## What prevented the founder actions
