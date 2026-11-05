@@ -5,7 +5,7 @@ import {hookOptionsView} from './editorial-options.js';
 
 /** One working copy: image sequence, recorded angle, writing and review share the existing story identity. */
 export function developWorkspace(state,story,{renderReadiness=()=>'',renderSourceNotes=()=>'',renderDecision=()=>''}={}) {
- const working=effective(story),selected=mediaFor(story),lead=leadPhoto(story),sources=[],seen=new Set();
+ const working=effective(story),selected=mediaFor(story),lead=selected[0]||leadPhoto(story),sources=[],seen=new Set();
  for(const claim of story.research||[]){const url=safeUrl(claim.url);if(url&&!seen.has(url)){seen.add(url);sources.push({...claim,url});}}
  const progress=creativeProgress(story);const count=[...working.caption].length,warning=count>2200||/INTERNAL[\s\S]{0,60}TEST|DO\s+NOT\s+PUBLISH/iu.test(working.caption);
  const choices=selected.length?selected:(story.media||[]).slice(0,4);

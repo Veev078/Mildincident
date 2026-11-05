@@ -39,3 +39,7 @@ test('clearer story journey retains stale-edit, permission and existing-provider
  const action=nextAction(original);assert.equal(action.tab,'publishing');assert.equal(action.label,'Review existing activity');
  const production=storyWorkspace(state,original,'publishing');assert.match(production,/Your post/);assert.match(production,/earlier publishing record/);assert.match(production,/Studio does not send or schedule/);
 });
+
+test('Develop keeps the explicitly selected cover even when another reference has an available preview',()=>{
+ const s=story();s.media=[{id:'chosen',creator:'Chosen photographer',previewUrl:''},{id:'other',creator:'Other photographer',previewUrl:'https://example.org/other.jpg'}];s.selectedAssetIds=['chosen'];s.localDraft=null;const html=storyWorkspace(state,s,'overview');const hero=html.split('develop-lead-image')[1].split('develop-sequence')[0];assert.ok(hero.includes('Chosen photographer'));assert.ok(!hero.includes('Other photographer'));assert.ok(!hero.includes('https://example.org/other.jpg'));
+});

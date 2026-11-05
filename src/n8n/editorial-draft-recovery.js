@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import {requireThat} from '../errors.js';
 import {editorialSelectionTools} from '../editorial-selection.js';
-import {editorialPrinciples} from '../editorial-principles.js';
+import {editorialPrinciples,separateEditorialCopy} from '../editorial-principles.js';
 
 export const DRAFT_RECOVERY_BUDGET=Object.freeze({maxResearchCalls:0,maxDraftCalls:1,maxResearchToolCalls:0,maxCandidates:1,maxInputCharactersPerCall:30000,maxDraftOutputTokens:1800,priceVerified:false});
 const sha=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -34,8 +34,9 @@ export function buildCapturedDraftRecovery({worker,execution,jobId,requestHash,e
  const draft=node('Draft Editorial Concept'),originalMessageSize=JSON.stringify(draft.parameters.responses).length;draft.retryOnFail=false;draft.parameters.options.maxTokens=1800;delete draft.parameters.builtInTools;delete draft.parameters.options.maxToolCalls;delete draft.parameters.options.maxToolsIterations;
  const principles=editorialPrinciples();if(!draft.parameters.responses.values[0].content.includes(principles.version))draft.parameters.responses.values[0].content+='\nEDITORIAL PRINCIPLES '+principles.version+': '+principles.drafting+'\nPHOTOGRAPHIC FIT: '+principles.photography;
  draft.parameters.responses.values[0].content+='\nDRAFT-ONLY RECOVERY: The passages below were captured in an earlier research execution, not fetched today. Generate exactly three supported hook_options, one per declared approach, and recommend one. The visual_cultural option may discuss the project’s social context; it must not describe an uninspected frame. Treat the proposed hook/why_interesting as editorial suggestions, never extra factual evidence. Do not invent facts to distinguish angles. Keep all mandatory fields concise, a source-grounded caption whose length fits its substance, single_image provisionally, and all three hooks within this same 1800-output-token response. Missing image verification is a visual_direction gap, not a reason to abandon an adequately supported preliminary caption.';
+ const quality=node('Quality Gate');if(!quality.parameters.jsCode.includes('function separateEditorialCopy'))quality.parameters.jsCode=`const rows=(function(){${quality.parameters.jsCode}\n})();return rows.map(i=>{const g=i.json;if(g.concept){const copy=(${separateEditorialCopy.toString()})(g.concept);g.concept.caption=copy.caption;g.internalProductionNotes=copy.notes;}return i;});`;
  const finalize=node('Finalize Development Candidate');
- finalize.parameters.jsCode=`const rows=(function(){${finalize.parameters.jsCode}\n})();return rows.map(i=>{const c=JSON.parse(i.json.candidate_json);c.recovery=${JSON.stringify(recovery)};i.json.candidate_json=JSON.stringify(c);return i;});`;
+ finalize.parameters.jsCode=`const rows=(function(){${finalize.parameters.jsCode}\n})();return rows.map(i=>{const c=JSON.parse(i.json.candidate_json);c.recovery=${JSON.stringify(recovery)};c.editorialPrinciplesVersion=${JSON.stringify(principles.version)};try{c.internalProductionNotes=$('Quality Gate').first().json.internalProductionNotes||c.internalProductionNotes||[];}catch{}i.json.candidate_json=JSON.stringify(c);return i;});`;
  const link=(from,to)=>{workflow.connections[from].main[0]=[{node:to,type:'main',index:0}];};
  link('Development Job Claimed?','Build Research Prompt');link('Build Research Prompt','Collect Link Checks');link('Passed Prechecks?','Extract Original-Page Image Previews');
  const reachable=new Set(),visit=name=>{if(reachable.has(name))return;reachable.add(name);for(const branch of workflow.connections[name]?.main||[])for(const edge of branch||[])visit(edge.node);};visit('Development Job Request');
