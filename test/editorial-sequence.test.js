@@ -35,3 +35,13 @@ test('sequence recommendations consume latest projected frame decisions without 
  attachLocalPreviews({stories:[story]},{all:()=>new Map(),allReviews:()=>reviews});
  const plan=buildSourceSequencePlan(story);assert.deepEqual(plan.options[1].slides.map(s=>s.assetId),['latest-shortlist','ordinary','former-shortlist']);assert.equal(plan.rightsGranted,false);assert.equal(plan.pixelReviewPerformed,false);
 });
+
+test('two distinct decoded frames can form a carousel while identical original bytes cannot pad it or change the founder cover',()=>{
+ const first={...asset('first',2020),localPreview:{originalSha256:'same-original'}},duplicate={...asset('duplicate',2020),localPreview:{originalSha256:'same-original'}},last={...asset('last',2020),localPreview:{originalSha256:'different-original'}};
+ const story={media:[first,duplicate,last],localDraft:{selectedAssetIds:['last','first']}};const before=JSON.stringify(story),plan=buildSourceSequencePlan(story),sequence=plan.options.find(o=>o.format==='carousel');assert.deepEqual(sequence.slides.map(s=>s.assetId),['last','first']);assert.equal(sequence.targetSlideCount,2);assert.equal(plan.pixelReviewPerformed,false);assert.equal(plan.rightsGranted,false);assert.equal(JSON.stringify(story),before);
+ assert.equal(buildSourceSequencePlan({media:[first,duplicate]}).options.filter(o=>o.format==='carousel').length,0);
+});
+
+test('a rejection of replaced pixels does not silently reject the replacement or alter an existing selection',()=>{
+ const replacement={...asset('replacement',2020),localPreview:{sha256:'new'},localReview:{decision:'reject',context:{previewSha256:'old'}}},story={media:[replacement],selectedAssetIds:['replacement']};assert.equal(buildSourceSequencePlan(story).options[0].slides[0].assetId,'replacement');replacement.localReview.context.previewSha256='new';assert.equal(buildSourceSequencePlan(story).options.length,0);assert.deepEqual(story.selectedAssetIds,['replacement']);
+});

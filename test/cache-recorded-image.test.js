@@ -11,3 +11,14 @@ test('policy, recorded ownership, foreign hosts, redirects and unsuitable respon
  await assert.rejects(cacheRecordedImage({...input,policy:{}}),{code:'SOURCE_HOST_NOT_ALLOWED'});await assert.rejects(cacheRecordedImage({...input,scope:{...scope,asset_id:'not-recorded'}}),/MEDIA_NOT_RECORDED/);assert.equal(calls,0);
  await assert.rejects(cacheRecordedImage(input),{code:'SOURCE_HTTP_401'});await assert.rejects(cacheRecordedImage({...input,fetchImpl:async()=>new Response('<html>',{headers:{'content-type':'text/html'}})}),{code:'INVALID_PREVIEW_TYPE'});await assert.rejects(cacheRecordedImage({...input,fetchImpl:async()=>new Response('x',{headers:{'content-type':'image/jpeg','content-length':'99999999'}})}),{code:'SOURCE_IMAGE_TOO_LARGE'});await assert.rejects(cacheRecordedImage({...input,fetchImpl:async()=>{throw new Error('redirect disallowed');}}),{code:'SOURCE_CONNECTION_FAILED'});assert.equal(saves,0);
 });
+
+test('publisher CDN acquisition requires both explicit host grants and never accepts unrelated sibling or suffix hosts',async()=>{
+ const make=host=>({candidate_json:JSON.stringify({jobId:job,media:[{asset_id:'recorded',source_page_url:'https://source.example.org/project',thumb_url:'https://'+host+'/frame.jpg'}]})});let calls=0;const fetchImpl=async()=>{calls++;return new Response('blocked',{status:403});},base={scope,sourceExecutionId:'2353',store:null,fetchImpl};
+ await assert.rejects(cacheRecordedImage({...base,rows:[make('cdn.source.example.org')],policy}),{code:'SOURCE_HOST_NOT_ALLOWED'});assert.equal(calls,0);await assert.rejects(cacheRecordedImage({...base,rows:[make('cdn.source.example.org')],policy:{version:1,http_network_policy:{type:'restricted',egress_rules:[{host:'source.example.org'},{host:'cdn.source.example.org'}]}}}),{code:'SOURCE_HTTP_403'});assert.equal(calls,1);
+ for(const host of ['source.example.org.attacker.org','cdn.example.org'])await assert.rejects(cacheRecordedImage({...base,rows:[make(host)],policy}),/SOURCE_IMAGE_HOST_NOT_VERIFIED/);
+});
+
+test('an unbounded response stops at the streaming byte limit before decoding or storing',async()=>{
+ let cancelled=false,saved=false;const body=new ReadableStream({start(c){c.enqueue(new Uint8Array(8*1024*1024+1));},cancel(){cancelled=true;}});
+ await assert.rejects(cacheRecordedImage({rows:[row],scope,sourceExecutionId:'2353',policy,store:{save(){saved=true;}},fetchImpl:async()=>new Response(body,{headers:{'content-type':'image/jpeg'}})}),{code:'SOURCE_IMAGE_TOO_LARGE'});assert.equal(cancelled,true);assert.equal(saved,false);
+});

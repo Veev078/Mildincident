@@ -386,7 +386,7 @@ try {
   await page.reload();assert.equal(await page.getByLabel('Local caption draft').inputValue(),'Edited fixture development caption using the normal Studio editor.');
   assert.equal(snapshot.records.stories.length,1);
   await page.goto(`${origin}/#/story/${devStoryId}/carousel`);
-  await page.getByText('The photograph and its supporting documents · 3 frames',{exact:true}).click();
+  await page.getByText('A sequence from these source references · 3 frames',{exact:true}).click();
   await page.getByRole('button',{name:'Use 3-frame source plan',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));
   assert.equal(drafts.get(devStoryId).format,'carousel');assert.equal(drafts.get(devStoryId).targetSlideCount,3);

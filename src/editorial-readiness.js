@@ -2,8 +2,9 @@ import {lintCaption} from './editorial-intelligence.js';
 export function imageEvidenceState(asset){
  const decoded=Boolean(asset.localPreview?.sha256&&asset.localPreview.width&&asset.localPreview.height);
  const sourceCopy=decoded&&Boolean(asset.localPreview.sourceInspection);
+ const review=asset.localReview,reviewed=decoded&&review?.context?.previewSha256===asset.localPreview.sha256&&['editorial_taste','photographic_style','composition','mood','story_potential'].includes(review.context.decisionBasis);
  const relevance=asset.sourceRelation==='page_cover'||asset.sourceRelation==='context_only'?'generic_or_unrelated':asset.materialType==='design_documentation'?'context_document':asset.sourceRelation==='subject_caption_match'?'subject_reference':'relevance_unreviewed';
- return {relevance,access:sourceCopy?'decoded_source_copy':decoded?'decoded_private_upload':asset.previewUrl?'reference_uninspected':'preview_unavailable',decodedPixels:decoded,sourceCopy,identityVerified:false,rightsGranted:false,aestheticAssessment:'not_performed'};
+ return {relevance,access:sourceCopy?'decoded_source_copy':decoded?'decoded_private_upload':asset.previewUrl?'reference_uninspected':'preview_unavailable',decodedPixels:decoded,sourceCopy,identityVerified:false,rightsGranted:false,aestheticAssessment:reviewed?'founder_review_recorded':'not_performed'};
 }
 export function assessStudioReadiness(story){
  const draft=story.localDraft||{};const working={...story,...draft};const ids=working.selectedAssetIds||[];const assets=story.media||[];const selected=ids.map(id=>assets.find(m=>m.id===id)).filter(Boolean);

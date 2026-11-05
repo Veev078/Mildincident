@@ -1,12 +1,13 @@
 import {requireThat} from '../errors.js';import {safePhotoReference} from './photo-url-guard.js';
 export const MEDIA_INSPECTION_PATH='mildincident-dev-recorded-media-v1';
 export const MAX_SOURCE_IMAGE_BYTES=8*1024*1024;
-export function resolveRecordedMedia(rows,scope,publicReference){
+export function resolveRecordedMedia(rows,scope,publicReference,allowPublisherSubdomain=false){
   if(rows.length!==1)throw new Error('AMBIGUOUS_RECORDED_CANDIDATE');let candidate;try{candidate=JSON.parse(rows[0].candidate_json);}catch{throw new Error('INVALID_RECORDED_CANDIDATE');}
   if(candidate.jobId!==scope.job_id)throw new Error('MEDIA_SCOPE_MISMATCH');
   const matches=(candidate.media||[]).filter(m=>m.asset_id===scope.asset_id);if(matches.length!==1)throw new Error('MEDIA_NOT_RECORDED');
   const m=matches[0];const url=publicReference(m.thumb_url);const source=publicReference(m.source_page_url);const host=s=>(s.match(/^https:\/\/([^/:?#]+)/i)||[])[1]?.replace(/^www\./,'').toLowerCase();
-  if(!url||!source||host(url)!==host(source))throw new Error('SOURCE_IMAGE_HOST_NOT_VERIFIED');
+  const sameHost=url&&source&&host(url)===host(source),publisherChild=url&&source&&host(url)?.endsWith('.'+host(source));
+  if(!sameHost&&!(allowPublisherSubdomain&&publisherChild))throw new Error('SOURCE_IMAGE_HOST_NOT_VERIFIED');
   return {job_id:scope.job_id,asset_id:scope.asset_id,url,source_page_url:source};
 }
 export function validateImageHead(response,maximum){
