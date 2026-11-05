@@ -42,3 +42,6 @@
 }
 
 .discovery-fields { border:0; padding:0; margin:0; min-width:0; }
+
+.recorded-source-access { margin:18px 0; padding:16px; background:var(--surface); border:1px solid var(--line); }
+.recorded-source-access p { margin:10px 0 0; max-width:680px; line-height:1.6; }

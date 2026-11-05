@@ -2,10 +2,10 @@ import {esc,sectionHeading} from './components.js';
 
 // These modes map to existing kind/prompt contracts, never to invented native presets.
 export function researchAccess(engine={}) {
- if(!engine.configured)return {canStart:false,code:'not_connected',message:'Research launch is not connected to this Studio. You can save a brief now; it will not run until an authorized research connection is available.'};
+ if(engine.configured!==true)return {canStart:false,code:'not_connected',message:'Research launch is not connected to this Studio. You can save a brief now; it will not run until an authorized research connection is available.'};
  if(engine.readOnly===true)return {canStart:false,code:'read_only',message:'This Studio receives research results but cannot start new research. A separately authorized launch connection is missing. Save your brief now; existing results can still be checked below.'};
- if(engine.readOnly!==false||!engine.generationApproved)return {canStart:false,code:'not_approved',message:'Research launch has not been authorized for this connection. Your brief can be saved without starting a run.'};
- if(!engine.workerActive||!engine.generationAvailable)return {canStart:false,code:'worker_unavailable',message:'The approved research worker is not available to run. Save your brief while its connection is checked.'};
+ if(engine.readOnly!==false||engine.generationApproved!==true)return {canStart:false,code:'not_approved',message:'Research launch has not been authorized for this connection. Your brief can be saved without starting a run.'};
+ if(engine.workerActive!==true||engine.generationAvailable!==true)return {canStart:false,code:'worker_unavailable',message:'The approved research worker is not available to run. Save your brief while its connection is checked.'};
  return {canStart:true,code:'available',message:'Research is available through the authorized development connection. One run prepares up to one proposal for review; saving alone does not start it.'};
 }
 

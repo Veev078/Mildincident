@@ -666,7 +666,7 @@ document.addEventListener('error', event => {
 
 async function createResearchRequest(input, {start=false}={}) {
   if(start&&!researchAccess(state.workspace?.engine).canStart)throw new Error(researchAccess(state.workspace?.engine).message);
-  if(start&&!window.confirm('Start one authorized research run? It may use the approved provider budget for one research and one draft call. It will not publish or grant rights.'))return false;
+  if(start&&!window.confirm('Start one authorized research run? It may charge for one research and one draft call. Proceed only under a separately approved spend limit; the provider price is not shown here. It will not publish or grant rights.'))return false;
   const keyField = input.kind==='brief' ? 'briefRequestKey' : 'discoveryRequestKey';
   state[keyField] ||= crypto.randomUUID();
   const result = await api('/api/research/requests', {method:'POST', headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({...input,idempotencyKey:state[keyField]})});
@@ -679,13 +679,15 @@ async function createResearchRequest(input, {start=false}={}) {
   await loadWorkspace({quiet:true}).catch(()=>{});
   if(start){try{await launchSavedResearch(result.request,{engine:state.workspace.engine,api});toast('Research start requested once. Progress and resulting ideas appear in Discover.');}catch(error){toast('Your brief is saved. '+error.message+' No automatic retry was made.',{error:true});}await loadWorkspace({quiet:true}).catch(()=>{});}
   else toast(reused?'Existing saved direction retained. Research has not started.':'Direction saved. Research has not started.');
-  document.querySelector(`[data-request-id="${result.request.id}"]`)?.closest('.research-activity-row')?.scrollIntoView({block:'center'});
+  const observed=state.workspace.researchRequests.find(r=>r.id===result.request.id);
+  const target=start&&observed?.engineJob?.candidates?.length?document.querySelector('.founder-inbox'):document.querySelector(`[data-request-id="${result.request.id}"]`)?.closest('.research-activity-row');target?.scrollIntoView({block:'center'});
 }
 document.addEventListener('click', async event=>{
   const button=event.target.closest('[data-engine-action]');if(!button||button.disabled)return;
   button.disabled=true;
   try{
     const action=button.dataset.engineAction;
+    if(action==='evidence'&&!await flushAllDrafts())throw new Error('Save or recover pending edits before reading recorded evidence.');
     await api(action==='refresh'?'/api/research/engine/refresh':`/api/research/requests/${button.dataset.request}/engine/${action}`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(action==='start'?{expectedVersion:Number(button.dataset.version)}:{})});
     await loadWorkspace({quiet:true});toast(action==='queue'?'Queued in isolated n8n development storage. No AI run was started.':action==='evidence'?'Captured execution evidence inspected without a new provider call.':action==='start'?'Bounded generation dispatched once. Refresh results to reconcile its status.':'Research results checked.');
   }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}

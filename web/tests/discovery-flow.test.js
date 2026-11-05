@@ -4,7 +4,7 @@ import {launchSavedResearch} from '../research-launch.js';
 import {reviewPath,storyStep} from '../review-path.js';
 const ready={configured:true,readOnly:false,generationApproved:true,generationAvailable:true,workerActive:true};
 test('launch requires every existing approval flag; missing or read-only capability never exposes a start action',()=>{
- for(const engine of [{},{configured:true,readOnly:true},{...ready,readOnly:undefined},{...ready,generationApproved:false},{...ready,workerActive:false},{...ready,generationAvailable:false}]){
+ for(const engine of [{},{configured:true,readOnly:true},{...ready,readOnly:undefined},{...ready,generationApproved:false},{...ready,workerActive:false},{...ready,generationAvailable:false},{...ready,generationApproved:'true'},{...ready,workerActive:1},{...ready,generationAvailable:'true'}]){
   assert.equal(researchAccess(engine).canStart,false);
   assert.ok(!discoverySetup({workspace:{engine}}).includes('value="start"'));
  }
@@ -34,4 +34,12 @@ test('review path preserves every diagnostic/evidence item and treats absent app
  assert.equal(path.next.key,'revision');assert.equal(path.tasks[1].key,'handoff');assert.ok(path.codes.includes('UNRECOGNIZED_GATE'));assert.deepEqual(path.tasks[1].decisions[0].evidence,[{postId:'same-id'}]);assert.equal(JSON.stringify(story),before);
  const sparse=reviewPath({media:[],selectedAssetIds:[],caption:''});assert.ok(sparse.tasks.some(t=>t.key==='facts'));assert.ok(sparse.tasks.some(t=>t.key==='rights'));assert.ok(sparse.tasks.some(t=>t.key==='caption'));assert.equal(sparse.publicationApproved,false);
  assert.equal(storyStep(story).tab,'overview');assert.equal(storyStep({media:[],selectedAssetIds:[],caption:''}).tab,'images');
+});
+
+import {storyWorkspace} from '../views.js';
+test('recorded source access remains bound to a development story and is unavailable without its read connection',()=>{
+ const story={id:'CON-DEV-fixture',title:'A source fixture',origin:'n8n_development',engineJobId:'fixture-job',media:[],research:[]};
+ const html=storyWorkspace({workspace:{engine:{configured:true,readOnly:true}}},story,'research');assert.ok(html.includes('Read recorded source evidence'));assert.ok(html.includes('data-request="fixture-job"'));assert.ok(html.includes('does not visit new sources or start research'));assert.ok(!/data-engine-action="evidence"[^>]*disabled/.test(html));
+ assert.match(storyWorkspace({workspace:{engine:{configured:false}}},story,'research'),/data-engine-action="evidence"[^>]*disabled/);
+ assert.ok(!storyWorkspace({workspace:{engine:{configured:true}}},{...story,origin:undefined},'research').includes('Read recorded source evidence'));
 });

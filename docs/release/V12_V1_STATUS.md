@@ -2,7 +2,7 @@
 
 Updated November 4, 2026 (America/New_York). This is the current V12 continuation checkpoint; the product constitution owns direction and older sprint notes retain historical evidence.
 
-**Branch:** `development/photography-review-20261029`. Verified starting HEAD and GitHub ref: `a772c317cadc2d00a9bdc2a1b083e5f59fcd5a10`. Checkpoint A is the commit containing this initial status; its SHA will be recorded in the next update. No deployment.
+**Branch:** `development/photography-review-20261029`. Verified starting HEAD and GitHub ref: `a772c317cadc2d00a9bdc2a1b083e5f59fcd5a10`. Checkpoint A: `a533038` (founder workflow, launch mapping and review hierarchy). Checkpoint B is the commit containing this update; its SHA will be recorded after final verification. No deployment.
 
 ## Current workstreams
 
@@ -24,7 +24,7 @@ Updated November 4, 2026 (America/New_York). This is the current V12 continuatio
 | Request `/engine/queue` then `/engine/start` | Explicit Start research only after configured, non-read-only, approved, active/available worker flags; version-bound start, no automatic retry. Hosted path cannot run. |
 | `/api/research/engine/refresh` | Check for results; native GET-only delivery remains separate from starting. |
 | Existing story draft PATCH / proposal history | Develop, photographs, caption and direction remain private working copies with source/local revision guards. |
-| Existing execution `/engine/evidence` | Still available in advanced request details; direct story-level access is next in Checkpoint B. Reads recorded execution, never reruns source/model. |
+| Existing execution `/engine/evidence` | Read recorded source evidence directly in the story’s Research & sources view. Existing execution identity/hash guards and sanitization remain; no fresh source/model request. Reads recorded execution, never reruns source/model. |
 | Production packet/check + provider observations | Review’s immediate task and secondary production records; guarded download/check only. Rights, facts, approval, version and prior-handoff gates are preserved. |
 | Original Founder Studio | Existing production continuation link. No native approval/write-back contract is added to this local Studio. |
 
@@ -32,7 +32,7 @@ Updated November 4, 2026 (America/New_York). This is the current V12 continuatio
 
 Current live read-only observation at November 4, 10:08 PM ET: **27 native stories, 302 media records, 15 Buffer records, two recovered historical results**, one unmatched native job retained. Native worker saved version `8b3e1293-5990-451c-8358-2cbe9e752a44`, inactive, no active version; readOnly=true, generationAvailable=false. Fresh private proof copies are under ignored `.local/v12-live/`. Source APIs were read only; no model/source-search or production call was made.
 
-Checkpoint A: **343 automated unit/integration tests**, JavaScript syntax/diff checks, **six complete V12 fixture browser journeys** with zero browser errors. Screenshots compare baseline `a772c31` against current Today, Discover, Story, Review and Production at1366×768,1440×900,390×844 under `.local/v12/`. Images are explicitly synthetic fixtures. Safe launch proof uses an injected adapter, not n8n/model execution. Existing full browser and HTTPS suites will be repeated in C. Real source preview pixels and actual-host V12 acceptance are not verified.
+Checkpoint A: **343 automated unit/integration tests**, JavaScript syntax/diff checks, **five complete V12 fixture browser journeys at A, six at B** with zero browser errors. Screenshots compare baseline `a772c31` against current Today, Discover, Story, Review and Production at1366×768,1440×900,390×844 under `.local/v12/`. Images are explicitly synthetic fixtures. Safe launch proof uses an injected adapter, not n8n/model execution. Existing full browser and HTTPS suites will be repeated in C. Real source preview pixels and actual-host V12 acceptance are not verified.
 
 ## Missing / blocked
 
@@ -44,7 +44,7 @@ Checkpoint A: **343 automated unit/integration tests**, JavaScript syntax/diff c
 
 ## Current milestone / remaining acceptance
 
-A: founder workflow and capability map implemented and tested. B: finish safe access to useful existing evidence/progress capabilities. C: complete regressions, visually inspect desktop/mobile and current-record captures, fix friction and document the exact deployable SHA. V1 acceptance still needs founder use on the existing host, one genuinely new inspectable source-grounded proposal, and separately validated native production continuation; no usability-completion percentage is claimed.
+A: founder workflow and capability map implemented and tested. B: completed safe access to recorded source evidence, explicit start of eligible saved/queued requests, fail-closed availability flags and results-first continuation. Verified40 focused unit/integration checks and6 V12 browser journeys, including captured source text without leaked execution headers or another dispatch. C: complete regressions, visually inspect desktop/mobile and current-record captures, fix friction and document the exact deployable SHA. V1 acceptance still needs founder use on the existing host, one genuinely new inspectable source-grounded proposal, and separately validated native production continuation; no usability-completion percentage is claimed.
 
 ## Three highest-impact next tasks
 
