@@ -1,3 +1,21 @@
+# Build G Part 1 — Discover, private themes and status consistency
+
+November5,2026, America/New_York. Verified local/GitHub baseline **81a0ca215cc76db45f658e40073b68b84188ad42** is independently confirmed live on the existing Render service (manual **dep-dbmeofrl550s738uu15g**,3:51PM Eastern). This checkpoint is local implementation, not deployed/native activation.
+
+- Discover preserves the three modes and existing guarded dispatch/result delivery, with Generate Stories as the primary action and an explicit unavailable explanation. Saving a direction is not presented as research.
+- Inline **Manage Themes** supports private create/edit/duplicate/archive/restore and selection, persisted as append-only revisions in existing research.sqlite. Original MILDINCIDENT is the protected default; native presets remain protected. Saved request theme snapshots survive later theme edits/archive and retries without changing research identity or global Brand Brain.
+- Discover's stale Marcie “Caption not drafted” note came from its legacy provisional-format field. It now respects exact linked2355 recovery/working copy and offers Review caption. Source2353, generated2355, founder edits, selected frames and approvals remain unchanged.
+- Existing caption-generation readiness is preserved; authorized revisions show Generate New Caption. No new model execution occurred.
+- Fresh native inspection confirms the existing worker remains inactive/e6fe10d3-c7a7-482b-9fd1-cd24c681b145. Prepared standard graph **1ec55f30…** matches the already reviewed Muse graph; no new engine or scaffolding was needed. Exact version activation and fresh authorization are the remaining run gates. Hosted grant contents/admin access remain unverified.
+
+[Part1 operations and exact approval request](V12_BUILD_G_PART1.md) specifies one planned Generate Stories acceptance, job **d7836190-8694-4609-a20b-84fbd26e501f**: temporary existing-worker activation, fresh single-run permit,1 research/3500 output-token call/2 web searches maximum,1 draft/1800 output-token call maximum,1 result, then deactivate/revoke/restore. Estimated **$0.15–$0.25**, not a hard cap; account/search pricing and SDK retries are unverified. Separate explicit approval is required. No paid call, workflow installation/activation, source-host bypass, production mutation, Buffer write or deployment occurred.
+
+Local verification covers private theme persistence/protection/revisions/immutable request snapshots and retained Marcie/Tropicana/Dekotora/Deneuve workflows. **388 unit/integration tests**, **4 focused discovery browser journeys** and **8 retained-record/theme browser journeys** pass, with no browser errors; syntax/whitespace checks pass. The pushed SHA is reported at handoff. Screenshots/logs/prepared native review remain under ignored .local/v12-g/. Actual hosted generation and new AI quality remain unverified. Photograph retrieval, native approval import and Buffer handoff remain on the same gated roadmap, detailed in operations; no expansion into them occurred.
+
+Next most valuable action: separately approve the single bounded real Generate Stories acceptance above. A later manual existing-service release of the final SHA also needs separate approval and a verified backup; rollback81a0ca2 preserves all data/history and the additive theme table.
+
+---
+
 # Build F — one story workspace and repeatable caption control
 
 Updated November5,2026, America/New_York. Verified baseline **2301abe04096d696e24612f145a292d1a6255993** matched the clean checkout/GitHub and is independently confirmed **live Build E** on the existing Render service. **Build F is implemented and tested locally; new native execution and deployment remain separately gated.** No paid call, source/image fetch, workflow installation/activation, credential change, production mutation, Buffer write or deployment occurred.

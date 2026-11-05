@@ -19,6 +19,7 @@ import { loadEditorialEngineClient } from './editorial-engine-client.js';
 import { EditorialEngineService } from './editorial-engine-service.js';
 import { developmentCandidateStory } from './development-story.js';
 import { LocalResearchStore } from './research-store.js';
+import {StudioThemes} from './themes.js';
 import {captionGenerationState,captionVersions} from './caption-generation.js';
 import {editorialPresetCatalog,resolvePresetRequest} from './editorial-presets.js';
 import { LocalDraftStore } from './store.js';
@@ -60,12 +61,13 @@ async function imageBody(request) {
 }
 
 export function createWorkspaceServer({ source, drafts, previews, research, engine, photography=research?new PhotographyService(research):null, founderReviews=research?new FounderReviewStore(research):null, feeds=research?new PublicationFeeds(research):null, access=null,backups=null,delivery=null,serverFactory=http.createServer, webRoot = WEB_ROOT }) {
+  const themes=research?new StudioThemes(research):null;
   const view = () => {
     const workspace = source.snapshot?source.view(drafts.all()):buildWorkspace({records:Object.fromEntries(Object.keys(WORKSPACE_TABLES).map(k=>[k,[]])),buffer:{posts:[],complete:false,observedAt:null},observedAt:new Date().toISOString(),warnings:[]});
     if(!source.snapshot)workspace.source={...workspace.source,kind:'disconnected',observedAt:null,bufferObservedAt:null,stale:true,unavailable:true,warnings:['No authoritative production snapshot is available. Private photographic research remains usable; connect n8n/Buffer or restore your private backup to inspect existing stories.'],refreshError:{code:'SOURCE_UNAVAILABLE',message:'Production observations unavailable; no example stories were substituted.'}};
     workspace.hosted=Boolean(access);workspace.backupStatus=backups?.status()||null;
     workspace.researchRequests = research?.all() || [];
-    workspace.researchPresets=editorialPresetCatalog(source.snapshot);
+    workspace.researchPresets=themes?themes.catalog(editorialPresetCatalog(source.snapshot)):editorialPresetCatalog(source.snapshot);workspace.studioThemes=themes?.all()||[];
     workspace.engine = engine?.status() || {configured:false,generationAvailable:false,generationApproved:false,workerActive:false};
     for (const request of workspace.researchRequests) for (const candidate of request.engineJob?.candidates || []) {
       const story = developmentCandidateStory(candidate,{request,soundtrack:source.snapshot?.records?.soundtrack || [],drafts:drafts.all(),continuation:request.continuation||request.engineJob.editorialContext?.continuation||null,decision:request.engineJob.reviewDecisions?.[candidate.id]||null,evidence:request.engineJob.evidence?.[candidate.id]||null});
@@ -140,6 +142,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       const photoRoute=url.pathname.match(/^\/api\/photography\/(hunts|decisions)\/([^/]+)$/);
       if(photoRoute&&photoRoute[1]==='hunts'&&request.method==='GET'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');json(response,200,{hunt:photography.get(decodeURIComponent(photoRoute[2]),Number(url.searchParams.get('offset')||0))});return;}
       if(photoRoute&&request.method==='POST'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request),id=decodeURIComponent(photoRoute[2]);if(photoRoute[1]==='decisions'){json(response,200,photography.decide(id,input));return;}const hunt=await photography.resume(id,input.pages??1);json(response,200,{hunt,productionApplied:false,rightsGranted:false});return;}
+      if(url.pathname==='/api/research/themes'&&request.method==='POST'){requireThat(themes,'RESEARCH_UNAVAILABLE','Private themes are unavailable.');json(response,200,{theme:themes.save(await body(request)),scope:'local_only',productionApplied:false});return;}
       if (url.pathname === '/api/workspace' && request.method === 'GET') { json(response, 200, view()); return; }
       if (url.pathname === '/api/research/requests' && request.method === 'POST') {
         requireThat(research, 'RESEARCH_UNAVAILABLE', 'The private research request store is unavailable.');

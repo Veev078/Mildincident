@@ -1,5 +1,7 @@
 # Build F — creative workflow and native execution boundaries
 
+[Build G Part 1](V12_BUILD_G_PART1.md) records the latest Discover/theme work and the next bounded full-research approval. Build F caption-only plans remain distinct and must be rechecked for expiry/drift before any execution.
+
 November5,2026, America/New_York. Baseline **2301abe04096d696e24612f145a292d1a6255993** was clean and matched GitHub; Render independently confirms it live. Build F continues the existing branch, worker, private stores and approval/Buffer architecture. No new engine, agent, workflow or dashboard was introduced.
 
 ## Founder experience implemented locally
