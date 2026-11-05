@@ -55,6 +55,7 @@ export class LocalPreviewStore {
       CREATE TABLE IF NOT EXISTS local_source_preview_evidence(story_id TEXT NOT NULL, asset_id TEXT NOT NULL,
       preview_sha256 TEXT NOT NULL, source_url TEXT NOT NULL, image_url TEXT NOT NULL, execution_id TEXT NOT NULL,
       inspected_at TEXT NOT NULL, PRIMARY KEY(story_id,asset_id,preview_sha256));`);
+    if(!this.db.prepare('PRAGMA table_info(local_source_preview_evidence)').all().some(c=>c.name==='acquisition_json'))this.db.exec('ALTER TABLE local_source_preview_evidence ADD COLUMN acquisition_json TEXT');
   }
 
   #public(row) {
@@ -147,11 +148,15 @@ export class LocalPreviewStore {
     return { bytes: await this.#readBlob(preview.sha256, 'jpg'), preview };
   }
 
-  sourceInspection(storyId,assetId,hash){const row=this.db.prepare('SELECT * FROM local_source_preview_evidence WHERE story_id=? AND asset_id=? AND preview_sha256=?').get(storyId,assetId,hash);return row?{sourceUrl:row.source_url,imageUrl:row.image_url,executionId:row.execution_id,inspectedAt:row.inspected_at,basis:'recorded_source_copy',identityVerified:false,rightsGranted:false}:null;}
+  sourceInspection(storyId,assetId,hash){const row=this.db.prepare('SELECT * FROM local_source_preview_evidence WHERE story_id=? AND asset_id=? AND preview_sha256=?').get(storyId,assetId,hash);return row?{sourceUrl:row.source_url,imageUrl:row.image_url,executionId:row.acquisition_json?null:row.execution_id,inspectedAt:row.inspected_at,basis:row.acquisition_json?'direct_recorded_source_copy':'recorded_source_copy',...(row.acquisition_json?JSON.parse(row.acquisition_json):{}),identityVerified:false,rightsGranted:false}:null;}
+  recordSourceAcquisition(storyId,assetId,hash,{sourceUrl,imageUrl,sourceExecutionId,receiptId}){
+    requireThat(this.get(storyId,assetId,hash)&&safePhotoReference(sourceUrl)&&safePhotoReference(imageUrl)&&/^\d{1,30}$/.test(sourceExecutionId)&&/^[a-f0-9-]{36}$/.test(receiptId),'INVALID_PREVIEW_SOURCE','A decoded scoped preview and original source execution are required.');
+    this.db.prepare('INSERT OR IGNORE INTO local_source_preview_evidence(story_id,asset_id,preview_sha256,source_url,image_url,execution_id,inspected_at,acquisition_json) VALUES(?,?,?,?,?,?,?,?)').run(storyId,assetId,hash,sourceUrl,imageUrl,sourceExecutionId,new Date().toISOString(),JSON.stringify({sourceExecutionId,receiptId,visualInspectionPerformed:false}));return this.get(storyId,assetId,hash);
+  }
   recordSourceInspection(storyId,assetId,hash,{sourceUrl,imageUrl,executionId}){
     requireThat(this.get(storyId,assetId,hash),'PREVIEW_NOT_FOUND','A decoded existing private preview is required.');
     requireThat(safePhotoReference(sourceUrl)&&safePhotoReference(imageUrl)&&/^[0-9]{1,30}$/.test(executionId),'INVALID_PREVIEW_SOURCE','Recorded public URLs and a native inspection execution are required.');
-    this.db.prepare('INSERT OR IGNORE INTO local_source_preview_evidence VALUES(?,?,?,?,?,?,?)').run(storyId,assetId,hash,sourceUrl,imageUrl,executionId,new Date().toISOString());
+    this.db.prepare('INSERT OR IGNORE INTO local_source_preview_evidence(story_id,asset_id,preview_sha256,source_url,image_url,execution_id,inspected_at) VALUES(?,?,?,?,?,?,?)').run(storyId,assetId,hash,sourceUrl,imageUrl,executionId,new Date().toISOString());
     return this.get(storyId,assetId,hash);
   }
 
