@@ -80,15 +80,15 @@ try{
  for(const [width,height]of [[1366,768],[1440,900],[390,844]]){await page.setViewportSize({width,height});await noOverflow(page,'empty Discover '+width);await screenshot(page,`after-discover-empty-${width}x${height}`);}
  await page.setViewportSize({width:1440,height:900});
  const baselineCount=app.research.all().length;
- await page.getByLabel('Creative direction',{exact:true}).fill('Preserve this unsaved specific direction while saving the default.');
- await page.getByRole('button',{name:'Save general discovery brief',exact:true}).click();
+ await page.getByRole('button',{name:'Custom direction',exact:true}).click();await page.getByLabel('Creative direction',{exact:true}).fill('Preserve this unsaved specific direction while saving the default.');
+ await page.getByRole('button',{name:'Surprise Me',exact:true}).click();await page.getByRole('button',{name:'Save general discovery brief',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('#toast')?.textContent.includes('Direction saved'));
  const firstDefaultCount=app.research.all().length;
  assert.equal(firstDefaultCount,baselineCount+1);
- await page.getByRole('button',{name:'Save general discovery brief',exact:true}).click();
+ await page.getByRole('button',{name:'Surprise Me',exact:true}).click();await page.getByRole('button',{name:'Save general discovery brief',exact:true}).click();
  await page.waitForTimeout(300);
  assert.equal(app.research.all().length,firstDefaultCount);
- assert.equal(await page.getByLabel('Creative direction',{exact:true}).inputValue(),'Preserve this unsaved specific direction while saving the default.');
+ await page.getByRole('button',{name:'Custom direction',exact:true}).click();assert.equal(await page.getByLabel('Creative direction',{exact:true}).inputValue(),'Preserve this unsaved specific direction while saving the default.');
  await page.getByLabel('Creative direction',{exact:true}).fill('');
  checks.push('repeated default saves reuse the same unstarted request; unsaved specific input is retained and no research runs');
  const queued=seedRequest(app,{kind:'brief',prompt:'SYNTHETIC queued fixture direction',state:'queued'});

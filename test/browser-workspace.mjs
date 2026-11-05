@@ -39,7 +39,7 @@ const checks = [];
 checks.push = (...items)=>{console.error('Browser step:',...items);return Array.prototype.push.apply(checks,items);};
 const errors = [];
 // Research records remain available inside the compact activity list.
-async function revealRequest(page,selector='[data-request-id]'){const card=page.locator(selector).first();await card.evaluate(el=>{const row=el.closest('.research-activity-row');if(row)row.open=true;});return card;}
+async function revealRequest(page,selector='[data-request-id]'){const card=page.locator(selector).first();await card.evaluate(el=>{const row=el.closest('.research-activity-row');if(row)row.open=true;const record=el.closest('.research-record-details');if(record)record.open=true;});return card;}
 
 try {
   browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
@@ -55,7 +55,7 @@ try {
 
 
   await page.goto(`${origin}/#/discovery`);
-  await page.getByRole('heading', {name:'Discover',exact:true}).waitFor();
+  await page.getByRole('heading', {name:'Discover',exact:true}).waitFor();await page.getByRole('button',{name:'Custom direction',exact:true}).click();
   await page.getByLabel('Creative direction', {exact:true}).fill('Find unusual connections between portrait photography and cinema');
   await page.getByLabel('Source link (optional)', {exact:true}).fill('https://example.org/photography');
   await page.getByRole('button', {name:'Save research direction',exact:true}).click();
@@ -74,6 +74,7 @@ try {
   assert.equal(research.all()[0].executionConfirmed,false);
   checks.push('creative brief persists, targets existing authenticated n8n form and links an actual source story without claiming execution');
 
+  await page.getByRole('button',{name:'Custom direction',exact:true}).click();
   const originalBriefCount=research.all().length;
   await page.getByLabel('Creative direction',{exact:true}).fill('Investigate another cultural connection with reliable source photographs');
   let discardResponse=true;
@@ -90,9 +91,9 @@ try {
   await page.unroute('**/api/research/requests');
   checks.push('a lost local research-create response can be retried without creating a duplicate ticket');
   await page.getByLabel('Creative direction',{exact:true}).fill('Keep this unsaved creative direction while preparing discovery');
-  await page.getByRole('button',{name:'Save general discovery brief',exact:true}).click();
+  await page.getByRole('button',{name:'Surprise Me',exact:true}).click();await page.getByRole('button',{name:'Save general discovery brief',exact:true}).click();
   await page.waitForFunction(()=>document.querySelectorAll('[data-request-id]').length===3);
-  assert.equal(await page.getByLabel('Creative direction',{exact:true}).inputValue(),'Keep this unsaved creative direction while preparing discovery');
+  await page.getByRole('button',{name:'Custom direction',exact:true}).click();assert.equal(await page.getByLabel('Creative direction',{exact:true}).inputValue(),'Keep this unsaved creative direction while preparing discovery');
   const discoveryLink=await page.locator('[data-research-handoff]').first().getAttribute('href');
   assert.equal(new URL(discoveryLink).pathname,'/form/mildincident-start-editorial-discovery');
   assert.equal(research.all()[0].kind,'discovery');
@@ -395,7 +396,7 @@ try {
   Object.assign(fixtureCandidate.media[0],{creator_basis:'copyright_holder_only',copyright_holder:'Fixture owner',source_research_links:[{kind:'series',label:'Synthetic series trail',url:'https://example.org/project',verified:true}],capture_coverage:{referenceCount:55,retainedCount:40,referenceLimit:40,pageTruncated:true}});
   for(const name of ['drawing','trench'])fixtureCandidate.media.push({asset_id:'dev-'+name,thumb_url:'https://example.org/'+name+'.jpg',source_page_url:'https://example.org/source',source_caption:'Synthetic fixture costume document, 1967.',credit_at_source:'Fixture museum',source_years:[1967],source_relation:'subject_caption_match',material_kind:'design_documentation'});
   engineFixture.candidates.push({job_id:queued.job_id,candidate_id:fixtureCandidate.id,status:'ready_to_review',candidate_json:JSON.stringify(fixtureCandidate)});
-  await page.getByRole('button',{name:'Check for new research',exact:true}).first().click();await page.getByText('Research results checked.',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Check for results',exact:true}).first().click();await page.getByText('Research results checked.',{exact:true}).waitFor();
   await (await revealRequest(page)).locator('details.research-system > summary').click();
   await page.getByRole('link',{name:'Open candidate in Studio →',exact:true}).click();
   await page.getByText('Story details & version history',{exact:true}).click();await page.getByText('Research proposal',{exact:true}).waitFor();
@@ -485,7 +486,7 @@ try {
   await page.goto(`${origin}/#/discover`);const reviewBaseline=research.all().length;
   await page.getByRole('button',{name:'Existing stories',exact:true}).click();const reviewCard=page.locator('[data-review-card]').first();const reviewId=await reviewCard.getAttribute('data-review-card');await reviewCard.getByRole('button',{name:'Save',exact:true}).click();await page.locator('[data-review-card="'+reviewId+'"] .review-receipt').filter({hasText:'Saved'}).waitFor();await page.reload();await page.getByRole('button',{name:'Existing stories',exact:true}).click();await page.locator('[data-review-card="'+reviewId+'"] .review-receipt').filter({hasText:'Saved'}).waitFor();
   const restoredCard=page.locator('[data-review-card="'+reviewId+'"]');await restoredCard.locator('form details > summary').click();await restoredCard.getByRole('button',{name:'Find alternatives',exact:true}).click();await page.getByText('Decision and research direction saved. Research has not started.',{exact:true}).waitFor();assert.equal(research.db.prepare('SELECT COUNT(*) n FROM founder_review_events WHERE target_id=?').get(reviewId).n,2);assert.equal(research.all().length,reviewBaseline+1);
-  const nativeJobCount=engineFixture.jobs.length;await page.getByRole('button',{name:'Check for new research',exact:true}).first().click();await page.getByText('Research results checked.',{exact:true}).waitFor();assert.equal(engineFixture.jobs.length,nativeJobCount);
+  const nativeJobCount=engineFixture.jobs.length;await page.getByRole('button',{name:'Check for results',exact:true}).first().click();await page.getByText('Research results checked.',{exact:true}).waitFor();assert.equal(engineFixture.jobs.length,nativeJobCount);
   const frameCard=page.locator('[data-review-card="'+reviewId+'"]');
   const displayedAsset=await frameCard.locator('form').getAttribute('data-asset');
   assert.ok(displayedAsset);

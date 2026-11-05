@@ -1,53 +1,69 @@
 # V12 / V1 living status
 
-Updated November 4, 2026 (America/New_York). This is the current V12 continuation checkpoint; the product constitution owns direction and older sprint notes retain historical evidence.
+Updated November 4, 2026 (America/New_York). **Sprint A checkpoints A–C are implemented and tested; end-to-end live V1 acceptance remains incomplete.** This is the continuation status. The constitution owns product direction; older sprint notes retain history.
 
-**Branch:** `development/photography-review-20261029`. Verified starting HEAD and GitHub ref: `a772c317cadc2d00a9bdc2a1b083e5f59fcd5a10`. Checkpoint A: `a533038` (founder workflow, launch mapping and review hierarchy). Checkpoint B is the commit containing this update; its SHA will be recorded after final verification. No deployment.
+Branch: `development/photography-review-20261029`.
 
-## Current workstreams
+- Verified starting GitHub/local HEAD: `a772c317cadc2d00a9bdc2a1b083e5f59fcd5a10`.
+- A — founder workflow and guarded launch mapping: `a533038100dc6e7a5d2a47537ea02c068bc27f54`.
+- B — recorded source evidence and saved-research continuation: `934342f8c1827f32e63a046ee5c318673b08e3a4`.
+- C — polish, background delivery/freshness fixes and final regression: the commit containing this update. Resolve its exact SHA with `git rev-parse HEAD`; the release response records the pushed SHA. All checkpoints use `[skip render]`.
 
-| Workstream | Current status / evidence |
+## Workstreams / capability → interface
+
+| Workstream / existing contract | Current founder experience and status |
 | --- | --- |
-| Founder entry / navigation | Checkpoint A implemented: Today’s Start a new discovery, three understandable approaches, same five destinations and legacy story URLs. |
-| Discovery configuration | Surprise Me saves the existing general discovery request. Custom direction saves the existing brief/source contract. Theme / preset explains the exact gap: native preset selection is managed in n8n; Studio has no selectable catalog or selection parameter. No invented preset choices. |
-| Research launch | Existing guarded queue/start routes connected under explicit confirmation and all existing availability flags. Verified with injected adapter, including cancel/no write, one dispatch and uncertain/no retry. Actual hosted connection remains read-only; worker inactive and no generation approval. No live run. |
-| Results / decisions | Current read-only refresh imported two historical results, one unmatched native job held; old work stays historical. Save/Pass/Explore/Develop use current private identities. Fresh discovery quality remains unverified. |
-| Story / photographs / caption | Coherent next action; existing autosave/order/opening/history retained. Browser journey proves Story → Photographs → Story → Review with exact multiline caption, direction and selection surviving reload. |
-| Review / Production | Immediate blocker first, other tasks visible, independent factual/permission/final-approval observations, all codes/evidence retained secondarily. Earlier handoff remains the priority; no approval or production writer added. |
-| Security / hosting | Existing origin/intent/session/revision and production safeguards unchanged. Full unit/integration suite passes; broader browser/HTTPS regression is a remaining Checkpoint C check. |
+| Entry / five primary destinations | Today leads with **Start a new discovery**, with Surprise Me, Theme / preset and Custom direction entry. Legacy routes remain. Verified empty and existing-work states. |
+| Discovery configuration / request POST | Surprise Me uses the existing general `discovery` brief; Custom direction uses the existing `brief` + source URL contract. Inactive fields cannot invalidate another mode; unsaved custom input survives mode switches/general saves. **Native preset selection is not exposed:** no invented catalog or preset parameter. |
+| Existing `/engine/queue` → `/engine/start` | Explicit Start research only under configured, non-read-only, approved, active/available flags. Separate confirmation discloses possible charges and requires an existing approved spend limit. Version-bound start, stable saved identity, no automatic retry after uncertainty. Implemented and adapter-tested; **hosted live launch remains blocked**. |
+| Result refresh / native GET-only delivery | Check for results; queued/running/received/reviewable/failed/history distinctions. New proposals lead Discover when present; requests/admin details remain secondary. Passive progress rows no longer block background delivery; open editable details still protect pending input. Two real historical results remain historical. |
+| Existing story draft PATCH / history | Develop → Photographs → Review has a coherent state/next action. Caption, natural-language direction, opening image, order, frame feedback, history and legacy focused tools retained. Private edits never imply production approval. |
+| Existing `/engine/evidence` | **Read recorded source evidence** directly in a development story’s Research & sources view. Flush pending edits first; retain execution/job/hash guards. Reads earlier captured evidence, never reruns search/model or exposes raw execution headers. Read connection absence is explicit. |
+| Readiness / package check / production observations | Immediate task first, completed preparation and all remaining tasks visible; codes/original decisions/evidence secondary. Rights, factual review and final approval independent. Earlier recorded handoffs take priority. Stale/incomplete provider observations without a recorded handoff lead to **Check for updates**, not an invented prior post. Production rows show preparation and one task link. |
+| Native approval / publishing | Existing Founder Studio continuation, packet download/check and provider records retained. **No new production writer, approval endpoint, native preset selector, Buffer sender or orchestration system.** |
 
-## Capability → interface map
+## Verified operational
 
-| Existing capability / contract | Founder access / boundary |
+Live **read-only** observation November 4, 10:08 PM ET: **27 native stories, 302 media records, 15 Buffer records, two recovered historical research results; one unmatched native job held**. Current worker saved version `8b3e1293-5990-451c-8358-2cbe9e752a44`, inactive, no active version; readOnly=true, generationApproved=false, generationAvailable=false. Existing source/native APIs worked. New proof storage `.local/v12-live/` is separate from founder stores; no native/production write or paid request was made.
+
+Final engineering verification:
+
+| Check | Result |
 | --- | --- |
-| POST `/api/research/requests` | Surprise Me/current preset brief or Custom direction; durable save-only outcome, same idempotency contract. |
-| Request `/engine/queue` then `/engine/start` | Explicit Start research only after configured, non-read-only, approved, active/available worker flags; version-bound start, no automatic retry. Hosted path cannot run. |
-| `/api/research/engine/refresh` | Check for results; native GET-only delivery remains separate from starting. |
-| Existing story draft PATCH / proposal history | Develop, photographs, caption and direction remain private working copies with source/local revision guards. |
-| Existing execution `/engine/evidence` | Read recorded source evidence directly in the story’s Research & sources view. Existing execution identity/hash guards and sanitization remain; no fresh source/model request. Reads recorded execution, never reruns source/model. |
-| Production packet/check + provider observations | Review’s immediate task and secondary production records; guarded download/check only. Rights, facts, approval, version and prior-handoff gates are preserved. |
-| Original Founder Studio | Existing production continuation link. No native approval/write-back contract is added to this local Studio. |
+| Automated unit/integration suite | **347 pass**, zero failures/skips |
+| Existing Chromium regression | **42 workflows pass** |
+| HTTPS hosted fixture | **11 pass**, including auth/CSRF, background delivery, private backup and cold restart |
+| UX / photographic refinement | **8 / 9 pass** |
+| V11 Discover / Develop regression | **5 / 7 pass** |
+| New V12 founder journey | **7 pass**, including blocked and authorized-adapter launch, cancellation, uncertainty/no retry, direct captured evidence, source freshness and editing continuity |
+| Syntax / whitespace / desktop-mobile layout | pass; zero browser JavaScript errors |
 
-## Verified operational vs implemented-only
+New V12 tests use the actual local application/routes/SQLite stores with injected adapters and **labeled synthetic pixels**, not live generation. Read-only live integration is separately verified above. The existing Render host was not changed or tested as a V12 deployment.
 
-Current live read-only observation at November 4, 10:08 PM ET: **27 native stories, 302 media records, 15 Buffer records, two recovered historical results**, one unmatched native job retained. Native worker saved version `8b3e1293-5990-451c-8358-2cbe9e752a44`, inactive, no active version; readOnly=true, generationAvailable=false. Fresh private proof copies are under ignored `.local/v12-live/`. Source APIs were read only; no model/source-search or production call was made.
+Before/after captures against `a772c31`: Today, Discover, Story, Review and Production at **1366×768, 1440×900 and 390×844**, under private `.local/v12/`. Fresh real-record copies (27 native + 2 historical results) are under `.local/v12/real-data/`; baseline comparison `report.json` and final `after-report.json` verify unchanged original snapshot/database hashes and zero writes. Captures retain observed/cached timestamps; freshness can change as time passes. External photograph requests were deliberately aborted, never replaced. **No real photograph pixels or new editorial quality were verified.**
 
-Checkpoint A: **343 automated unit/integration tests**, JavaScript syntax/diff checks, **five complete V12 fixture browser journeys at A, six at B** with zero browser errors. Screenshots compare baseline `a772c31` against current Today, Discover, Story, Review and Production at1366×768,1440×900,390×844 under `.local/v12/`. Images are explicitly synthetic fixtures. Safe launch proof uses an injected adapter, not n8n/model execution. Existing full browser and HTTPS suites will be repeated in C. Real source preview pixels and actual-host V12 acceptance are not verified.
+Measured fixture friction: the immediate review action’s lower edge moves from **y=1353 to y=663** at1366×768 (below fold → visible). At1440×900:1355→665. New proposals precede setup when present; empty inboxes lead with setup. Direct evidence access no longer requires finding a request’s administrative record. These are interaction measurements, not founder satisfaction or aesthetic-quality proof.
 
-## Missing / blocked
+Authoritative reports: `.local/v12/workflow-report.json`, `.local/browser-tests/report.json`, `.local/v12/ux-regression/report.json`, `.local/ux-refinement/refinement-report.json`, `.local/v11/discover-report.json`, `.local/v11/develop-report.json`. Old `*-failure.png` files are development artifacts, not final evidence.
 
-- Hosted launch lacks an authorized write/dispatch connection and active, version-approved bounded worker. Current spend/pricing approval remains separate. Saving is not running research.
-- Studio cannot select native presets: no current preset catalog/selection contract is exposed. Custom subject requests work as briefs, not as native preset changes.
-- New source yield, inspectable real photographs and editorial quality remain unproven. Current policy/source-access and source URL availability need legitimate verification; no image proxy or replacement photographs.
-- Native fact/rights/final approval, production import and Buffer sending remain existing-workflow operations. No new production mutation is introduced; remote atomic handoff acceptance is still required before deeper integration.
-- No Render deploy or actual-host post-deploy validation was performed.
+## Implemented but not live-accepted / blocked
 
-## Current milestone / remaining acceptance
+- Actual hosted research launch is read-only and the worker inactive. A separately authorized dispatch connection, active/version-approved bounded worker and current spend/pricing approval are missing. **Saving is not running research.**
+- Studio cannot select a named native preset: no verified catalog/selection contract is exposed. Custom theme requests work as briefs, not as preset changes.
+- Fresh source yield, inspectable real photographs, attribution/editorial quality and founder taste acceptance remain unproven. Legitimate source/preview access is required; no proxy workaround or fabricated photography.
+- Native rights/fact/final approvals and guarded production import remain existing-workflow operations. Shared atomic handoff/production acceptance is still required before any separately approved writer or Buffer action.
+- Founder acceptance and actual-host post-deploy verification are outstanding. No V1 completion percentage is claimed.
 
-A: founder workflow and capability map implemented and tested. B: completed safe access to recorded source evidence, explicit start of eligible saved/queued requests, fail-closed availability flags and results-first continuation. Verified40 focused unit/integration checks and6 V12 browser journeys, including captured source text without leaked execution headers or another dispatch. C: complete regressions, visually inspect desktop/mobile and current-record captures, fix friction and document the exact deployable SHA. V1 acceptance still needs founder use on the existing host, one genuinely new inspectable source-grounded proposal, and separately validated native production continuation; no usability-completion percentage is claimed.
+## Release and remaining acceptance
+
+The frontend branch is ready for a **separately authorized manual update of the existing Render service**, retaining current read-only behavior. No new secrets, environment change, schema migration or dependency update is required by V12. Do not apply a new Blueprint/service. Preserve an offsite private backup, disk and histories; manually deploy the exact tested SHA with auto-deploy off; verify HTTPS login, unauthenticated401, discovery saved/blocked/history states, caption/order/direction persistence and safe source refresh. Follow the existing-service procedure in `docs/PRIVATE_HOSTING.md`. **No deploy was performed.**
+
+A–C engineering acceptance is complete. Live V1 acceptance still requires founder use on the existing host, one genuinely new inspectable source-grounded proposal and separately validated native approval/production continuation. Existing authentication, private persistence, factual/rights and idempotency safeguards remain; no workflow activation, Buffer draft, publication, credential change or paid research occurred.
 
 ## Three highest-impact next tasks
 
-1. Complete this sprint’s B/C checks, then founder acceptance of Today → Discover → Story → Photographs → Review → Production on a separately authorized existing-service update.
-2. Separately authorize and verify the bounded launch/source-access path so one new, inspectable photographic proposal reaches Studio. Verify preset-selection contract before offering named native presets.
-3. Verify native approval/production handoff against current package/rights/fact/provider evidence before any authorized writer or Buffer operation.
+1. Founder acceptance of Today → Discover → Story → Photographs → Review → Production after an authorized existing-service update; confirm actual-device previews and restart persistence.
+2. Separately authorize and verify the bounded launch/source-access path to deliver one new inspectable photographic proposal. Verify the native preset catalog/selection contract before exposing selectable names.
+3. Validate current native fact/rights/final approval and production handoff with exact package/provider evidence and concurrency/idempotency proof before any approved production writer.
+
+Reproduce in the managed Node24.19.0 / system-Chromium environment: `npm run check`, `npm test`, `npm run test:browser`, `npm run test:hosted`, `npm run test:ux -- --baseline=a772c31 --artifacts=.local/v12/ux-regression`, `npm run test:refinement`, `node test/browser-v12.mjs`. Loopback tests need execution permission in a restricted sandbox. `node test/browser-v12-live.mjs` additionally requires the private read-only snapshot/research copies, intentionally excluded from Git.

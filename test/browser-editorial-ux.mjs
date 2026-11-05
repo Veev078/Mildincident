@@ -83,10 +83,10 @@ try{
   await page.locator('[data-review-card="'+id+'"] .review-receipt').filter({hasText:'Saved'}).waitFor();
   checks.push('one-click founder selection persists and is available in the saved review queue');
   const creative=page.getByLabel('Creative direction',{exact:true});
-  if(!await creative.isVisible())await page.locator('.discovery-research summary').click();
+  if(!await creative.isVisible())await page.getByRole('button',{name:'Custom direction',exact:true}).click();
   await creative.fill('Synthetic private direction; do not dispatch a model.');
-  await page.getByRole('button',{name:'Save general discovery brief',exact:true}).click();
-  assert.equal(await creative.inputValue(),'Synthetic private direction; do not dispatch a model.');
+  await page.getByRole('button',{name:'Surprise Me',exact:true}).click();await page.getByRole('button',{name:'Save general discovery brief',exact:true}).click();
+  await page.getByRole('button',{name:'Custom direction',exact:true}).click();assert.equal(await creative.inputValue(),'Synthetic private direction; do not dispatch a model.');
   assert.equal(app.research.all().length,1);
   await page.getByRole('button',{name:'Save research direction',exact:true}).click();
   await page.waitForFunction(()=>document.querySelectorAll('[data-request-id]').length===2);

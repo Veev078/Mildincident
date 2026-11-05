@@ -2,16 +2,20 @@ import {effective} from './components.js';
 
 const requirements=[
  ['revision','Source changes','overview',/STALE_LOCAL|LOCAL_REVISION|SOURCE_REVISION/],
- ['handoff','Existing publishing activity','publishing',/HANDOFF_RECONCILIATION|UNRESOLVED_PROVIDER|MULTIPLE_HANDOFF|UNRESOLVED_BUFFER|PROVIDER_SNAPSHOT/],
+ ['handoff','Existing publishing activity','publishing',/HANDOFF_RECONCILIATION|UNRESOLVED_PROVIDER|MULTIPLE_HANDOFF|UNRESOLVED_BUFFER/],
  ['rights','Photograph permissions','images',/RIGHTS|PERMISSION/],
  ['facts','Facts and attribution','research',/CLAIMS|FACT/],
  ['caption','Caption and final approval','caption',/CAPTION|FINAL_APPROVAL|INTERNAL_TEST|LOCAL_CHANGES/],
  ['sequence','Image selection and sequence','images',/SELECTED|SEQUENCE|FORMAT|MEDIA/],
  ['files','Production files','publishing',/FILE|RENDER|EXPORT|PREFLIGHT/],
  ['package','Native production record','publishing',/PACKAGE|HANDOFF_VERSION|CURRENT_HANDOFF|EDITORIAL_HANDOFF/],
- ['source','Current source records','publishing',/SOURCE_SNAPSHOT|COVERAGE/],
+ ['source','Current source records','publishing',/SOURCE_SNAPSHOT|PROVIDER_SNAPSHOT|COVERAGE/],
 ];
 const keyForDecision={permissions:'rights',claims:'facts',caption:'caption',sequence:'sequence',handoff:'handoff'};
+
+export function hasPublishingActivity(story){
+ return Boolean(story.publishing?.multipleHandoffs||story.publishing?.postIds?.length||story.production?.provider?.length||story.production?.handoffs?.some(h=>h.state!=='abandoned'));
+}
 
 /** A presentation of existing evidence, never an authorization or a new readiness gate. */
 export function productionSummary(story){
@@ -30,14 +34,15 @@ export function productionSummary(story){
  for(const decision of story.productionDecisions||[]){const key=keyForDecision[decision.key]||decision.key;const definition=requirements.find(r=>r[0]===key);add(key,definition?.[1]||decision.title,decision.tab,null,decision);}
  if(story.localDraft?.stale)add('revision','Source changes','overview','STALE_LOCAL_REVISION');
  const observed=story.publishing||{};
- if(observed.requiresReview||observed.multipleHandoffs)add('handoff','Existing publishing activity','publishing',null);
+ if(observed.requiresReview||observed.multipleHandoffs){const activity=hasPublishingActivity(story);add(activity?'handoff':'source',activity?'Existing publishing activity':'Current source records','publishing',null);}
  // An empty code list does not prove permission, factual approval or publishing authority.
  const factRecorded=story.production?.package?.sourceClaimsReviewed===true;
  const selectedKnown=selected.length>0&&selected.every(id=>assets.some(a=>a.id===id));
  const rightsRecorded=selectedKnown&&selected.every(id=>{const a=assets.find(a=>a.id===id);return a.rightsStatus==='cleared'||a.nativeRightsReview?.kind==='recorded_human_clearance';})&&story.production?.package?.rightsStatus==='reviewed';
  const approvalRecorded=story.production?.package?.finalApprovalStatus==='approved'&&Boolean(story.production?.package?.finalCaption)&&story.production.package.finalCaption===current.caption;
- const requirementsState=[{key:'facts',label:'Factual review',recorded:factRecorded},{key:'rights',label:'Image permissions',recorded:rightsRecorded},{key:'approval',label:'Final native approval',recorded:approvalRecorded}];
- const groups=[...grouped.values()].sort((a,b)=>((a.key==='revision'?0:a.key==='handoff'?1:2)-(b.key==='revision'?0:b.key==='handoff'?1:2)));
+ const requirementsState=[{key:'facts',label:'Factual review',recorded:factRecorded},{key:'rights',label:'Image permissions',recorded:rightsRecorded},{key:'approval',label:'Final approval',recorded:approvalRecorded}];
+ const priority=key=>key==='revision'?0:key==='handoff'?1:key==='source'?2:3;
+ const groups=[...grouped.values()].sort((a,b)=>priority(a.key)-priority(b.key));
  const next=groups[0];
  return {prepared,codes,groups,requirements:requirementsState,next,publicationApproved:false,productionApplied:false};
 }

@@ -43,3 +43,23 @@ test('recorded source access remains bound to a development story and is unavail
  assert.match(storyWorkspace({workspace:{engine:{configured:false}}},story,'research'),/data-engine-action="evidence"[^>]*disabled/);
  assert.ok(!storyWorkspace({workspace:{engine:{configured:true}}},{...story,origin:undefined},'research').includes('Read recorded source evidence'));
 });
+
+import {discovery} from '../discover.js';
+test('genuine new proposals lead Discover; a blank inbox leads with the honest discovery entry',()=>{
+ const workspace={stories:[{id:'new',title:'A recorded proposal',origin:'n8n_development',revision:'r1',media:[]}],engine:{configured:true,readOnly:true}};
+ const populated=discovery({workspace});assert.ok(populated.indexOf('founder-inbox')<populated.indexOf('discovery-start'));
+ const history=discovery({workspace:{...workspace,stories:[{...workspace.stories[0],recoveredHistory:true}]}});assert.ok(history.indexOf('discovery-start')<history.indexOf('founder-inbox'));
+});
+
+test('legacy form access keeps its URL privacy warning and stays absent in hosted mode',()=>{
+ const request={id:'saved-brief',kind:'brief',prompt:'A retained private research direction',version:0,handoffUrl:'https://example.org/form?request=direction'};
+ const workspace={stories:[],researchRequests:[request],engine:{configured:false}};
+ const local=discovery({workspace});assert.ok(local.includes('data-research-handoff'));assert.ok(local.includes('includes your direction in its URL and browser history'));
+ const hosted=discovery({workspace:{...workspace,hosted:true}});assert.ok(!hosted.includes('data-research-handoff'));
+});
+
+test('stale provider observations require an update, not an invented earlier publishing handoff',()=>{
+ const story={media:[],selectedAssetIds:[],caption:'A working caption',publishing:{observed:'unknown',requiresReview:true,postIds:[]},productionPreparation:{blockers:['PROVIDER_SNAPSHOT_STALE']}};
+ const path=reviewPath(story);assert.equal(path.next.key,'source');assert.equal(path.next.label,'Check the latest source records');assert.ok(!path.tasks.some(t=>t.key==='handoff'));assert.ok(path.codes.includes('PROVIDER_SNAPSHOT_STALE'));assert.equal(storyStep(story).label,'Review source records');
+ const recorded=reviewPath({...story,publishing:{...story.publishing,postIds:['existing-id']}});assert.equal(recorded.next.key,'handoff');assert.ok(recorded.tasks.some(t=>t.key==='source'));
+});
