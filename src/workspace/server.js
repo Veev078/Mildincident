@@ -19,6 +19,7 @@ import { loadEditorialEngineClient } from './editorial-engine-client.js';
 import { EditorialEngineService } from './editorial-engine-service.js';
 import { developmentCandidateStory } from './development-story.js';
 import { LocalResearchStore } from './research-store.js';
+import {editorialPresetCatalog,resolvePresetRequest} from './editorial-presets.js';
 import { LocalDraftStore } from './store.js';
 import { HandoffError, requireThat } from '../errors.js';
 import { LocalPreviewStore, attachLocalPreviews, MAX_PREVIEW_BYTES, imageFeedbackProvenance } from './previews.js';
@@ -63,9 +64,10 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     if(!source.snapshot)workspace.source={...workspace.source,kind:'disconnected',observedAt:null,bufferObservedAt:null,stale:true,unavailable:true,warnings:['No authoritative production snapshot is available. Private photographic research remains usable; connect n8n/Buffer or restore your private backup to inspect existing stories.'],refreshError:{code:'SOURCE_UNAVAILABLE',message:'Production observations unavailable; no example stories were substituted.'}};
     workspace.hosted=Boolean(access);workspace.backupStatus=backups?.status()||null;
     workspace.researchRequests = research?.all() || [];
+    workspace.researchPresets=editorialPresetCatalog(source.snapshot);
     workspace.engine = engine?.status() || {configured:false,generationAvailable:false,generationApproved:false,workerActive:false};
     for (const request of workspace.researchRequests) for (const candidate of request.engineJob?.candidates || []) {
-      const story = developmentCandidateStory(candidate,{soundtrack:source.snapshot?.records?.soundtrack || [],drafts:drafts.all(),continuation:request.continuation||request.engineJob.editorialContext?.continuation||null,decision:request.engineJob.reviewDecisions?.[candidate.id]||null,evidence:request.engineJob.evidence?.[candidate.id]||null});
+      const story = developmentCandidateStory(candidate,{request,soundtrack:source.snapshot?.records?.soundtrack || [],drafts:drafts.all(),continuation:request.continuation||request.engineJob.editorialContext?.continuation||null,decision:request.engineJob.reviewDecisions?.[candidate.id]||null,evidence:request.engineJob.evidence?.[candidate.id]||null});
       requireThat(!workspace.stories.some(s=>s.id===story.id),'AMBIGUOUS_ENGINE_RESULT','Development story identity collides with an existing record.');
       story.engineReviewVersion=request.engineJob.version;
       story.recoveredHistory=request.engineJob.recoveredHistory===true;
@@ -121,7 +123,8 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       if (url.pathname === '/api/research/requests' && request.method === 'POST') {
         requireThat(research, 'RESEARCH_UNAVAILABLE', 'The private research request store is unavailable.');
         const input = await body(request); const workspace = view();
-        json(response, 201, { request: research.create(input, workspace.stories, {reuseDefault:true}), scope: 'local_only', productionApplied: false }); return;
+        const resolved=resolvePresetRequest(input,workspace.researchPresets,input.idempotencyKey?research.get(input.idempotencyKey):null);
+        json(response, 201, { request: research.create(resolved.input, workspace.stories, {reuseDefault:true,preset:resolved.preset}), scope: 'local_only', productionApplied: false }); return;
       }
       if (url.pathname === '/api/research/engine/refresh' && request.method === 'POST') {
         requireThat(engine,'ENGINE_NOT_CONFIGURED','Private development engine connection is unavailable.');

@@ -1,6 +1,16 @@
 # V12 / V1 living status
 
-Updated November 4, 2026 (America/New_York). **Sprint A checkpoints A–C are implemented and tested; end-to-end live V1 acceptance remains incomplete.** This is the continuation status. The constitution owns product direction; older sprint notes retain history.
+Updated November 4, 2026 (America/New_York). **Sprint B is in progress on top of verified Sprint A HEAD `70dd9b6bd3ed25de346c702bf049bb10534f5a63`; end-to-end live V1 acceptance remains incomplete.** The constitution owns product direction; older sprint evidence below retains history.
+
+## Sprint B — operational discovery
+
+B1 implements a read-only native theme catalog and request-bound selection through the **existing `brief`/prompt contract**. Every selection retains the exact native direction, key and content-derived version in an additive private SQLite table. It never writes the shared preset selection. Exact-content retries survive restarts/catalog changes; stale or ambiguous choices fail closed. Missing catalog access shows an unavailable state. Custom directions/source links now follow delivered proposals into Develop; later private edits take precedence.
+
+Live GET-only inspection November 4, 10:45 PM ET: native intake `75BYc3JkTnA2eQVc` active version `7240d849-d676-43ef-86ca-9b367d99add5` has authenticated founder forms and scheduled intake, no authenticated per-request preset selector. Studio worker `6CkqfYc4Pyd4k8vi` is a separate inactive development workflow. Chief AI `bc6s9K5aMPNPzsPU` is inactive; its native approval responsibility is not replaced by local source triage. Preset table `2NoRbvxCc120cM8t` has Original MILDINCIDENT, Forgotten Pop Culture, Fashion & Subcultures and Halloween / Dark Curiosities; all four `is_active=false`. Shared selection `OQUJtdxjKZQLhYwS` points to `original_mildincident`. Halloween remains a saved October 28–31 overlay, not a newly activated season. Catalog selection saves a research direction, **not native preset activation or a research execution**. No invented native preset field was added.
+
+B1 targeted checks: 36 pass (catalog reads/failure, immutable versioned direction/retry/restart, existing launch/receipt/idempotency, source caching, founder views). New execution is still blocked by read-only hosting, inactive worker, absent authorized dispatch/version and spend approval. No workflow/credential change, native write, paid call or deployment.
+
+The remaining Sprint A sections are the prior acceptance baseline; Sprint B verification and editorial evaluation will supersede their counts and blockers below.
 
 Branch: `development/photography-review-20261029`.
 

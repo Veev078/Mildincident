@@ -6,7 +6,7 @@ import {assessEditorialPackage} from '../editorial-evidence.js';
 import {buildWorkspace,WORKSPACE_TABLES} from './model.js';
 
 /** Adapt a real, provenance-validated n8n development candidate to existing Studio tools. */
-export function developmentCandidateStory(candidate,{soundtrack=[],drafts=new Map(),decision=null,evidence=null,continuation=null}={}) {
+export function developmentCandidateStory(candidate,{request=null,soundtrack=[],drafts=new Map(),decision=null,evidence=null,continuation=null}={}) {
   const id='CON-DEV-'+candidate.jobId;
   const sourceAudit=assessEditorialPackage(candidate,evidence);
   const metadata=new Map((evidence?.images||[]).filter(m=>m.assetId).map(m=>[m.assetId,m]));
@@ -36,6 +36,7 @@ export function developmentCandidateStory(candidate,{soundtrack=[],drafts=new Ma
   story.generationFormat=format;story.generationFormatBasis=candidate.formatBasis;story.discoveryPlan=candidate.discoveryPlan||null;
   story.production=projectProduction({row:{concept_id:id},records:{packages:[],imports:[],archives:[],exports:[],proofs:[],guardedHandoffs:[]},buffer:{posts:[],complete:false,observedAt:candidate.provenance.generatedAt},observedAt:candidate.provenance.generatedAt,safeUrl:browserUrl});
   story.continuationOf=continuation?{...continuation.origin,intent:continuation.intent}:null;
+  story.researchDirection=request?.kind==='brief'?{prompt:request.prompt,sourceUrl:request.sourceUrl,preset:request.preset||null}:null;
   story.origin='n8n_development';story.engineCandidateId=candidate.id;story.engineJobId=candidate.jobId;story.engineProvenance=candidate.provenance;story.developmentDecision=decision;
   return story;
 }

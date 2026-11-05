@@ -15,7 +15,7 @@ test('modes map to the existing brief/current-preset contracts without fabricati
  const workspace={engine:{configured:true,readOnly:true}};
  const custom=discoverySetup({workspace,discoveryMode:'custom',researchDraft:{prompt:'A specific <source> direction',sourceUrl:'https://example.org/'}});
  assert.ok(custom.includes('A specific &lt;source&gt; direction'));assert.ok(custom.includes('data-mode="custom"'));assert.ok(custom.includes('Save research direction'));assert.ok(!custom.includes('<source>'));
- const preset=discoverySetup({workspace,discoveryMode:'preset'});assert.ok(preset.includes('does not expose a selectable preset catalog'));assert.ok(!preset.includes('<select'));
+ const preset=discoverySetup({workspace,discoveryMode:'preset'});assert.ok(preset.includes('Themes are unavailable'));assert.ok(!preset.includes('<select'));assert.match(preset,/value="save" disabled/);
  assert.ok(discoverySetup({workspace,researchDraft:{prompt:'Retain the actual draft'}}).includes('Your unsaved custom direction is still here'));
 });
 test('start follows save identity → queue → version-bound dispatch once and never retries uncertain requests',async()=>{

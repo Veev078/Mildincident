@@ -519,7 +519,7 @@ document.addEventListener('click', event => {
 document.addEventListener('input', event => {
   const imageForm=event.target.closest('[data-image-review]');if(imageForm)rememberImageReview(imageForm);
   const input = event.target;
-  if (input.closest('[data-research-form]')) { state.briefRequestKey = null; state.researchDraft = { ...(state.researchDraft || {}), [input.name]: input.value }; }
+  if (input.closest('[data-research-form]')&&['prompt','sourceUrl'].includes(input.name)) { state.briefRequestKey = null; state.researchDraft = { ...(state.researchDraft || {}), [input.name]: input.value }; }
   if (input.dataset.briefField && input.matches('textarea,input[type="text"]')) {
     editCreativeBrief(input.dataset.story, brief => { brief[input.dataset.briefField] = input.value; });
   }
@@ -668,11 +668,11 @@ document.addEventListener('error', event => {
 async function createResearchRequest(input, {start=false}={}) {
   if(start&&!researchAccess(state.workspace?.engine).canStart)throw new Error(researchAccess(state.workspace?.engine).message);
   if(start&&!window.confirm('Start one authorized research run? It may charge for one research and one draft call. Proceed only under a separately approved spend limit; the provider price is not shown here. It will not publish or grant rights.'))return false;
-  const keyField = input.kind==='brief' ? 'briefRequestKey' : 'discoveryRequestKey';
+  const keyField = input.preset?'presetRequestKey':input.kind==='brief' ? 'briefRequestKey' : 'discoveryRequestKey';
   state[keyField] ||= crypto.randomUUID();
   const result = await api('/api/research/requests', {method:'POST', headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({...input,idempotencyKey:state[keyField]})});
   state[keyField] = null;
-  if (input.kind==='brief') state.researchDraft = {};
+  if (input.kind==='brief'&&!input.preset) state.researchDraft = {};
   if(route().view==='home')location.hash='#/discovery';
   const reused=state.workspace.researchRequests.some(r=>r.id===result.request.id);
   if (!reused) state.workspace.researchRequests.unshift(result.request);
@@ -708,7 +708,11 @@ document.addEventListener('submit', async event => {
   event.preventDefault();if(state.discoverySubmitting)return;state.discoverySubmitting=true;const button=form.querySelector('button[type="submit"]');button.disabled=true;
   const status=form.querySelector('[data-research-status]');status.textContent='Saving…';const fields=form.querySelector('[data-discovery-fields]');if(fields)fields.disabled=true;
   try {
-    if(form.matches('[data-research-form]')) {const custom=!form.hasAttribute('data-discovery-setup')||form.dataset.mode==='custom';const result=await createResearchRequest(custom?{kind:'brief',prompt:form.elements.prompt.value,sourceUrl:form.elements.sourceUrl.value}:{kind:'discovery',prompt:DEFAULT_DISCOVERY_PROMPT,sourceUrl:''},{start:event.submitter?.value==='start'});if(result===false)status.textContent='Nothing was started or saved.';}
+    if(form.matches('[data-research-form]')) {
+      const custom=!form.hasAttribute('data-discovery-setup')||form.dataset.mode==='custom';let input=custom?{kind:'brief',prompt:form.elements.prompt.value,sourceUrl:form.elements.sourceUrl.value}:{kind:'discovery',prompt:DEFAULT_DISCOVERY_PROMPT,sourceUrl:''};
+      if(form.dataset.mode==='preset'){const option=form.elements.presetKey.selectedOptions[0],preset=state.workspace.researchPresets?.items.find(p=>p.key===option?.value&&p.version===option?.dataset.version);if(!preset)throw new Error('Choose an available recorded theme.');input={kind:'brief',prompt:preset.direction,sourceUrl:'',preset:{key:preset.key,version:preset.version}};}
+      const result=await createResearchRequest(input,{start:event.submitter?.value==='start'});if(result===false)status.textContent='Nothing was started or saved.';
+    }
     else {
       await api(`/api/research/requests/${form.dataset.request}/events`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({event:'story_linked',storyId:form.elements.storyId.value,expectedVersion:Number(form.dataset.version)})});
       await loadWorkspace({quiet:true});toast('Existing source story linked locally. Production records are unchanged.');
@@ -877,6 +881,10 @@ document.addEventListener('click',event=>{
  if(!['surprise','preset','custom'].includes(mode))return;
  state.discoveryMode=mode;state.focusDiscoverySetup=true;
  if(route().view==='discovery'){event.preventDefault();render();document.querySelector('#research-direction')?.scrollIntoView({block:'start'});}
+});
+document.addEventListener('change',event=>{
+ const select=event.target.closest('#discovery-preset');if(!select||state.discoverySubmitting)return;
+ state.presetChoice={key:select.value,version:select.selectedOptions[0]?.dataset.version};state.presetRequestKey=null;render();document.querySelector('#discovery-preset')?.focus();
 });
 document.addEventListener('click',async event=>{
  const button=event.target.closest('[data-start-saved-research]');if(!button||state.discoverySubmitting)return;

@@ -17,6 +17,7 @@ export class LocalResearchStore {
       CREATE TABLE IF NOT EXISTS research_request_aliases(idempotency_key TEXT PRIMARY KEY,request_id TEXT NOT NULL,kind TEXT NOT NULL,prompt TEXT NOT NULL,source_url TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS research_delivery_state(id INTEGER PRIMARY KEY CHECK(id=1),data_json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS research_continuations(request_id TEXT PRIMARY KEY,context_json TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS research_presets(request_id TEXT PRIMARY KEY,preset_json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS research_engine_jobs(request_id TEXT PRIMARY KEY,request_hash TEXT NOT NULL,state TEXT NOT NULL,version INTEGER NOT NULL,data_json TEXT NOT NULL,updated_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS research_engine_events(request_id TEXT NOT NULL,version INTEGER NOT NULL,state TEXT NOT NULL,data_json TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(request_id,version));`);
   }
@@ -27,10 +28,10 @@ export class LocalResearchStore {
     return {id:row.id,kind:row.kind,prompt:row.prompt,sourceUrl:row.source_url,createdAt:row.created_at,baselineIds:JSON.parse(row.baseline_json),
       version:events.at(-1)?.version||0,events:events.map(e=>({version:e.version,event:e.event,storyId:e.story_id,createdAt:e.created_at})),
       linkedStoryId:events.filter(e=>e.event==='story_linked').at(-1)?.story_id||null,handoffUrl:this.db.prepare('SELECT request_id FROM research_continuations WHERE request_id=?').get(row.id)?null:url.href,
-      continuation:JSON.parse(this.db.prepare('SELECT context_json FROM research_continuations WHERE request_id=?').get(row.id)?.context_json||'null'),engineJob:this.engineJob(row.id),executionConfirmed:false,productionApplied:false};
+      continuation:JSON.parse(this.db.prepare('SELECT context_json FROM research_continuations WHERE request_id=?').get(row.id)?.context_json||'null'),preset:JSON.parse(this.db.prepare('SELECT preset_json FROM research_presets WHERE request_id=?').get(row.id)?.preset_json||'null'),engineJob:this.engineJob(row.id),executionConfirmed:false,productionApplied:false};
   }
   all(){return this.db.prepare('SELECT id FROM research_requests ORDER BY rowid DESC LIMIT 100').all().map(row=>this.get(row.id));}
-  create(input,stories,{reuseDefault=false}={}){requireThat(input&&Object.keys(input).every(k=>['kind','prompt','sourceUrl','idempotencyKey'].includes(k)),'INVALID_RESEARCH_REQUEST','Unsupported research request fields.');
+  create(input,stories,{reuseDefault=false,preset=null}={}){requireThat(input&&Object.keys(input).every(k=>['kind','prompt','sourceUrl','idempotencyKey'].includes(k)),'INVALID_RESEARCH_REQUEST','Unsupported research request fields.');
     requireThat(['discovery','brief'].includes(input.kind),'INVALID_RESEARCH_REQUEST','Choose discovery or creative brief.');
     const prompt=String(input.prompt||'').trim();requireThat(prompt.length>=12&&prompt.length<=2000&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(prompt),'INVALID_RESEARCH_REQUEST','Use a direction between 12 and 2000 characters.');
     const sourceUrl=String(input.sourceUrl||'').trim();requireThat(!sourceUrl||browserUrl(sourceUrl),'INVALID_RESEARCH_REQUEST','Use an HTTPS source link without credentials.');
@@ -48,6 +49,7 @@ export class LocalResearchStore {
         requireThat(!alias||reuseDefault,'EDIT_CONFLICT','This identity is a private save retry, not an authoritative research job. Preserve the original request.');
         const identity=existing||{kind:alias.kind,prompt:alias.prompt,sourceUrl:alias.source_url};
         requireThat(identity.kind===input.kind&&identity.prompt===prompt&&identity.sourceUrl===sourceUrl,'EDIT_CONFLICT','This request identity belongs to a different brief. Preserve it and create a new request.');
+        requireThat(JSON.stringify(existing?.preset||null)===JSON.stringify(preset),'EDIT_CONFLICT','This request identity belongs to a different theme selection.');
         const result=existing||this.get(alias.request_id);
         requireThat(result,'EDIT_CONFLICT','The original request is unavailable. Preserve this request identity.');
         this.db.exec(outer?'COMMIT':'RELEASE create_research_request');return result;
@@ -66,6 +68,7 @@ export class LocalResearchStore {
         const result=this.get(equivalent.id);this.db.exec(outer?'COMMIT':'RELEASE create_research_request');return result;
       }
       this.db.prepare('INSERT INTO research_requests VALUES(?,?,?,?,?,?)').run(id,input.kind,prompt,sourceUrl,JSON.stringify(stories.map(s=>s.id)),new Date().toISOString());
+      if(preset)this.db.prepare('INSERT INTO research_presets VALUES(?,?)').run(id,JSON.stringify(preset));
       if(defaultKey)this.db.prepare('INSERT INTO research_request_equivalence VALUES(?,?,?)').run(id,defaultKey,baselineContext);
       const result=this.get(id);this.db.exec(outer?'COMMIT':'RELEASE create_research_request');return result;
     }catch(error){this.db.exec(outer?'ROLLBACK':'ROLLBACK TO create_research_request');if(!outer)this.db.exec('RELEASE create_research_request');throw error;}

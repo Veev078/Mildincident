@@ -8,6 +8,7 @@ export const emptyCreativeBrief = () => ({
 export function creativeBriefFor(story) {
   const stored = story.localDraft?.creativeBrief;
   const defaults = emptyCreativeBrief();
+  defaults.notes=story.researchDirection?.prompt||'';
   return stored ? { ...defaults, ...structuredClone(stored), ratings: { ...defaults.ratings, ...stored.ratings } } : defaults;
 }
 

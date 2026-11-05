@@ -6,6 +6,7 @@ import { BufferReader } from '../buffer-reader.js';
 import { readAllPages } from '../production-audit.js';
 import { WORKSPACE_TABLES, buildWorkspace } from './model.js';
 import { HandoffError, requireThat } from '../errors.js';
+import {EDITORIAL_PRESET_TABLES} from './editorial-presets.js';
 
 export const PRODUCTION_CONTEXT_TABLES=Object.freeze({exports:'dbyxu6uxL2Tpiaxd',proofs:'NEO7s23dFiIdUb1u',guardedHandoffs:'lBncgD93WV9a8oMu',staging:'lLXVATP5mOBIoogV'});
 
@@ -101,6 +102,8 @@ export async function fetchWorkspaceSnapshot({ read = n8nReader(process.env.N8N_
     }));
   }
   const contextWarnings=[];for(const [name,id] of Object.entries(PRODUCTION_CONTEXT_TABLES)){try{records[name]=await readAllPages(read,`/api/v1/data-tables/${id}/rows`);}catch{contextWarnings.push(`${name} production context unavailable; relationships remain unverified.`);}}
+  // Optional catalog failure must not replace or prevent authoritative story reads.
+  try{for(const [name,id] of Object.entries(EDITORIAL_PRESET_TABLES))records[name]=await readAllPages(read,`/api/v1/data-tables/${id}/rows`);}catch{for(const name of Object.keys(EDITORIAL_PRESET_TABLES))delete records[name];contextWarnings.push('Editorial themes could not be read. Existing saved directions are preserved.');}
   if(!bufferReader)return {records,buffer:{posts:[],complete:false,observedAt:null},coverage:{buffer:'not_configured'},observedAt:new Date().toISOString(),warnings:[...contextWarnings,'Buffer is not connected. Provider status and performance are unknown.']};
   const account = await bufferReader.account();
   const channels = [];
