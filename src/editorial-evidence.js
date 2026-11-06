@@ -115,8 +115,20 @@ export function captureEditorialEvidence(execution,{workerId,jobId,requestHash,c
   for(const image of images){const existing=candidate.media.find(m=>m.previewUrl===image.url);if(existing)image.assetId=existing.id;
     else if(image.relation==='subject_caption_match'&&additionalMedia.length<Math.max(0,40-candidate.media.length)){image.assetId=image.id;image.additionalSourceReference=true;additionalMedia.push({id:image.id,title:image.caption.slice(0,180)||'Source image reference',creator:image.creator,sourceUrl:image.sourceUrl,previewUrl:image.url,provider:'captured_source_page_image',rightsStatus:'preview_unreviewed',license:'UNKNOWN — source visibility is not publication permission',width:null,height:null});}}
 
-  const models=['Research Candidates','Draft Editorial Concept'].map(name=>{const runs=data[name]||[];const usages=runs.map(r=>r.metadata?.tokenUsage);const measurable=runs.length>0&&usages.every(u=>Number.isFinite(u?.inputTokens)&&Number.isFinite(u?.outputTokens));const output=nodeItems(data,name)[0];const fullResponse=Boolean(output?.usage||output?.object==='response');
-    return {node:name,runs:runs.length,inputTokens:measurable?usages.reduce((n,u)=>n+u.inputTokens,0):null,outputTokens:measurable?usages.reduce((n,u)=>n+u.outputTokens,0):null,toolCalls:providerWebSearchUsage(fullResponse?output:null).calls,toolExecutionEvidence:providerWebSearchUsage(fullResponse?output:null),usageSource:measurable?'n8n_execution_metadata':'unavailable'};});
+  const models=['Research Candidates','Draft Editorial Concept'].map(name=>{
+    const runs=data[name]||[];
+    const observations=runs.map(run=>{
+      const output=(run.data?.main?.flat()||[]).map(item=>item.json).find(j=>j?.usage||j?.object==='response');
+      const provider=output?.usage,metadata=run.metadata?.tokenUsage;
+      const valid=(a,b)=>Number.isSafeInteger(a)&&a>=0&&Number.isSafeInteger(b)&&b>=0;
+      const measured=valid(provider?.input_tokens,provider?.output_tokens)?{input:provider.input_tokens,output:provider.output_tokens,basis:'provider_response'}:valid(metadata?.inputTokens,metadata?.outputTokens)?{input:metadata.inputTokens,output:metadata.outputTokens,basis:'n8n_execution_metadata'}:null;
+      return {measured,search:providerWebSearchUsage(output),responseId:typeof output?.id==='string'?output.id.slice(0,200):null};
+    });
+    const complete=observations.length>0&&observations.every(o=>o.measured);
+    const searchKnown=observations.length>0&&observations.every(o=>o.search.calls!==null);
+    const searches={calls:searchKnown?observations.reduce((n,o)=>n+o.search.calls,0):null,basis:observations.length===1?observations[0].search.basis:'per_node_run_records',emitted:observations.length?observations.reduce((n,o)=>n+(o.search.emitted||0),0):null,completed:observations.length?observations.reduce((n,o)=>n+(o.search.completed||0),0):null,incomplete:observations.length?observations.reduce((n,o)=>n+(o.search.incomplete||0),0):null};
+    return {node:name,runs:runs.length,inputTokens:complete?observations.reduce((n,o)=>n+o.measured.input,0):null,outputTokens:complete?observations.reduce((n,o)=>n+o.measured.output,0):null,toolCalls:searches.calls,toolExecutionEvidence:searches,responseIds:observations.map(o=>o.responseId).filter(Boolean),usageSource:complete?[...new Set(observations.map(o=>o.measured.basis))].join('+'):'unavailable'};
+  });
   const measured=models.filter(m=>m.runs>0);const complete=measured.length>0&&measured.every(m=>m.inputTokens!==null&&m.outputTokens!==null);
   const related=images.filter(m=>m.relation==='subject_caption_match'&&m.assetId);
   const target=candidate.format==='single_image'?1:candidate.targetSlideCount||5;

@@ -1,3 +1,9 @@
+# Current checkpoint — V12 product integration
+
+[Current evidence, issue inventory and gated roadmap](release/V12_PRODUCT_INTEGRATION.md). Real native acceptance2359 generated a source-grounded caption/three hooks before this sprint; worker subsequently restored inactive. Current changes improve Discover-to-caption handoff, in-editor evidence and usage accounting. Hosted Render remains Build F81a0ca2. Photography, ongoing spending and approval-to-Buffer gates are still open. No new paid run, native change or deployment occurred in this sprint. Older sections below retain dated history.
+
+---
+
 # Current V12 continuation status
 
 See [V12 / V1 living status](release/V12_V1_STATUS.md) for current workstreams, evidence, blockers and next tasks. The entries below retain earlier sprint history.

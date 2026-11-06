@@ -89,3 +89,11 @@ test('image-level creator and terms stay separate from article authors and publi
  const [image]=inspectPhotoSource('<script type="application/ld+json">'+JSON.stringify(data)+'</script><img src="/frame.jpg" alt="A precise source caption">','https://example.org/article',{});
  assert.equal(image.caption,'A precise source caption');assert.equal(image.creator,'');assert.equal(image.imageMetadata.creatorReported,'Image creator');assert.equal(image.imageMetadata.copyrightHolderReported,'Image owner');assert.equal(image.imageMetadata.licenseReportedUrl,'https://example.org/image-terms');assert.equal(image.imageMetadata.rightsGranted,false);assert.ok(!JSON.stringify(image).includes('Page author'));assert.ok(!JSON.stringify(image).includes('page-license'));
 });
+
+test('provider response usage survives absent n8n metadata; unfinished search records do not inflate reported requests',()=>{
+ const raw=execution();const response={id:'resp_fixture',object:'response',usage:{input_tokens:18755,output_tokens:2741},tool_usage:{web_search:{num_requests:2}},output:[{type:'web_search_call',status:'completed'},{type:'web_search_call',status:'completed'},{type:'web_search_call',status:'searching'}]};
+ raw.data.resultData.runData['Research Candidates']=output([response]);
+ const evidence=captureEditorialEvidence(raw,{workerId:'dev-worker',jobId:job,requestHash:'a'.repeat(64),candidate}),model=evidence.usage.models[0];
+ assert.equal(evidence.usage.inputTokens,18825);assert.equal(evidence.usage.outputTokens,2771);assert.equal(model.usageSource,'provider_response');assert.deepEqual(model.responseIds,['resp_fixture']);assert.equal(model.toolCalls,2);assert.equal(model.toolExecutionEvidence.emitted,3);assert.equal(model.toolExecutionEvidence.incomplete,1);assert.equal(evidence.usage.price,null);assert.equal(evidence.usage.priceVerified,false);
+ response.usage.input_tokens=-1;const absent=captureEditorialEvidence(raw,{workerId:'dev-worker',jobId:job,requestHash:'a'.repeat(64),candidate});assert.equal(absent.usage.inputTokens,null);
+});

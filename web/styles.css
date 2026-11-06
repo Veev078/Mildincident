@@ -4135,3 +4135,11 @@ dialog:has(>.image-inspector) { padding:24px; max-height:calc(100vh - 40px); }
 .story-organization { display:flex; gap:1rem; flex-wrap:wrap; margin-top:.4rem; }
 .filter-bar > label { display:flex; align-items:center; gap:.45rem; font-size:.85rem; }
 .filter-bar select { max-width:100%; padding:.45rem; border:1px solid var(--line); background:var(--paper,#f5f8fc); color:inherit; }
+
+/* Real drafts remain readable before entering the story workspace. */
+.proposal-draft { border-left: 2px solid var(--accent, #284cc3); padding-left: 1rem; margin: 1.25rem 0; }
+.proposal-draft > p:not(.eyebrow) { font-family: Georgia, serif; line-height: 1.65; overflow-wrap: anywhere; }
+.generation-receipt { margin: 1.25rem 0; padding: 1rem 0; border-bottom: 1px solid var(--line, #d5deea); }
+.generation-receipt summary { cursor: pointer; }
+.caption-source-excerpt { margin: .5rem 0 1rem; }
+.caption-source-excerpt blockquote { margin: .75rem 0; padding-left: .75rem; border-left: 2px solid var(--line, #d5deea); overflow-wrap: anywhere; }

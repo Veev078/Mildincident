@@ -1,3 +1,22 @@
+# Current V12 checkpoint — product integration
+
+November 5, 2026 (America/New_York). [Current integration report and UX inventory](V12_PRODUCT_INTEGRATION.md) supersede the historical readiness statements below.
+
+| Area | Implemented / locally verified | Hosted / fully operational |
+| --- | --- | --- |
+| Discover and private themes | Build G + caption preview/direct editor entry | Render remains Build F 81a0ca2; G/current changes undeployed |
+| Real Muse drafting | Authorized native execution2359 returned one source-grounded Sophy Rickett caption/three hooks, isolated Studio edit/refresh/restart verified | Acceptance result not proven in hosted storage; worker restored inactive, permit revoked |
+| Usage and source review | Provider token capture, explicit search accounting uncertainty, saved excerpts beside caption and usage receipt | Requires manual deployment; no billing/invoice or hidden-attempt guarantee |
+| Founder generation | Existing single-run server grant/idempotency/uncertainty safeguards; allowance/exposure explanation | Ongoing policy/renewal and live per-request authorization still gated; no active grant |
+| Photography | Native source adapter and receipt/import preparation; inline requests | Actual authorized sourcing/identity/rights and hosted dispatch/reconciliation incomplete |
+| Approval/publishing | Exact review-copy packet and production gate contracts | Native import/live conditional claim/draft-only Buffer acceptance not operational; no publication |
+
+Next: separately approve a backed-up manual release of the final pushed checkpoint, then review the founder journey with paid generation disabled. No deployment, live workflow/grant mutation, paid call or Buffer action in this integration sprint.
+
+---
+
+The following entries are dated history; they do not override the current checkpoint above.
+
 # Native retry investigation — stopped pending deployed-runtime proof
 
 November5,2026. [Focused transport audit](V12_OPENAI_RETRY_AUDIT.md) corrects the SDK assumption: the inspected published OpenAI v2.3 app-node implementation uses n8n requestWithAuthentication/Axios, not the OpenAI SDK. Seven ordinary success/failure simulations make one attempt each; credential-refresh and actual function-tool-continuation negative controls produce two requests. These source-derived tests use real local HTTP/Axios and synthetic configuration, not the deployed Cloud runtime.26 existing permit/dispatch tests pass.

@@ -1,5 +1,10 @@
 # Consequential product decisions
 
+## 2026-11-05 — Make real editorial results usable before expanding execution permissions
+
+Founder requests a substantive product-integration checkpoint after authorized native acceptance2359. Evidence: new drafts were buried below old proposals; caption/source review required extra navigation; provider token counts were lost when n8n metadata was absent. Keep the existing pipeline and single-run server grant, show latest proposals/caption previews, disclose recorded usage and unfinished tool records, and put captured text beside editing. Do not turn two provider-reported searches plus an unfinished emitted record into three billed calls, or convert a working draft into approval. Owner: repository engineering. Modules: editorial-evidence, development-story, Discover/review/caption. Verified through regression tests and copied-real-data desktop/mobile edit/restart journeys. Deployment, ongoing budget policy, photo retrieval/import and native publishing remain separately gated. [Evidence and roadmap](release/V12_PRODUCT_INTEGRATION.md).
+
+
 ## 2026-10-31 — V11 editorial activities and preserved native authority
 
 Founder requested an implementation sprint on the verified development branch, superseding the preceding connection-only check. Discover presents actual proposals; research instructions are compact activity records. Reuse only explicitly enrolled, equivalent unstarted defaults with identical observed source/local revisions. Preserve original request records; retry aliases cannot remap authoritative native job identities. Historical imported results remain historical, and uncertain queue/start observations never imply confirmed execution.
