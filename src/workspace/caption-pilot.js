@@ -8,6 +8,16 @@ const sha=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const day=t=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(t));
 const terminal=new Set(['ready_to_review','needs_research','approved','rejected','failed']);
 const uuid=v=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(v);
+export const perUsePolicy=c=>c?.version===2&&c.mode==='founder_confirmed';
+export function policyApprovalValid(c,now=Date.now()){
+ const common=c?.enabled===true&&c.approved===true&&uuid(c.id)&&typeof c.workerVersion==='string'&&c.workerVersion.length>0&&/^[a-f0-9]{64}$/.test(c.graphSha256||'');
+ if(!common)return false;
+ if(perUsePolicy(c))return c.dailyCaptionLimit===undefined&&c.dailyStoryLimit===undefined&&c.reviewThresholdUsd===undefined&&
+  (c.expiresAt===undefined||Date.parse(c.expiresAt)>now)&&c.operations&&Object.keys(c.operations).every(k=>['caption','story'].includes(k))&&
+  ['caption','story'].every(k=>typeof c.operations[k]==='boolean')&&(c.operations.caption||c.operations.story);
+ return (c.version===undefined||c.version===1)&&c.mode===undefined&&Date.parse(c.expiresAt)>now&&Number.isInteger(c.dailyCaptionLimit)&&c.dailyCaptionLimit>0&&c.dailyCaptionLimit<=6&&Number.isInteger(c.dailyStoryLimit)&&c.dailyStoryLimit>=0&&c.dailyStoryLimit<=3&&c.reviewThresholdUsd===2;
+}
+const usageEstimate=usage=>Number.isFinite(usage?.inputTokens)&&Number.isFinite(usage?.outputTokens)?usage.inputTokens*2.5/1e6+usage.outputTokens*15/1e6+(usage.models||[]).reduce((n,m)=>n+(Number.isFinite(m.toolCalls)?m.toolCalls*.01:0),0):null;
 export async function readCaptionPilotConfig({env,config}){
  if(!env.STUDIO_CAPTION_POLICY_FILE)return {enabled:false};
  const root=await fs.realpath(config.dataRoot),filename=path.resolve(env.STUDIO_CAPTION_POLICY_FILE),stat=await fs.lstat(filename),actual=await fs.realpath(filename);
@@ -25,7 +35,7 @@ export class CaptionPilot{
  async inspect(){
   this.workerReady=false;this.validPolicy=false;
   try{const c=await this.loadConfig();this.config=c;
-   requireThat(c.enabled===true&&c.approved===true&&uuid(c.id)&&Date.parse(c.expiresAt)>this.now()&&c.dailyCaptionLimit>0&&c.dailyCaptionLimit<=6&&Number.isInteger(c.dailyCaptionLimit)&&c.dailyStoryLimit>=0&&c.dailyStoryLimit<=3&&Number.isInteger(c.dailyStoryLimit)&&c.reviewThresholdUsd===2&&typeof c.workerVersion==='string'&&/^[a-f0-9]{64}$/.test(c.graphSha256),'CAPTION_POLICY_DISABLED','Caption improvements need an approved server-side pilot policy.');
+   requireThat(policyApprovalValid(c,this.now()),'CAPTION_POLICY_DISABLED','AI operations need an approved server-side policy.');
    requireThat(c.connection&&['jobsTableId','candidatesTableId','editorialWorkerId'].every(k=>c.connection[k]===OBSERVED_RESEARCH_CONNECTION[k])&&c.connection.headerName==='X-Mildincident-Development-Key'&&typeof c.connection.token==='string'&&c.connection.token.length>=32&&!/[\r\n]/.test(c.connection.token),'INVALID_CAPTION_POLICY','The pilot requires the existing private development connection.');
    this.validPolicy=true;const worker=await this.engine.client.api('/workflows/'+c.connection.editorialWorkerId);
    const projection=Object.fromEntries(['name','nodes','connections','settings'].map(k=>[k,worker[k]]));
@@ -35,37 +45,42 @@ export class CaptionPilot{
   return this.policyState();
  }
  counts(){const key=day(this.now()),used=new Map();
-  for(const row of this.research.db.prepare('SELECT id,day_key FROM studio_generation_actions WHERE confirmed_at IS NOT NULL').all())if(row.day_key===key)used.set(row.id,'caption');
+  for(const row of this.research.db.prepare('SELECT id,day_key,data_json FROM studio_generation_actions WHERE confirmed_at IS NOT NULL').all())if(row.day_key===key)used.set(row.id,JSON.parse(row.data_json).operation||'caption');
   for(const row of this.research.db.prepare("SELECT request_id,data_json,created_at FROM research_engine_events WHERE state='dispatching'").all())if(day(row.created_at)===key){const data=JSON.parse(row.data_json);used.set(row.request_id,data.captionTarget||data.editorialContext?.captionImprovement?'caption':'story');}
   return {caption:[...used.values()].filter(k=>k==='caption').length,story:[...used.values()].filter(k=>k==='story').length};
  }
  result(p,job){return ['ready_to_review','needs_research','approved'].includes(job?.state)?job.candidates?.find(c=>{
+  if(p.operation==='story')return c.id==='DEV-'+p.id+'-1'&&c.jobId===p.id&&c.provenance?.executionId===job.executionId&&c.captionDraft?.trim()&&c.status!=='rejected'&&!c.recovery&&job.requestHash===p.requestHash;
   const r=c.recovery,source=p.packet.source;return c.id==='DEV-'+p.id+'-1'&&c.provenance?.executionId===job.executionId&&c.jobId===p.id&&c.captionDraft?.trim()&&c.status!=='rejected'&&r?.mode==='draft_only'&&r.direction===p.direction&&r.sourceJobId===source.sourceJobId&&r.sourceCandidateId===source.sourceCandidateId&&r.sourceExecutionId===source.sourceExecutionId&&r.evidenceSha256===p.packet.evidenceSha256&&r.sourceRevision===p.sourceRevision&&r.workingVersion===p.workingVersion;
  }):null;}
  busy(exceptId=null){
   for(const row of this.research.db.prepare('SELECT id FROM studio_generation_actions WHERE confirmed_at IS NOT NULL').all()){if(row.id===exceptId)continue;const j=this.research.engineJob(row.id);if(!j||!terminal.has(j.state)||j.lastError==='ENGINE_RESULT_MISSING'||['ready_to_review','needs_research','approved'].includes(j.state)&&!this.result(this.raw(row.id),j))return true;}
   return this.research.db.prepare("SELECT request_id,state FROM research_engine_jobs").all().some(j=>j.request_id!==exceptId&&!terminal.has(j.state));
  }
- usageReview(){
-  const key=day(this.now()),ids=new Set(this.research.db.prepare('SELECT id,day_key FROM studio_generation_actions WHERE confirmed_at IS NOT NULL').all().filter(r=>r.day_key===key).map(r=>r.id));
-  for(const row of this.research.db.prepare("SELECT request_id,created_at FROM research_engine_events WHERE state='dispatching'").all())if(day(row.created_at)===key)ids.add(row.request_id);
+ usageReview({allTime=false}={}){
+  const key=day(this.now()),ids=new Set(this.research.db.prepare('SELECT id,day_key FROM studio_generation_actions WHERE confirmed_at IS NOT NULL').all().filter(r=>allTime||r.day_key===key).map(r=>r.id));
+  for(const row of this.research.db.prepare("SELECT request_id,created_at FROM research_engine_events WHERE state='dispatching'").all())if(allTime||day(row.created_at)===key)ids.add(row.request_id);
   let estimate=0,unmeasured=0;
   for(const id of ids){const job=this.research.engineJob(id),usage=Object.values(job?.evidence||{})[0]?.usage;
    if(!Number.isFinite(usage?.inputTokens)||!Number.isFinite(usage?.outputTokens)){unmeasured++;continue;}
    estimate+=usage.inputTokens*2.5/1e6+usage.outputTokens*15/1e6;
    for(const m of usage.models||[])if(Number.isFinite(m.toolCalls))estimate+=m.toolCalls*.01;
   }
-  return {estimatedUsd:Math.round(estimate*10000)/10000,thresholdUsd:2,state:estimate>=2?'review_threshold_reached':unmeasured?'partially_measured':'below_review_threshold',unmeasuredOperations:unmeasured,verifiedBill:false,hardBillingCap:false,pricingBasis:'Assumed $2.50/M input, $15/M output and $0.01 per recorded search; account pricing and hidden usage unverified.'};
+  return {estimatedUsd:Math.round(estimate*10000)/10000,operations:ids.size,thresholdUsd:perUsePolicy(this.config)?null:2,state:perUsePolicy(this.config)?unmeasured?'partially_measured':'measured':estimate>=2?'review_threshold_reached':unmeasured?'partially_measured':'below_review_threshold',unmeasuredOperations:unmeasured,verifiedBill:false,hardBillingCap:false,pricingBasis:'Assumed $2.50/M input, $15/M output and $0.01 per recorded search; account pricing and hidden usage unverified.'};
  }
- policyState(){const c=this.config,counts=this.counts(),enabled=this.validPolicy===true&&c.enabled===true&&c.approved===true&&Date.parse(c.expiresAt)>this.now()&&!this.disabled();
-  const state=!enabled?'disabled':!this.workerReady?'inactive':this.busy()?'busy':counts.caption>=c.dailyCaptionLimit?'limit_reached':'available';
+ policyState(operation='caption'){const c=this.config,counts=this.counts(),persistent=perUsePolicy(c),enabled=this.validPolicy===true&&policyApprovalValid(c,this.now())&&!this.disabled();
+  const state=!enabled?'disabled':persistent&&!c.operations[operation]?'not_authorized':!this.workerReady?'inactive':this.busy()?'busy':!persistent&&counts[operation]>=(operation==='caption'?c.dailyCaptionLimit:c.dailyStoryLimit)?'limit_reached':'available';
+  if(persistent)return {state,enabled,mode:'founder_confirmed',canPrepare:true,message:state==='available'?'Review each request, then confirm. Pay per use; one operation at a time.':state==='disabled'?'AI starts are disabled. Editing and saved work remain available.':state==='not_authorized'?'This operation is not included in the installed approval.':state==='inactive'?'The reviewed AI worker is inactive or needs review.':state==='busy'?'An operation is running or needs reconciliation. Check its result before starting another.':'AI starts need review.',operations:{...c.operations},dailyCounts:counts,limits:null,reviewThresholdUsd:null,usageReview:this.usageReview(),hardBillingCap:false};
   return {state,enabled,canPrepare:true,message:state==='available'?'Choose an improvement, review it, then confirm one draft.':state==='disabled'?'AI caption improvements are disabled until the pilot policy is approved.':state==='inactive'?(this.issue||'The reviewed worker is inactive. Saved drafts remain available.'):state==='busy'?'Another operation is running or needs reconciliation. No new draft will start.':'Today’s approved caption allowance is used.',dailyCounts:counts,limits:{caption:c.dailyCaptionLimit||6,story:c.dailyStoryLimit??3},reviewThresholdUsd:2,usageReview:this.usageReview(),hardBillingCap:false};
  }
  raw(id){const row=this.research.db.prepare('SELECT * FROM studio_generation_actions WHERE id=?').get(id);return row?{...JSON.parse(row.data_json),confirmedAt:row.confirmed_at}:null;}
- proposal(p){if(!p)return null;const j=this.research.engineJob(p.id),candidate=this.result(p,j),policy=this.policyState();
+ proposal(p){if(!p)return null;const j=this.research.engineJob(p.id),candidate=this.result(p,j),policy=this.policyState(p.operation||'caption');
   const state=!p.confirmedAt?(Date.parse(p.expiresAt)>this.now()?'prepared':'expired'):candidate?'completed':j?.state==='failed'||j?.state==='rejected'?'failed':['dispatch_uncertain','queue_uncertain'].includes(j?.state)||!j||['ready_to_review','needs_research','approved'].includes(j?.state)&&!candidate?'uncertain':j?.state==='dispatching'&&!j.executionId?'dispatching':['dispatching','generating'].includes(j?.state)?'running':'queued';
-  return {id:p.id,jobId:p.id,storyId:p.storyId,sourceRevision:p.sourceRevision,workingVersion:p.workingVersion,direction:p.direction,sourceLabel:p.sourceLabel,createdAt:p.createdAt,expiresAt:p.expiresAt,state,canConfirm:!p.confirmedAt&&policy.state==='available'&&Date.parse(p.expiresAt)>this.now(),limits:{maxDraftOutputTokens:1800,maxResearchCalls:0,maxResearchToolCalls:0},estimatedCost:'Approximately $0.04–$0.08; account pricing and hidden retries may differ. This is not a hard cap.',...(candidate?{resultCandidateId:candidate.id,versionId:'generated:'+candidate.id}:{}),...(j?.executionId?{executionId:j.executionId}:{}),usage:j?.evidence?.[candidate?.id]?.usage||null};
+  const usage=j?.evidence?.[candidate?.id]?.usage||null,story=p.operation==='story';
+  return {id:p.id,jobId:p.id,operation:story?'story':'caption',storyId:p.storyId,sourceRevision:p.sourceRevision,workingVersion:p.workingVersion,direction:p.direction,sourceLabel:p.sourceLabel,createdAt:p.createdAt,expiresAt:p.expiresAt,state,canConfirm:!p.confirmedAt&&policy.state==='available'&&Date.parse(p.expiresAt)>this.now(),limits:{maxDraftOutputTokens:1800,maxResearchCalls:story?1:0,maxResearchOutputTokens:story?3500:0,maxResearchToolCalls:story?2:0},estimatedCost:story?'Approximately $0.15–$0.25; account pricing and hidden retries may differ. This is not a hard cap.':'Approximately $0.04–$0.08; account pricing and hidden retries may differ. This is not a hard cap.',...(candidate?{resultCandidateId:candidate.id,versionId:'generated:'+candidate.id,resultStoryId:story?'CON-DEV-'+p.id:p.storyId}:{}),...(j?.executionId?{executionId:j.executionId}:{}),usage,estimatedUsd:usageEstimate(usage)};
  }
+ usageSummary(){return {today:this.usageReview(),allTime:this.usageReview({allTime:true}),recent:this.research.db.prepare('SELECT id FROM studio_generation_actions WHERE confirmed_at IS NOT NULL ORDER BY rowid DESC LIMIT 20').all().map(r=>this.proposal(this.raw(r.id)))};}
+ storyStatus(id){const p=this.raw(id);return p?.operation==='story'?this.proposal(p):null;}
  status(story){const row=this.research.db.prepare('SELECT id FROM studio_generation_actions WHERE story_id=? ORDER BY rowid DESC LIMIT 1').get(story.id);return {...this.policyState(),proposal:row?this.proposal(this.raw(row.id)):null};}
  validateStory(story,input){requireThat(story&&story.origin==='n8n_development'&&!story.localDraft?.stale&&input.sourceRevision===story.revision&&input.workingVersion===(story.localDraft?.version||0),'EDIT_CONFLICT','Save and reload the story before requesting a draft.');}
  validateStoredPacket(packet){
@@ -96,12 +111,13 @@ export class CaptionPilot{
   await this.inspect();const row=this.research.db.prepare('SELECT id FROM studio_generation_actions WHERE idempotency_key=?').get(input.idempotencyKey),saved=this.raw(row.id);requireThat(saved.storyId===story.id&&saved.sourceRevision===input.sourceRevision&&saved.workingVersion===input.workingVersion&&saved.direction===input.direction,'EDIT_CONFLICT','This request identity belongs to another writing context.');return this.proposal(saved);
  }
  disable(){const time=new Date(this.now()).toISOString();this.research.db.exec('BEGIN IMMEDIATE');try{this.research.db.prepare('INSERT INTO studio_generation_control VALUES(1,1,?) ON CONFLICT(id) DO UPDATE SET disabled=1,updated_at=excluded.updated_at').run(time);this.research.db.prepare('INSERT INTO studio_generation_policy_events(created_at,event,data_json) VALUES(?,?,?)').run(time,'disabled','{}');this.research.db.exec('COMMIT');}catch(e){this.research.db.exec('ROLLBACK');throw e;}return this.policyState();}
- assertStart(id){const p=this.raw(id);requireThat(p?.policyId===this.config.id&&Date.parse(p.packet.authorization?.expiresAt)>this.now(),'CAPTION_POLICY_DISABLED','The exact action approval expired or changed.');requireThat(this.policyState().enabled&&this.workerReady,'CAPTION_POLICY_DISABLED','Future AI starts are disabled or the reviewed worker is unavailable.');requireThat(!this.busy(id),'GENERATION_BUSY','Another operation needs completion or reconciliation.');}
+ assertStart(id){const p=this.raw(id),operation=p?.operation||'caption',a=p?.authorization||p?.packet?.authorization;requireThat(p?.policyId===this.config.id&&Date.parse(a?.expiresAt)>this.now(),'CAPTION_POLICY_DISABLED','The exact action approval expired or changed.');requireThat(this.policyState(operation).enabled&&this.workerReady&&(!perUsePolicy(this.config)||this.config.operations[operation]),'CAPTION_POLICY_DISABLED','Future AI starts are disabled or the reviewed worker is unavailable.');requireThat(!this.busy(id),'GENERATION_BUSY','Another operation needs completion or reconciliation.');}
  guardLegacyStart(id){
   requireThat(!this.disabled(),'CAPTION_POLICY_DISABLED','Future AI starts were disabled.');
   // This check runs inside the existing durable dispatch-claim transaction.
   if(!this.config.enabled&&!this.research.db.prepare('SELECT id FROM studio_generation_actions WHERE confirmed_at IS NOT NULL LIMIT 1').get())return;
   requireThat(!this.busy(id),'GENERATION_BUSY','Another operation needs completion or reconciliation.');
+  if(perUsePolicy(this.config)){requireThat(this.raw(id)?.confirmedAt,'CAPTION_NOT_AUTHORIZED','Review and confirm this operation through Studio first.');return this.assertStart(id);}
   const job=this.research.engineJob(id);if(job?.editorialContext?.captionImprovement)return this.assertStart(id);
   if(this.config.enabled){const counts=this.counts(),kind=job?.captionTarget?'caption':'story';requireThat(this.policyState().enabled&&counts[kind]<(kind==='caption'?this.config.dailyCaptionLimit:this.config.dailyStoryLimit),'CAPTION_POLICY_DISABLED','The approved daily generation allowance is unavailable.');}
  }
@@ -138,5 +154,40 @@ export class CaptionPilot{
    await actionEngine.start(p.id,this.research.engineJob(p.id).version,{beforeClaim:()=>{this.assertStart(p.id);validateCurrentStory();}});
   }catch(error){const j=this.research.engineJob(p.id);if(j&&j.state==='queued')this.research.recordEngineState(p.id,'dispatch_uncertain',{lastError:error.code||'CAPTION_START_UNCERTAIN'});return this.proposal(this.raw(p.id));}
   return this.proposal(this.raw(p.id));
+ }
+
+ // Full-story actions reuse the same ledger, private worker, grants and dispatch boundary.
+ // The immutable review freezes the existing editorial preset/feedback context, not a second engine.
+ storyBinding(request){return sha({kind:request.kind,prompt:request.prompt,sourceUrl:request.sourceUrl,preset:request.preset||null,continuation:request.continuation||null});}
+ async prepareStory(id,input={}){
+  requireThat(Object.keys(input).length===0&&uuid(id),'INVALID_RESEARCH_REQUEST','Review one saved discovery request.');
+  const existing=this.raw(id);if(existing){requireThat(existing.operation==='story','EDIT_CONFLICT','This identity belongs to another action.');await this.inspect();return this.proposal(existing);}
+  const request=this.research.get(id);requireThat(request&&!request.engineJob&&!request.linkedStoryId,'ENGINE_ALREADY_DISPATCHED','Use a new saved direction; existing or uncertain operations are never resent.');
+  const editorialContext=this.engine.editorialContext(request),now=this.now();
+  const p={id,operation:'story',storyId:'request:'+id,sourceLabel:request.preset?.name||(request.kind==='discovery'?'Surprise Me — current editorial direction':request.prompt),createdAt:new Date(now).toISOString(),expiresAt:new Date(now+20*60000).toISOString(),requestBinding:this.storyBinding(request),editorialContext,requestHash:requestFingerprint({...request,editorialContext})};
+  this.research.db.prepare('INSERT OR IGNORE INTO studio_generation_actions VALUES(?,?,?,?,NULL,NULL,?)').run(id,'story:'+id,p.storyId,p.createdAt,JSON.stringify(p));
+  const saved=this.raw(id);requireThat(saved.operation==='story'&&saved.requestBinding===p.requestBinding,'EDIT_CONFLICT','The saved direction changed.');await this.inspect();return this.proposal(saved);
+ }
+ async confirmStory(id,input={}){
+  requireThat(Object.keys(input).length===1&&input.confirm===true&&uuid(id),'INVALID_RESEARCH_REQUEST','Explicitly confirm one reviewed story request.');
+  let p=this.raw(id);requireThat(p?.operation==='story','INVALID_RESEARCH_REQUEST','Review this saved direction first.');if(p.confirmedAt)return this.proposal(p);
+  await this.inspect();
+  const validate=()=>{const request=this.research.get(id);requireThat(request&&this.storyBinding(request)===p.requestBinding&&(!request.engineJob||request.engineJob.requestHash===p.requestHash),'EDIT_CONFLICT','The reviewed direction or context changed. Prepare a fresh request.');};
+  this.research.db.exec('BEGIN IMMEDIATE');try{
+   p=this.raw(id);if(p.confirmedAt){this.research.db.exec('COMMIT');return this.proposal(p);}
+   validate();requireThat(!this.research.engineJob(id),'ENGINE_ALREADY_DISPATCHED','This request already has execution activity.');
+   requireThat(this.policyState('story').state==='available'&&Date.parse(p.expiresAt)>this.now(),'CAPTION_NOT_AUTHORIZED',this.policyState('story').message);
+   p.authorization={id:randomUUID(),jobId:id,maxRuns:1,expiresAt:new Date(this.now()+20*60000).toISOString()};p.policyId=this.config.id;
+   const time=new Date(this.now()).toISOString();this.research.db.prepare('UPDATE studio_generation_actions SET confirmed_at=?,day_key=?,data_json=? WHERE id=?').run(time,day(time),JSON.stringify(p),id);
+   this.research.db.prepare('INSERT INTO studio_generation_policy_events(created_at,event,data_json) VALUES(?,?,?)').run(time,'confirmed',JSON.stringify({proposalId:id,policyId:p.policyId,operation:'story'}));this.research.db.exec('COMMIT');
+  }catch(error){this.research.db.exec('ROLLBACK');throw error;}
+  try{
+   const client=this.createClient({connection:{...this.config.connection,mode:'standard',generationEnabled:true,approvedWorkerVersion:this.config.workerVersion,approvedGraphSha256:this.config.graphSha256,executionScope:'founder_policy',authorization:p.authorization,captionAction:{jobId:id,requestHash:p.requestHash,operation:'story'}}});
+   const actionEngine=new EditorialEngineService({research:this.research,client});this.assertStart(id);
+   await actionEngine.queue(id,{editorialContext:p.editorialContext});
+   await this.inspect();validate();this.assertStart(id);
+   await actionEngine.start(id,this.research.engineJob(id).version,{beforeClaim:()=>{this.assertStart(id);validate();}});
+  }catch(error){const j=this.research.engineJob(id);if(j?.state==='queued')this.research.recordEngineState(id,'dispatch_uncertain',{lastError:error.code||'ENGINE_START_UNCERTAIN'});}
+  return this.proposal(this.raw(id));
  }
 }

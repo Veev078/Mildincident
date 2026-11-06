@@ -1,3 +1,9 @@
+# Current checkpoint — recurring founder-confirmed AI operations
+
+[Operational integration and activation plan](V12_OPERATIONAL_INTEGRATION.md). The founder confirms real caption 2360 and hosted preservation/cleanup. This sprint implements recurring per-use caption/story requests with explicit confirmation, no daily quotas, one shared in-flight slot, durable receipts/estimated usage and operator maintenance. Local retained-data browser simulations are distinct from live operation. The recurring policy and native worker remain uninstalled/inactive for this sprint; deployment and paid execution require separate approval.
+
+---
+
 # Current V12 checkpoint — operational caption improvement, activation gated
 
 [Implementation, policy and exact native approval checkpoint](V12_CAPTION_PILOT.md). Continues a4a0669. Direction → unpaid review → explicit confirmation → durable one-use grant/reservation → existing queue/native worker → Compare → deliberate Apply is implemented locally and simulated with retained Marcie data. Policy remains disabled by default. No live permission, native change, paid call or deployment.

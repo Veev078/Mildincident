@@ -1,3 +1,4 @@
+import {storyProposal} from './ai-operations.js';
 import {researchAccess} from './discovery-flow.js';
 import {CAPTION_IMPROVEMENTS,captionRequestProposal,canConfirmCaption} from './caption-request-flow.js';
 import {launchSavedResearch} from './research-launch.js';
@@ -674,8 +675,8 @@ document.addEventListener('error', event => {
 }, true);
 
 async function createResearchRequest(input, {start=false}={}) {
-  if(start&&!researchAccess(state.workspace?.engine).canStart)throw new Error(researchAccess(state.workspace?.engine).message);
-  if(start&&!window.confirm('Start one authorized research run? It may charge for one research and one draft call. Proceed only under a separately approved spend limit; the provider price is not shown here. It will not publish or grant rights.'))return false;
+  if(start&&!researchAccess(state.workspace?.engine).canReview)throw new Error(researchAccess(state.workspace?.engine).message);
+  if(start&&state.workspace.engine?.founderPolicy?.mode!=='founder_confirmed'&&!window.confirm('Start one authorized research run? It may charge for one research and one draft call. Proceed only under a separately approved spend limit; the provider price is not shown here. It will not publish or grant rights.'))return false;
   const keyField = input.preset?'presetRequestKey':input.kind==='brief' ? 'briefRequestKey' : 'discoveryRequestKey';
   state[keyField] ||= crypto.randomUUID();
   const result = await api('/api/research/requests', {method:'POST', headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({...input,idempotencyKey:state[keyField]})});
@@ -686,7 +687,7 @@ async function createResearchRequest(input, {start=false}={}) {
   if (!reused) state.workspace.researchRequests.unshift(result.request);
   render();
   await loadWorkspace({quiet:true}).catch(()=>{});
-  if(start){try{await launchSavedResearch(result.request,{engine:state.workspace.engine,api});toast('Research start requested once. Progress and resulting ideas appear in Discover.');}catch(error){toast('Your brief is saved. '+error.message+' No automatic retry was made.',{error:true});}await loadWorkspace({quiet:true}).catch(()=>{});}
+  if(start){try{const launched=await launchSavedResearch(result.request,{engine:state.workspace.engine,api});if(launched.proposal)state.storyGenerationProposal=launched.proposal;toast(launched.proposal?'Review the plan, then confirm one story. No AI has started.':'Research start requested once. Progress and resulting ideas appear in Discover.');}catch(error){toast('Your brief is saved. '+error.message+' No automatic retry was made.',{error:true});}await loadWorkspace({quiet:true}).catch(()=>{});}
   else toast(reused?'Existing saved direction retained. Research has not started.':'Direction saved. Research has not started.');
   const observed=state.workspace.researchRequests.find(r=>r.id===result.request.id);
   const target=start&&observed?.engineJob?.candidates?.length?document.querySelector('.founder-inbox'):document.querySelector(`[data-request-id="${result.request.id}"]`);target?.scrollIntoView({block:'center'});
@@ -825,10 +826,10 @@ document.addEventListener('change',event=>{
 document.addEventListener('click',async event=>{
  const button=event.target.closest('[data-start-saved-research]');if(!button||state.discoverySubmitting)return;
  const request=state.workspace.researchRequests.find(r=>r.id===button.dataset.startSavedResearch);if(!request)return;
- if(!researchAccess(state.workspace.engine).canStart){toast(researchAccess(state.workspace.engine).message,{error:true});return;}
- if(!window.confirm('Start one authorized research run for this saved brief? It uses the approved provider budget and does not publish.'))return;
+ if(!researchAccess(state.workspace.engine).canReview){toast(researchAccess(state.workspace.engine).message,{error:true});return;}
+ if(state.workspace.engine?.founderPolicy?.mode!=='founder_confirmed'&&!window.confirm('Start one authorized research run for this saved brief? It uses the approved provider budget and does not publish.'))return;
  state.discoverySubmitting=true;button.disabled=true;
- try{await launchSavedResearch(request,{engine:state.workspace.engine,api});await loadWorkspace({quiet:true});toast('Research start requested once. Check its recorded progress below.');}catch(error){toast(error.message+' Check results before retrying; no automatic retry was made.',{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}finally{state.discoverySubmitting=false;button.disabled=false;const fields=document.querySelector('[data-discovery-fields]');if(fields)fields.disabled=false;}
+ try{const launched=await launchSavedResearch(request,{engine:state.workspace.engine,api});if(launched.proposal)state.storyGenerationProposal=launched.proposal;await loadWorkspace({quiet:true});toast(launched.proposal?'Review the plan before confirming. No AI has started.':'Research start requested once. Check its recorded progress below.');}catch(error){toast(error.message+' Check results before retrying; no automatic retry was made.',{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}finally{state.discoverySubmitting=false;button.disabled=false;const fields=document.querySelector('[data-discovery-fields]');if(fields)fields.disabled=false;}
 });
 
 // Library organization changes no caption, media, native approval or production record.
@@ -926,3 +927,16 @@ document.addEventListener('click',async event=>{
 const themeByKey=key=>[...(state.workspace?.researchPresets?.items||[]),...(state.workspace?.studioThemes||[])].find(t=>t.key===key);
 document.addEventListener('submit',async event=>{const form=event.target.closest('[data-theme-form]');if(!form)return;event.preventDefault();const fields=new FormData(form),status=form.parentElement.querySelector('[data-theme-status]');try{const result=await api('/api/research/themes',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({...(fields.get('key')?{key:fields.get('key')}:{}),expectedRevision:Number(fields.get('revision')),name:fields.get('name'),direction:fields.get('direction')})});state.presetChoice=result.theme;await loadWorkspace({quiet:true});announce('Private theme saved. Research has not started.');}catch(error){status.textContent=error.message;}});
 document.addEventListener('click',async event=>{const button=event.target.closest('[data-theme-edit],[data-theme-copy],[data-theme-archive]');if(!button)return;const key=button.dataset.themeEdit||button.dataset.themeCopy||button.dataset.themeArchive,theme=themeByKey(key),form=document.querySelector('[data-theme-form]');if(!theme)return;if(button.dataset.themeArchive){try{await api('/api/research/themes',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({key,expectedRevision:theme.revision,archived:!theme.archived})});await loadWorkspace({quiet:true});}catch(error){toast(error.message,{error:true});}return;}form.elements.name.value=button.dataset.themeCopy?theme.name.slice(0,115)+' copy':theme.name;form.elements.direction.value=theme.direction;form.elements.key.value=button.dataset.themeEdit?key:'';form.elements.revision.value=button.dataset.themeEdit?theme.revision:0;form.elements.name.focus();});
+
+// A reviewed story uses the same durable founder action ledger as caption improvements.
+document.addEventListener('click',async event=>{
+ const confirm=event.target.closest('[data-story-generation-confirm]'),disable=event.target.closest('[data-ai-disable]');if((!confirm&&!disable)||state.storyConfirmBusy||confirm?.disabled)return;
+ const p=storyProposal(state);if(confirm&&(!p||p.id!==confirm.dataset.storyGenerationConfirm||p.state!=='prepared'||!p.canConfirm))return;
+ state.storyConfirmBusy=true;if(confirm)state.storyGenerationProposal={...p,state:'uncertain',canConfirm:false};render();
+ try{
+  const result=await api(disable?'/api/generation/disable':`/api/research/requests/${encodeURIComponent(p.id)}/generation/confirm`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(disable?{}:{confirm:true})});
+  if(result.proposal)state.storyGenerationProposal=result.proposal;
+  await loadWorkspace({quiet:true});toast(disable?'Future AI starts disabled. Accepted work may still finish.':'Story request confirmed once. Check its recorded progress.');
+ }catch(error){toast(error.message+(confirm?' Check results; no automatic resubmission was made.':''),{error:true});}
+ finally{state.storyConfirmBusy=false;render();}
+});

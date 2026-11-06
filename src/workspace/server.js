@@ -69,6 +69,8 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     workspace.hosted=Boolean(access);workspace.backupStatus=backups?.status()||null;
     workspace.researchRequests = research?.all() || [];
     workspace.researchPresets=themes?themes.catalog(editorialPresetCatalog(source.snapshot)):editorialPresetCatalog(source.snapshot);workspace.studioThemes=themes?.all()||[];
+    workspace.aiUsage=captionPilot?.usageSummary?.()||null;
+    for(const request of workspace.researchRequests)if(captionPilot)request.generationProposal=captionPilot.storyStatus?.(request.id);
     workspace.engine = engine?.status() || {configured:false,generationAvailable:false,generationApproved:false,workerActive:false};
     for (const request of workspace.researchRequests) for (const candidate of request.engineJob?.candidates || []) {
       const story = developmentCandidateStory(candidate,{request,soundtrack:source.snapshot?.records?.soundtrack || [],drafts:drafts.all(),continuation:request.continuation||request.engineJob.editorialContext?.continuation||null,decision:request.engineJob.reviewDecisions?.[candidate.id]||null,evidence:request.engineJob.evidence?.[candidate.id]||null});
@@ -161,11 +163,18 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
         requireThat(engine,'ENGINE_NOT_CONFIGURED','Private development engine connection is unavailable.');
         if(delivery){const state=await delivery.tick();requireThat(state.state==='connected','ENGINE_NETWORK_UNCERTAIN','Research delivery is temporarily unavailable; cached work is preserved.');}else await engine.refresh();json(response,200,{engine:engine.status(),productionApplied:false});return;
       }
+      const storyAction=url.pathname.match(/^\/api\/research\/requests\/([a-f0-9-]{36})\/generation\/(prepare|confirm)$/);
+      if(storyAction&&request.method==='POST'){
+        requireThat(captionPilot,'CAPTION_POLICY_DISABLED','Founder-confirmed generation is unavailable.');const input=await body(request);
+        const proposal=storyAction[2]==='prepare'?await captionPilot.prepareStory(storyAction[1],input):await captionPilot.confirmStory(storyAction[1],input);
+        json(response,storyAction[2]==='prepare'?201:202,{proposal,productionApplied:false});return;
+      }
       const engineMatch=url.pathname.match(/^\/api\/research\/requests\/([a-f0-9-]{36})\/engine\/(queue|start|review|evidence)$/);
       if(engineMatch && request.method==='POST'){
         requireThat(engine,'ENGINE_NOT_CONFIGURED','Private development engine connection is unavailable.');
         const input=await body(request);let job;
         requireThat(!['queue','start'].includes(engineMatch[2])||engine.client?.connection?.executionScope!=='draft_only','CAPTION_SCOPE_MISMATCH','Use the exact story caption action for a drafting-only authorization.');
+        if(['queue','start'].includes(engineMatch[2]))requireThat(!captionPilot?.raw(engineMatch[1]),'CAPTION_SCOPE_MISMATCH','Use the reviewed founder action for policy requests.');
         if(['queue','start'].includes(engineMatch[2]))requireThat(!research.engineJob(engineMatch[1])?.editorialContext?.captionImprovement,'CAPTION_SCOPE_MISMATCH','Confirm policy caption actions through their exact story.');
         if(engineMatch[2]==='queue'){requireThat(input&&Object.keys(input).length===0,'INVALID_RESEARCH_REQUEST','Queue requires only a saved request identity.');job=await engine.queue(engineMatch[1]);}
         else if(engineMatch[2]==='start'){requireThat(input&&Object.keys(input).every(k=>k==='expectedVersion'),'INVALID_RESEARCH_REQUEST','Unsupported start fields.');job=await engine.start(engineMatch[1],input.expectedVersion);}

@@ -60,7 +60,7 @@ export function validateCaptionImprovementJob(row,dispatch,{workerId,now=Date.no
  return p;
 }
 
-const codeNode=(name,jsCode)=>({id:name.toLowerCase().replace(/[^a-z0-9]+/g,'-'),name,type:'n8n-nodes-base.code',typeVersion:2,position:[0,0],parameters:{jsCode},onError:'continueErrorOutput'});
+const codeNode=(name,jsCode)=>({id:name.toLowerCase().replace(/[^a-z0-9]+/g,'-'),name,type:'n8n-nodes-base.code',typeVersion:2,onError:'continueErrorOutput',position:[0,0],parameters:{jsCode}});
 const gate=name=>({id:name.toLowerCase().replace(/[^a-z0-9]+/g,'-'),name,type:'n8n-nodes-base.if',typeVersion:2,position:[0,0],parameters:{conditions:{options:{caseSensitive:true,typeValidation:'strict',version:2},conditions:[{id:'retained-caption-packet',leftValue:'={{ Boolean($("Verify Development Claim").first().json.editorial_context_json && Object.keys(JSON.parse($("Verify Development Claim").first().json.editorial_context_json)).includes("captionImprovement")) }}',rightValue:true,operator:{type:'boolean',operation:'true',singleValue:true}}],combinator:'and'},options:{}}});
 
 /** Prepare one reviewed dual-path graph on the existing worker; no install or activation. */

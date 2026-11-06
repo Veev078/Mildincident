@@ -1,3 +1,9 @@
+# Current checkpoint — recurring founder-confirmed AI operations
+
+[Operational integration and activation plan](release/V12_OPERATIONAL_INTEGRATION.md). The founder confirms real caption 2360 and hosted preservation/cleanup. This sprint implements recurring per-use caption/story requests with explicit confirmation, no daily quotas, one shared in-flight slot, durable receipts/estimated usage and operator maintenance. Local retained-data browser simulations are distinct from live operation. The recurring policy and native worker remain uninstalled/inactive for this sprint; deployment and paid execution require separate approval.
+
+---
+
 # Current checkpoint — Improve with AI request path
 
 [Current operational contract and activation checkpoint](release/V12_CAPTION_PILOT.md). Preserved/resumed work implements source-bound per-action caption requests, a disabled-by-default pilot policy, durable reservations/limits, exact delivery and manual draft application. Local retained-data simulations and desktop/mobile review are distinct from real new generation or hosted use. The same worker patch is prepared, not installed; no live grant, activation, paid call, deployment or Buffer action. Earlier sections retain dated history.

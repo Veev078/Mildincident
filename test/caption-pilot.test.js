@@ -189,3 +189,42 @@ test('confirmed retained evidence survives native history expiry without researc
  f.research.recordEngineState(next.id,'failed',{lastError:'SIMULATED_TERMINAL_FAILURE'});fresh.packet.evidenceSha256='0'.repeat(64);f.research.db.prepare('UPDATE studio_generation_actions SET data_json=? WHERE id=?').run(JSON.stringify(fresh),next.id);
  await assert.rejects(f.pilot.prepare(f.story,body(f.story,'concise')));assert.equal(f.state.dispatches,2);
 });
+
+function recurring(f,operations={caption:true,story:true}){
+ Object.assign(f.config,{version:2,mode:'founder_confirmed',operations});
+ for(const key of ['dailyCaptionLimit','dailyStoryLimit','reviewThresholdUsd','expiresAt'])delete f.config[key];
+}
+test('recurring founder policy has no daily quota, but every caption needs a fresh explicit single-use action',async t=>{
+ const f=await fixture(t);recurring(f);const grants=new Set();
+ for(let i=0;i<8;i++){
+  const p=await f.pilot.prepare(f.story,body(f.story));assert.equal(p.canConfirm,true);assert.equal(f.state.dispatches,i);
+  await f.pilot.confirm(f.story,confirmation(f.story,p));grants.add(f.pilot.raw(p.id).packet.authorization.id);
+  f.research.recordEngineState(p.id,'failed',{lastError:'SIMULATED_TERMINAL_FAILURE'});
+ }
+ assert.equal(grants.size,8);assert.equal(f.state.dispatches,8);assert.equal(f.pilot.counts().caption,8);assert.equal(f.pilot.policyState().limits,null);assert.equal(f.pilot.policyState().mode,'founder_confirmed');
+ const store=new LocalResearchStore(f.filename);f.stores.push(store);const reopened=f.makePilot(store);await reopened.inspect();assert.equal(reopened.counts().caption,8);assert.equal(reopened.policyState().state,'available');
+});
+test('story review freezes the saved request and preset context; duplicate confirmations dispatch only once and persist the receipt',async t=>{
+ const f=await fixture(t);recurring(f);const before=JSON.stringify(f.story),r=f.research.create({kind:'discovery',prompt:'Discover one specific photographic cultural story.'},[]);
+ const [a,b]=await Promise.all([f.pilot.prepareStory(r.id),f.pilot.prepareStory(r.id)]);assert.equal(a.id,b.id);assert.equal(a.limits.maxResearchCalls,1);assert.equal(f.state.dispatches,0);
+ await Promise.all([f.pilot.confirmStory(r.id,{confirm:true}),f.pilot.confirmStory(r.id,{confirm:true})]);assert.equal(f.state.queueCalls,1);assert.equal(f.state.dispatches,1);assert.equal(f.pilot.counts().story,1);assert.equal(f.pilot.counts().caption,0);
+ const p=f.pilot.raw(r.id),candidate={id:'DEV-'+r.id+'-1',jobId:r.id,status:'ready_to_review',captionDraft:'SIMULATED source-grounded story caption.',provenance:{executionId:'999',kind:'discovery',generatedAt:new Date(f.clock.now).toISOString()}};
+ f.research.recordEngineState(r.id,'ready_to_review',{executionId:'999',candidates:[candidate],evidence:{[candidate.id]:{usage:{inputTokens:4564,outputTokens:626,models:[{toolCalls:0}]}}}});
+ const out=f.pilot.storyStatus(r.id);assert.equal(out.state,'completed');assert.equal(out.resultStoryId,'CON-DEV-'+r.id);assert.equal(out.estimatedUsd,.0208);assert.equal(f.pilot.usageSummary().allTime.operations,1);assert.equal(f.pilot.usageSummary().allTime.estimatedUsd,.0208);assert.equal(p.authorization.maxRuns,1);assert.equal(f.research.authorizationRemaining(p.authorization),0);assert.equal(JSON.stringify(f.story),before);
+ const store=new LocalResearchStore(f.filename);f.stores.push(store);const reopened=f.makePilot(store);await reopened.inspect();assert.equal(reopened.storyStatus(r.id).state,'completed');assert.equal(reopened.usageSummary().recent[0].executionId,'999');await reopened.confirmStory(r.id,{confirm:true});assert.equal(f.state.dispatches,1);
+});
+test('caption and story confirmations share one durable in-flight slot across independent database connections',async t=>{
+ const f=await fixture(t);recurring(f);const store=new LocalResearchStore(f.filename);f.stores.push(store);const second=f.makePilot(store),r=f.research.create({kind:'discovery',prompt:'A separately confirmed cultural story.'},[]),caption=await f.pilot.prepare(f.story,body(f.story));await second.prepareStory(r.id);
+ const results=await Promise.allSettled([f.pilot.confirm(f.story,confirmation(f.story,caption)),second.confirmStory(r.id,{confirm:true})]);assert.equal(results.filter(x=>x.status==='fulfilled').length,1);assert.equal(f.state.dispatches,1);assert.equal(f.state.queueCalls,1);
+});
+test('lost story queue or dispatch response is durable uncertainty and never resubmits, including after restart',async t=>{
+ for(const mode of ['queue_uncertain','dispatch_uncertain']){
+  const f=await fixture(t);recurring(f);f.state.mode=mode;const r=f.research.create({kind:'discovery',prompt:'A single simulated editorial generation.'},[]);await f.pilot.prepareStory(r.id);await f.pilot.confirmStory(r.id,{confirm:true});await new Promise(r=>setImmediate(r));
+  const store=new LocalResearchStore(f.filename);f.stores.push(store);const reopened=f.makePilot(store);await reopened.inspect();assert.equal(reopened.storyStatus(r.id).state,'uncertain');await reopened.confirmStory(r.id,{confirm:true});assert.equal(f.state.queueCalls,1);assert.equal(f.state.dispatches,mode==='queue_uncertain'?0:1);assert.equal(reopened.policyState('story').state,'busy');
+ }
+});
+test('operation allowlist, changed source binding, durable disable and legacy bypass remain fail-closed under per-use approval',async t=>{
+ const f=await fixture(t);recurring(f,{caption:false,story:true});const p=await f.pilot.prepare(f.story,body(f.story));assert.equal(p.canConfirm,false);await assert.rejects(f.pilot.confirm(f.story,confirmation(f.story,p)));
+ const r=f.research.create({kind:'discovery',prompt:'An original direction that must stay exact.'},[]);await f.pilot.prepareStory(r.id);f.research.db.prepare('UPDATE research_requests SET prompt=? WHERE id=?').run('A different direction after review.',r.id);await assert.rejects(f.pilot.confirmStory(r.id,{confirm:true}),{code:'EDIT_CONFLICT'});assert.equal(f.state.dispatches,0);
+ f.pilot.disable();const next=f.research.create({kind:'discovery',prompt:'A fresh direction while future starts are disabled.'},[]);await f.pilot.prepareStory(next.id);await assert.rejects(f.pilot.confirmStory(next.id,{confirm:true}));assert.throws(()=>f.pilot.guardLegacyStart(next.id),{code:'CAPTION_POLICY_DISABLED'});assert.equal(f.state.dispatches,0);
+});

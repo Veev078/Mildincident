@@ -2,6 +2,10 @@ import {researchAccess} from './discovery-flow.js';
 
 /** Uses the existing guarded queue/start routes once; uncertain writes are never retried here. */
 export async function launchSavedResearch(request,{engine,api}) {
+ if(engine?.founderPolicy?.mode==='founder_confirmed'){
+  if(!researchAccess(engine).canReview)throw new Error(researchAccess(engine).message);
+  return api(`/api/research/requests/${encodeURIComponent(request.id)}/generation/prepare`,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:'{}'});
+ }
  if(!researchAccess(engine).canStart)throw new Error(researchAccess(engine).message);
  let job=request.engineJob;
  if(!job){

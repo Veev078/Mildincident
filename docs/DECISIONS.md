@@ -1,3 +1,9 @@
+# November 6, 2026 — recurring founder confirmation, not daily quotas
+
+Version-2 private approval may authorize unlimited manually confirmed caption/story operations, paid per actual use. Preserve version-1 bounded permits; never silently upgrade them. Reuse the same worker, action/grant ledger and exact source/request/graph checks, with one shared in-flight slot and no automatic resubmission. Persistent approval is operator-installed once; the browser can only confirm individual actions or disable future starts. Full recurring live activation remains unapproved in this sprint.
+
+---
+
 # Consequential product decisions
 
 ## 2026-11-06 — Confirmed caption actions reuse retained evidence and the same native worker

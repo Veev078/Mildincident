@@ -62,3 +62,9 @@ test('stale provider observations require an update, not an invented earlier pub
  const path=reviewPath(story);assert.equal(path.next.key,'source');assert.equal(path.next.label,'Check the latest source records');assert.ok(!path.tasks.some(t=>t.key==='handoff'));assert.ok(path.codes.includes('PROVIDER_SNAPSHOT_STALE'));assert.equal(storyStep(story).label,'Review source records');
  const recorded=reviewPath({...story,publishing:{...story.publishing,postIds:['existing-id']}});assert.equal(recorded.next.key,'handoff');assert.ok(recorded.tasks.some(t=>t.key==='source'));
 });
+
+test('per-use Generate Stories prepares an unpaid plan and never falls into a legacy queue/start dispatch',async()=>{
+ const engine={configured:true,readOnly:true,founderPolicy:{mode:'founder_confirmed',enabled:true,state:'available',operations:{caption:true,story:true}}},calls=[],api=async(url,options)=>{calls.push([url,JSON.parse(options.body)]);return {proposal:{id:'saved',state:'prepared'}};};
+ const result=await launchSavedResearch({id:'saved'},{engine,api});assert.equal(result.proposal.state,'prepared');assert.deepEqual(calls,[['/api/research/requests/saved/generation/prepare',{}]]);assert.equal(researchAccess(engine).canStart,true);assert.equal(researchAccess({...engine,founderPolicy:{...engine.founderPolicy,state:'inactive'}}).canStart,false);assert.equal(researchAccess({...engine,founderPolicy:{...engine.founderPolicy,state:'inactive'}}).canReview,true);
+ const html=discoverySetup({workspace:{engine}});assert.match(html,/no daily request quota/i);assert.match(html,/separate confirmation/);
+});
