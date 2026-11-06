@@ -1,3 +1,9 @@
+# Current checkpoint — Improve with AI request path
+
+[Current operational contract and activation checkpoint](release/V12_CAPTION_PILOT.md). Preserved/resumed work implements source-bound per-action caption requests, a disabled-by-default pilot policy, durable reservations/limits, exact delivery and manual draft application. Local retained-data simulations and desktop/mobile review are distinct from real new generation or hosted use. The same worker patch is prepared, not installed; no live grant, activation, paid call, deployment or Buffer action. Earlier sections retain dated history.
+
+---
+
 # Current checkpoint — editorial workspace overhaul
 
 [Current report and next functional milestone](release/V12_EDITORIAL_WORKSPACE.md). Local, undeployed improvements replace the confusing caption controls with Edit / Improve with AI / Compare drafts, unify Develop/caption, keep sources close and clarify Review. Real retained Marcie/Truman browser journeys preserve existing copy, history, image order and provenance through restart. Baseline303566f is the last deployed code; this sprint performs no paid call, live mutation or deployment. Earlier sections below are historical checkpoints.

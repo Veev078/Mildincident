@@ -31,7 +31,7 @@ const CONTENT_TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; 
 
 function json(response, status, value) {
   response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
-  response.end(JSON.stringify(value));
+  response.end(JSON.stringify(value,(key,v)=>key==='captionImprovement'&&v?.version===1?{protocol:'caption_improvement_v1',direction:v.direction,requestId:v.requestId}:key==='authorization'&&v?.maxRuns===1?{maxRuns:1,expiresAt:v.expiresAt}:v));
 }
 
 async function body(request,maxSize=128*1024) {
@@ -60,7 +60,8 @@ async function imageBody(request) {
   return Buffer.concat(chunks);
 }
 
-export function createWorkspaceServer({ source, drafts, previews, research, engine, photography=research?new PhotographyService(research):null, founderReviews=research?new FounderReviewStore(research):null, feeds=research?new PublicationFeeds(research):null, access=null,backups=null,delivery=null,serverFactory=http.createServer, webRoot = WEB_ROOT }) {
+export function createWorkspaceServer({ source, drafts, previews, research, engine, captionPilot=null, photography=research?new PhotographyService(research):null, founderReviews=research?new FounderReviewStore(research):null, feeds=research?new PublicationFeeds(research):null, access=null,backups=null,delivery=null,serverFactory=http.createServer, webRoot = WEB_ROOT }) {
+  if(captionPilot&&engine)engine.captionPilot=captionPilot;
   const themes=research?new StudioThemes(research):null;
   const view = () => {
     const workspace = source.snapshot?source.view(drafts.all()):buildWorkspace({records:Object.fromEntries(Object.keys(WORKSPACE_TABLES).map(k=>[k,[]])),buffer:{posts:[],complete:false,observedAt:null},observedAt:new Date().toISOString(),warnings:[]});
@@ -118,6 +119,12 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       if(backupRoute&&request.method==='GET'){requireThat(access&&backups,'BACKUP_UNAVAILABLE','Hosted backups are unavailable.');const backupId=backupRoute[1]==='latest'?backups.status().id:backupRoute[1];requireThat(backupId,'BACKUP_UNAVAILABLE','No verified backup is available yet.');const stream=await backups.archive(backupId);response.writeHead(200,{'Content-Type':'application/gzip','Content-Disposition':'attachment; filename="mildincident-private-backup-'+backupRoute[1]+'.tar.gz"'});await pipeline(stream,response);return;}
       const continuationRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/photo-research$/);
       if(continuationRoute&&request.method==='POST'){requireThat(research,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request),workspace=view(),story=workspace.stories.find(s=>s.id===decodeURIComponent(continuationRoute[1]));const saved=research.createPhotoContinuation(story,input,workspace.stories);json(response,201,{request:saved,scope:'private_research_only',networkRequests:0,paidCalls:0,productionApplied:false});return;}
+      if(url.pathname==='/api/generation/disable'&&request.method==='POST'){requireThat(captionPilot,'CAPTION_POLICY_DISABLED','No pilot policy is configured.');requireThat(Object.keys(await body(request)).length===0,'INVALID_CAPTION_REQUEST','Disable future starts without other changes.');json(response,200,{pilot:captionPilot.disable(),productionApplied:false});return;}
+      const captionAction=url.pathname.match(/^\/api\/stories\/([^/]+)\/caption\/(prepare|confirm)$/);
+      if(captionAction&&request.method==='POST'){
+        requireThat(captionPilot,'CAPTION_POLICY_DISABLED','The caption pilot is not configured.');const id=decodeURIComponent(captionAction[1]),readStory=()=>view().stories.find(s=>s.id===id),story=readStory();requireThat(story,'STORY_NOT_FOUND','Open an existing story.');const input=await body(request);
+        const proposal=captionAction[2]==='prepare'?await captionPilot.prepare(story,input):await captionPilot.confirm(story,input,{readStory});json(response,captionAction[2]==='confirm'?202:201,{proposal,productionApplied:false});return;
+      }
       const captionRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/caption\/(generate|use|versions)$/);
       if(captionRoute&&['GET','POST'].includes(request.method)){
         const story=view().stories.find(s=>s.id===decodeURIComponent(captionRoute[1]));requireThat(story,'STORY_NOT_FOUND','Open an existing story.');if(captionRoute[2]==='versions'){requireThat(request.method==='GET','METHOD_NOT_ALLOWED','Read saved caption versions.');json(response,200,{versions:captionVersions(story,research?.all()||[],drafts)});return;}requireThat(request.method==='POST','METHOD_NOT_ALLOWED','Use the story caption action.');const input=await body(request);
@@ -159,6 +166,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
         requireThat(engine,'ENGINE_NOT_CONFIGURED','Private development engine connection is unavailable.');
         const input=await body(request);let job;
         requireThat(!['queue','start'].includes(engineMatch[2])||engine.client?.connection?.executionScope!=='draft_only','CAPTION_SCOPE_MISMATCH','Use the exact story caption action for a drafting-only authorization.');
+        if(['queue','start'].includes(engineMatch[2]))requireThat(!research.engineJob(engineMatch[1])?.editorialContext?.captionImprovement,'CAPTION_SCOPE_MISMATCH','Confirm policy caption actions through their exact story.');
         if(engineMatch[2]==='queue'){requireThat(input&&Object.keys(input).length===0,'INVALID_RESEARCH_REQUEST','Queue requires only a saved request identity.');job=await engine.queue(engineMatch[1]);}
         else if(engineMatch[2]==='start'){requireThat(input&&Object.keys(input).every(k=>k==='expectedVersion'),'INVALID_RESEARCH_REQUEST','Unsupported start fields.');job=await engine.start(engineMatch[1],input.expectedVersion);}
         else if(engineMatch[2]==='evidence'){requireThat(Object.keys(input).length===0,'INVALID_RESEARCH_REQUEST','Evidence inspection takes no caller URLs or execution IDs.');job=await engine.captureEvidence(engineMatch[1]);}

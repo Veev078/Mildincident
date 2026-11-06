@@ -1,3 +1,16 @@
+# Current V12 checkpoint — operational caption improvement, activation gated
+
+[Implementation, policy and exact native approval checkpoint](V12_CAPTION_PILOT.md). Continues a4a0669. Direction → unpaid review → explicit confirmation → durable one-use grant/reservation → existing queue/native worker → Compare → deliberate Apply is implemented locally and simulated with retained Marcie data. Policy remains disabled by default. No live permission, native change, paid call or deployment.
+
+- Persistent 6-caption / 3-story limits, one in flight, failed/uncertain consumption, exact source/evidence/request binding, request/receipt/usage history and durable disable.
+- Automatic per-action caption authorization implemented; standard story-generation grant renewal remains separate. $2 review threshold is monitored estimated usage, never a hard billing cap.
+- Same native worker requires reviewed combined graph **ea9b5178…** and separately approved activation. It reuses execution 2359 Muse drafting, skips research/fetch for captions and preserves credential/model/settings contracts.
+- Retained Marcie browser simulation covers duplicate confirmation, delivery/Compare/manual Apply, failure, uncertainty and restart/disable; desktop/mobile reviewed. Returned text is explicitly simulated, not new AI output. Hosted verification remains incomplete.
+
+Minimum next approval: release the completed commit, install/activate the exact reviewed worker graph, install a short-lived **one-caption/zero-story** policy and supervise one founder-confirmed drafting-only acceptance; then disable/deactivate/restore. Full recurring pilot still requires separate approval.
+
+---
+
 # Current V12 checkpoint — editorial workspace overhaul
 
 [Founder-facing changes, real retained journeys and next functional milestone](V12_EDITORIAL_WORKSPACE.md). Baseline303566f was deployed before this sprint; **the overhaul is local and undeployed**.

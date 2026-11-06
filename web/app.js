@@ -1,4 +1,5 @@
 import {researchAccess} from './discovery-flow.js';
+import {CAPTION_IMPROVEMENTS,captionRequestProposal,canConfirmCaption} from './caption-request-flow.js';
 import {launchSavedResearch} from './research-launch.js';
 import {DEFAULT_DISCOVERY_PROMPT} from './discovery-request.js';
 import { esc, date, human, storyUrl, effective, mediaFor, proposalContent } from './components.js';
@@ -15,6 +16,7 @@ const reviewContext=form=>Object.fromEntries(['version','revision','working','pr
 const saving = new Set();
 const inFlight = new Map();
 const savePromises = new Map();
+const captionRequestLocks=new Set();
 const history = new Map();
 const timers = new Map();
 const versions = new Map();
@@ -110,6 +112,14 @@ async function loadWorkspace({ quiet = false } = {}) {
         const baseRevision = prior?.draft?.baseRevision || prior?.revision || story.localDraft?.baseRevision;
         story.localDraft = { ...(story.localDraft || {}), ...(prior?.draft || {}), ...changes, baseRevision,
           version: versions.get(story.id) || 0, stale: !baseRevision || baseRevision !== story.revision };
+      }
+    }
+    for(const story of workspace.stories){
+      const proposal=story.captionGeneration?.pilot?.proposal;
+      if(proposal?.state==='completed'&&state.captionRequestedProposals?.[proposal.id]&&state.captionTools?.[story.id]==='improve'){
+        state.captionTools[story.id]='compare';state.captionChoices ||= {};
+        const version=story.captionGeneration?.versions?.find(v=>v.id===proposal.versionId||v.jobId===proposal.jobId||v.candidateId===proposal.resultCandidateId);
+        if(version)state.captionChoices[story.id]=version.id;
       }
     }
     state.loading = false; state.error = null; render();
@@ -825,6 +835,56 @@ document.addEventListener('click',async event=>{
 document.addEventListener('click',async event=>{const button=event.target.closest('[data-organize-story]');if(!button)return;button.disabled=true;try{if(!await flushAllDrafts())throw new Error('Save pending edits first.');const story=storyById(button.dataset.organizeStory),field=button.dataset.field;const result=await api('/api/stories/'+encodeURIComponent(story.id)+'/organization',{method:'PATCH',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({baseRevision:story.revision,expectedVersion:story.organization?.version||0,[field]:!story.organization?.[field]})});story.organization=result.organization;render();toast(field==='archived'?(result.organization.archived?'Story archived. Restore it from Archived stories.':'Story restored.'):(result.organization.pinned?'Story pinned.':'Story unpinned.'));}catch(error){toast(error.message,{error:true});button.disabled=false;}});
 document.addEventListener('change',event=>{if(event.target.id==='story-status'){state.pipelineGroup=event.target.value;render();}if(event.target.id==='story-sort'){state.storySort=event.target.value;render();}if(event.target.id==='story-archive'){state.storyArchive=event.target.value;render();}});
 
+// Plans are unpaid; confirmation consumes one server-owned policy authorization.
+// A local lock protects duplicate clicks; the durable server claim remains authoritative.
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-caption-request]');if(!button||button.disabled)return;
+ const id=button.dataset.story,action=button.dataset.captionRequest;
+ if(captionRequestLocks.has(id))return;
+ captionRequestLocks.add(id);button.disabled=true;state.captionRequestBusy ||= {};state.captionRequestBusy[id]=true;
+ state.captionErrors ||= {};delete state.captionErrors[id];
+ try{
+  if(action!=='disable'&&!await flushAllDrafts())throw new Error('Save pending edits before continuing.');
+  const story=storyById(id);if(!story)throw new Error('Reload this story before continuing.');
+  const path='/api/stories/'+encodeURIComponent(id)+'/caption/';
+  const post=body=>({method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(body)});
+  if(action==='prepare'){
+   const direction=state.captionDirections?.[id]||captionRequestProposal(story,state)?.direction||'concise';
+   if(!Object.hasOwn(CAPTION_IMPROVEMENTS,direction))throw new Error('Choose a supported improvement direction.');
+   state.captionRequestKeys ||= {};const binding=JSON.stringify([id,story.revision,story.localDraft?.version||0,direction]);
+   const previous=captionRequestProposal(story,state);if(['completed','failed','rejected','expired'].includes(previous?.state))delete state.captionRequestKeys[binding];
+   const idempotencyKey=state.captionRequestKeys[binding] ||= crypto.randomUUID();
+   const result=await api(path+'prepare',post({sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,direction,idempotencyKey}));
+   if(!result.proposal?.id)throw new Error('The request plan was not confirmed. No AI has been started.');
+   state.captionProposals ||= {};state.captionProposals[id]=result.proposal;
+   state.captionTools ||= {};state.captionTools[id]='improve';
+   announce('Request prepared for review. No AI has started.');
+  }else if(action==='confirm'){
+   const proposal=captionRequestProposal(story,state);
+   if(!proposal||proposal.id!==button.dataset.proposal||!canConfirmCaption(story,proposal))throw new Error('This request is no longer ready to confirm. Review a current plan first.');
+   state.captionRequestedProposals ||= {};state.captionRequestedProposals[proposal.id]=true;
+   state.captionProposals ||= {};state.captionProposals[id]={...proposal,state:'uncertain',canConfirm:false,message:'Confirmation sent. Waiting for its recorded outcome; do not submit again.'};
+   render();
+   const result=await api(path+'confirm',post({proposalId:proposal.id,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,confirm:true}));
+   if(result.proposal)state.captionProposals[id]=result.proposal;
+   await loadWorkspace({quiet:true});announce('Caption request confirmed once. Your working copy is preserved.');
+  }else if(action==='compare'){
+   const proposal=captionRequestProposal(story,state),result=await api(path+'versions');
+   state.captionVersions ||= {};state.captionVersions[id]=result.versions;
+   state.captionTools ||= {};state.captionTools[id]='compare';state.captionChoices ||= {};
+   const version=result.versions?.find(v=>v.id===proposal?.versionId||v.jobId===proposal?.jobId||v.candidateId===proposal?.resultCandidateId);
+   if(version)state.captionChoices[id]=version.id;
+  }else if(action==='disable'){
+   await api('/api/generation/disable',post({}));await loadWorkspace({quiet:true});
+   state.captionProposals ||= {};delete state.captionProposals[id];announce('Future AI starts disabled. Accepted work may still finish.');
+  }
+ }catch(error){
+  state.captionErrors[id]=action==='confirm'?error.message+' Check the recorded outcome; this request will not be resent automatically.':error.message;
+ }finally{
+  captionRequestLocks.delete(id);state.captionRequestBusy[id]=false;button.disabled=false;render();
+ }
+});
+
 // Existing version selection is a private edit; new model calls use a separately approved binding.
 document.addEventListener('click',async event=>{
  const button=event.target.closest('[data-caption-operation]');if(!button||button.disabled)return;button.disabled=true;
@@ -853,7 +913,7 @@ document.addEventListener('click',async event=>{
 });
 document.addEventListener('change',event=>{
  const select=event.target;if(select.matches('[data-caption-choice]')){state.captionChoices ||= {};state.captionChoices[select.dataset.captionChoice]=select.value;render();}
- if(select.matches('[data-caption-direction]')){state.captionDirections ||= {};state.captionDirections[select.dataset.captionDirection]=select.value;render();}
+ if(select.matches('[data-caption-direction]')){state.captionDirections ||= {};state.captionDirections[select.dataset.captionDirection]=select.value;state.captionProposals ||= {};delete state.captionProposals[select.dataset.captionDirection];render();document.querySelector('#caption-improvement-direction')?.focus({preventScroll:true});}
 });
 
 // Download only after all pending edits have saved; this packet does not import or approve anything.

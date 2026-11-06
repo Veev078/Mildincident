@@ -104,10 +104,11 @@ export class LocalResearchStore {
     }catch(error){this.db.exec(outer?'ROLLBACK':'ROLLBACK TO engine_state');if(!outer)this.db.exec('RELEASE engine_state');throw error;}
   }
   authorizationRemaining(authorization){if(!authorization||authorization.maxRuns!==1||Date.parse(authorization.expiresAt)<=Date.now())return 0;return Math.max(0,1-this.db.prepare("SELECT COUNT(*) AS n FROM research_engine_events WHERE state='dispatching' AND json_extract(data_json,'$.authorization.id')=?").get(authorization.id).n);}
-  claimEngineDispatch(id,version,dispatchId,authorization=null){
+  claimEngineDispatch(id,version,dispatchId,authorization=null,{beforeClaim}={}){
     this.db.exec('BEGIN IMMEDIATE');try{
       const previous=this.engineJob(id);requireThat(previous?.state==='queued'&&!previous.dispatchId&&!previous.receiptExecutionId&&!previous.executionId,'ENGINE_ALREADY_DISPATCHED','Only an undispatched queued job can start. Reconcile existing work.');
       if(authorization)requireThat(this.authorizationRemaining(authorization)>0,'RESEARCH_AUTHORIZATION_EXHAUSTED','The approved research run is spent or expired. Check its result; a new run needs separate authorization.');
+      beforeClaim?.();
       const job=this.recordEngineState(id,'dispatching',{dispatchId,...(authorization?{authorization}: {})},version);this.db.exec('COMMIT');return job;
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
