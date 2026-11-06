@@ -7,7 +7,7 @@ const state={workspace:{hosted:true},compared:[]};
 const make=()=>buildWorkspace(workspaceSnapshot()).stories[0];
 test('opening a story keeps photographs, caption, direction and review in one existing working copy',()=>{
  const story=make(),before=JSON.stringify(story),html=storyWorkspace(state,story,'overview');
- for(const marker of ['develop-workspace','develop-lead-image','aria-label="Selected photographs"','aria-label="Local caption draft"','aria-label="Your direction"','data-story-task="caption"','data-action="rehearse-story"','data-action="make-opening"'])assert.ok(html.includes(marker),marker);
+ for(const marker of ['caption-workbench','writing-hero','caption-contact-sheet','aria-label="Local caption draft"','aria-label="Your direction"','data-story-task="caption"','Arrange sequence','Review photographs'])assert.ok(html.includes(marker),marker);
  assert.ok(html.includes(story.caption));assert.ok(html.includes('data-asset="asset-2"'));assert.ok(!html.includes('Choose one narrative hook'));
  assert.equal(JSON.stringify(story),before);
 });
@@ -19,5 +19,5 @@ test('the simple direction uses retained creative notes and never rewrites sourc
 });
 test('source changes disable all working-copy inputs and sequence actions without losing text',()=>{
  const story=make();story.localDraft={stale:true,caption:'Retained caption',creativeBrief:{notes:'Retained direction'}};
- const html=storyWorkspace(state,story,'overview');assert.match(html,/id="caption-editor"[^>]*disabled/);assert.match(html,/id="founder-direction"[^>]*disabled/);assert.match(html,/data-action="make-opening"[^>]*disabled/);assert.ok(html.includes('Retained caption'));assert.ok(html.includes('Retained direction'));assert.ok(html.includes('Compare source and local draft'));
+ const html=storyWorkspace(state,story,'overview');assert.match(html,/id="caption-editor"[^>]*disabled/);assert.match(html,/id="founder-direction"[^>]*disabled/);assert.match(storyWorkspace(state,story,'carousel'),/data-action="move-slide"[^>]*disabled/);assert.ok(html.includes('Retained caption'));assert.ok(html.includes('Retained direction'));assert.ok(html.includes('Compare source and local draft'));
 });

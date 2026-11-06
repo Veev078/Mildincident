@@ -21,7 +21,7 @@ test('three story activities retain every existing deep link without numbered cr
 test('story overview leads with actual references and preserves private notes, working caption and source details',()=>{
  const original=story();original.localDraft={version:1,caption:'Working caption stays preserved',notes:'An unfinished angle'};
  const html=storyWorkspace(state,original,'overview');
- assert.ok(html.indexOf('class="develop-visual')<html.indexOf('class="develop-editor'));
+ assert.ok(html.includes('class="writing-hero"'));assert.ok(html.includes('caption-workbench'));
  assert.ok(html.includes('aria-label="Local caption draft"'));assert.ok(html.includes('aria-label="Your direction"'));
  assert.match(html,/An unfinished angle/);assert.match(html,/Working caption stays preserved/);
  assert.match(html,/Story details &amp; version history|Story details & version history/);
@@ -29,7 +29,7 @@ test('story overview leads with actual references and preserves private notes, w
  assert.match(html,/No preview available|https:\/\/example.org\/thumb/);
  assert.ok(!html.includes('Image verified'));
  original.media=[];original.selectedAssetIds=[];
- const missing=storyWorkspace(state,original,'overview');assert.match(missing,/No image references are attached/);assert.ok(!missing.includes('<img '));
+ const missing=storyWorkspace(state,original,'overview');assert.match(missing,/No photographs selected yet/);assert.ok(!missing.includes('<img '));
 });
 
 test('clearer story journey retains stale-edit, permission and existing-provider boundaries',()=>{
@@ -37,9 +37,9 @@ test('clearer story journey retains stale-edit, permission and existing-provider
  const stale=storyWorkspace(state,original,'caption');assert.match(stale,/Compare source and local draft/);assert.match(stale,/id="caption-editor"[^>]*disabled/);
  original.localDraft=null;original.publishing.requiresReview=true;
  const action=nextAction(original);assert.equal(action.tab,'publishing');assert.equal(action.label,'Review existing activity');
- const production=storyWorkspace(state,original,'publishing');assert.match(production,/Your post/);assert.match(production,/earlier publishing record/);assert.match(production,/Studio does not send or schedule/);
+ const production=storyWorkspace(state,original,'publishing');assert.match(production,/Your post/);assert.match(production,/Review the existing publishing record/);assert.match(production,/Studio does not transfer, approve, send or schedule/);
 });
 
 test('Develop keeps the explicitly selected cover even when another reference has an available preview',()=>{
- const s=story();s.media=[{id:'chosen',creator:'Chosen photographer',previewUrl:''},{id:'other',creator:'Other photographer',previewUrl:'https://example.org/other.jpg'}];s.selectedAssetIds=['chosen'];s.localDraft=null;const html=storyWorkspace(state,s,'overview');const hero=html.split('develop-lead-image')[1].split('develop-sequence')[0];assert.ok(hero.includes('Chosen photographer'));assert.ok(!hero.includes('Other photographer'));assert.ok(!hero.includes('https://example.org/other.jpg'));
+ const s=story();s.media=[{id:'chosen',creator:'Chosen photographer',previewUrl:''},{id:'other',creator:'Other photographer',previewUrl:'https://example.org/other.jpg'}];s.selectedAssetIds=['chosen'];s.localDraft=null;const html=storyWorkspace(state,s,'overview');const hero=html.split('writing-hero')[1].split('writing-credit')[1].split('caption-contact-sheet')[0];assert.ok(hero.includes('Chosen photographer'));assert.ok(!hero.includes('Other photographer'));assert.ok(!hero.includes('https://example.org/other.jpg'));
 });

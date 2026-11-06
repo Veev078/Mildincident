@@ -1,3 +1,9 @@
+# Current checkpoint — editorial workspace overhaul
+
+[Current report and next functional milestone](release/V12_EDITORIAL_WORKSPACE.md). Local, undeployed improvements replace the confusing caption controls with Edit / Improve with AI / Compare drafts, unify Develop/caption, keep sources close and clarify Review. Real retained Marcie/Truman browser journeys preserve existing copy, history, image order and provenance through restart. Baseline303566f is the last deployed code; this sprint performs no paid call, live mutation or deployment. Earlier sections below are historical checkpoints.
+
+---
+
 # Current checkpoint — V12 product integration
 
 [Current evidence, issue inventory and gated roadmap](release/V12_PRODUCT_INTEGRATION.md). Real native acceptance2359 generated a source-grounded caption/three hooks before this sprint; worker subsequently restored inactive. Current changes improve Discover-to-caption handoff, in-editor evidence and usage accounting. Hosted Render remains Build F81a0ca2. Photography, ongoing spending and approval-to-Buffer gates are still open. No new paid run, native change or deployment occurred in this sprint. Older sections below retain dated history.

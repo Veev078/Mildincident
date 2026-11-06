@@ -1,3 +1,17 @@
+# Current V12 checkpoint — editorial workspace overhaul
+
+[Founder-facing changes, real retained journeys and next functional milestone](V12_EDITORIAL_WORKSPACE.md). Baseline303566f was deployed before this sprint; **the overhaul is local and undeployed**.
+
+- One shared editor for Develop/caption; Edit / Improve with AI / Compare drafts; adaptive copy height and adjacent save state.
+- Actual text differences, distinct-text draft choices and deliberate version reuse preserve history/provenance/order. Captured sources stay beside writing.
+- Post preview plus five honest preparation/approval areas; Download review copy remains a download, not approval or Buffer transfer.
+- Real retained Marcie2353/2355 and Truman Review verified in isolated stores, including edit/compare/reuse/source/photo/Review/refresh/restart and desktop/mobile.
+- Caption/Generate Stories remain separately authorized native operations. Repeatable per-action policy/renewal, photography rights/identity, native approval import and publishing remain open. No paid call, live grant/native mutation or deployment in this sprint.
+
+Next functional sprint: request-scoped, founder-confirmed caption improvements under an explicitly approved pilot allowance, reusing retained research and the existing worker. Current exact single-run binding must not be generalized implicitly.
+
+---
+
 # Current V12 checkpoint — product integration
 
 November 5, 2026 (America/New_York). [Current integration report and UX inventory](V12_PRODUCT_INTEGRATION.md) supersede the historical readiness statements below.

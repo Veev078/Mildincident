@@ -4,12 +4,12 @@ const story={id:'CON-CAPTION-FIXTURE',title:'Synthetic caption story',hook:'A so
 test('caption workbench retains the working editor contract and shows actual selected photographs in saved order',()=>{
  const working={...story,localDraft:{version:3,caption:'Working caption\nSecond paragraph',selectedAssetIds:['frame-b','frame-a']}};const before=JSON.stringify(working);
  const html=captionWorkspace({workspace:{hosted:true}},working,{renderChecks:()=>'<p>Existing checks preserved</p>'});
- assert.match(html,/id="caption-editor" aria-label="Local caption draft" data-draft-field="caption"/);assert.match(html,/Working caption\nSecond paragraph/);assert.match(html,/data-action="copy-caption"/);assert.match(html,/Autosaves privately/);assert.match(html,/Existing checks preserved/);assert.match(html,/Original source caption/);
- assert.ok(html.indexOf('data-asset="frame-b"')<html.indexOf('data-asset="frame-a"'));assert.match(html,/No preview available/);assert.match(html,/Preview availability does not establish identity or image rights/);assert.equal(JSON.stringify(working),before);
+ assert.match(html,/id="caption-editor" aria-label="Local caption draft" data-draft-field="caption"/);assert.match(html,/Working caption\nSecond paragraph/);assert.match(html,/data-action="copy-caption"/);assert.match(html,/Saved privately/);assert.match(html,/Existing checks preserved/);assert.match(captionWorkspace({captionTools:{[story.id]:'compare'}},working).replace(/<[^>]*>/g,''),/Original source caption/);
+ assert.ok(html.indexOf('data-asset="frame-b"')<html.indexOf('data-asset="frame-a"'));assert.match(html,/No preview available/);assert.match(html,/Image identity and rights still need review/);assert.equal(JSON.stringify(working),before);
 });
 test('caption context deduplicates safe source links and preserves empty, stale and publication boundaries',()=>{
  const html=captionWorkspace({}, {...story,selectedAssetIds:[],localDraft:{caption:'',selectedAssetIds:[],stale:true}});
- assert.equal((html.match(/href="https:\/\/example.org\/source"/g)||[]).length,1);assert.ok(!html.includes('javascript:'));assert.match(html,/No photographs selected yet/);assert.match(html,/Choose your images/);assert.match(html,/rows="13" disabled/);assert.match(html,/does not approve or publish/);
+ assert.equal((html.match(/href="https:\/\/example.org\/source"/g)||[]).length,1);assert.ok(!html.includes('javascript:'));assert.match(html,/no photograph selected/);assert.match(html,/Review photographs/);assert.match(html,/id="caption-editor"[^>]*disabled/);assert.match(html,/does not approve or publish/);
  assert.ok(!html.includes('src="https://example.org/frame-b.jpg"'));
 });
 test('caption length and internal-marker warnings remain accurate and stored text stays escaped',()=>{

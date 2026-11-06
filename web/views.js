@@ -2,7 +2,6 @@ import {creativeProgress,organizeStories} from './story-progress.js';
 import {postReview} from './post-review.js';
 import {reviewPath,storyStep} from './review-path.js';
 import {developWorkspace} from './develop.js';
-import {captionWorkspace} from './caption.js';
 import {musicIntentView,musicIntentFor} from './music.js';
 import { matchesEditorialReview, editorialReviewFilter, esc, human, date, safeUrl, storyUrl, effective, workingStory, mediaFor, leadPhoto, badge, stateLabel, nextAction, image, empty, external, sectionHeading, storyCard, blockers, draftNotice, fieldDisabled, proposalControl } from './components.js';
 import { directionView, creativeBriefSummary } from './direction.js';
@@ -43,11 +42,11 @@ const storyStages = [
 ];
 export function storyWorkspace(state, story, tab) {
   story = workingStory(story);
-  const content = { overview: storyOverview, direction: directionView, research: storyResearch, images: storyImages, carousel: storyCarousel, caption: storyCaption, music: storyMusic, publishing: storyPublishing };
+  const content = { overview: storyOverview, direction: directionView, research: storyResearch, images: storyImages, carousel: storyCarousel, caption: storyOverview, music: storyMusic, publishing: storyPublishing };
   if (!content[tab]) tab = 'overview';
   const status = stateLabel(story),step=storyStep(story,tab),stage=storyStages.find(item=>item.includes.includes(tab));
   return `<a class="back-link" href="#/stories">← All stories</a><div class="story-heading"><div><p class="eyebrow">${esc(story.subject || 'Editorial story')}</p><h1>${esc(story.title)}</h1><div class="story-meta">${badge(step.state, status.tone)}<span>${esc(human(story.format))}</span></div></div>${tab==='publishing'||step.tab===tab||step.tab==='caption'&&tab==='overview'?'':`<a class="button button-dark story-next-step" href="${storyUrl(story.id,step.tab)}">${esc(step.label)} →</a>`}</div>
-    ${draftNotice(story)}<nav class="story-stages story-activities" aria-label="Story stages"><span class="story-stage-context">${esc(story.title)}</span>${storyStages.map(item=>`<a href="${storyUrl(story.id,item.tab)}" ${item===stage?'aria-current="page"':''}>${item.label}</a>`).join('')}</nav>
+    ${['overview','caption'].includes(tab)&&!story.localDraft?.stale?'':draftNotice(story)}<nav class="story-stages story-activities" aria-label="Story stages"><span class="story-stage-context">${esc(story.title)}</span>${storyStages.map(item=>`<a href="${storyUrl(story.id,item.tab)}" ${item===stage?'aria-current="page"':''}>${item.label}</a>`).join('')}</nav>
     <div class="story-tools-row">
     <details class="story-record-details system-details"><summary>Story details & version history</summary><p><a class="text-link" href="${storyUrl(story.id,'research')}">Sources & evidence</a> · <a class="text-link" href="${storyUrl(story.id,'music')}">Music & media direction</a></p>${story.recoveryOfStoryId?`<p class="small"><a href="${storyUrl(story.recoveryOfStoryId)}">Original research story →</a> · This recovered version and your edits are preserved separately.</p>`:""}<p class="small muted">Story <code>${esc(story.id)}</code> · ${story.packageVersion?`Production package v${esc(story.packageVersion)}`:'No production package recorded'}. Changes save privately; production records remain separate.</p>${story.origin==='n8n_development'?`<p class="small"><strong>Research proposal</strong> · Execution ${esc(story.engineProvenance?.executionId||'not recorded')}.${story.discoveryPlan?` ${esc(human(story.discoveryPlan.approach))} · ${esc(human(story.discoveryPlan.territory))} · preset ${esc(human(story.discoveryPlan.preset))}.`:''} ${story.generationFormatBasis==='provisional_single_frame_before_drafting'?'Held before drafting; the single-frame placeholder is not a generated format decision. ':''}This is not a production-table record, source verification or publication approval.</p>`:''}<div class="story-header-actions">${proposalControl(story,'Download working copy ↗')}<button class="text-button" data-action="draft-history" data-story="${esc(story.id)}">Version history</button></div></details>
     <details class="story-editorial-checks"><summary>Editorial checks${story.editorialAudit?.issues?.length?` · ${story.editorialAudit.issues.length} to review`:""}</summary><div data-editorial-audit>${editorialAuditNotice(story)}</div></details></div><div class="story-workspace">${content[tab](state, story)}</div>`;
@@ -60,7 +59,7 @@ export function workingReviewSummary(story){
 export function readinessPanel(story){ return postReview(story); }
 
 function storyOverview(state, story) {
- return developWorkspace(state,story,{renderReadiness:workingReviewSummary,renderSourceNotes:existingSourceNotes});
+ return developWorkspace(state,story,{renderSourceNotes:existingSourceNotes,renderChecks:captionChecks});
 }
 
 function selectionReviewPanel(story){
@@ -102,7 +101,6 @@ function storyCarousel(state, story) {
     ${sourceSequenceOptions(story)}<section class="editorial-panel"><h2>The caption beside the sequence</h2><p class="body-copy">${esc(current.caption || 'No caption has been saved.')}</p><a class="text-link" href="${storyUrl(story.id, 'caption')}">Edit the caption →</a></section></div><aside class="workspace-aside"><section class="aside-block"><p class="eyebrow">Carousel review</p><h3>${selected.length}${target ? ` / ${target}` : ''} slides selected</h3><ul class="check-list"><li>${selected.length ? '✓' : '○'} At least one photograph</li><li>${!target || selected.length === target ? '✓' : '○'} ${target ? `${story.localDraft?.targetSlideCount ? 'Working target' : 'Source target'}: ${target} slides` : 'No source slide target recorded'}</li><li>${selected.every(a => a.width === 1080 && a.height === 1350) && selected.length ? '✓' : '○'} 1080 × 1350 dimensions recorded</li><li>${selected.every(a => a.rightsStatus === 'cleared') && selected.length ? '✓' : '○'} Per-image clearance recorded</li></ul><p class="small muted">These are record checks, not a decoded JPG/export verification. Local proposals do not generate or upload files.</p></section><section class="aside-block"><h3>Ready for a considered review.</h3><p>Use the existing n8n export flow after approving the selection. Download your working copy for review.</p>${proposalControl(story, 'Download proposal ↗')}</section></aside>`;
 }
 
-function storyCaption(state,story) { return captionWorkspace(state,story,{renderChecks:captionChecks}); }
 
 export function captionChecks(story) {
   const issues = story.intelligence?.caption?.issues || [];

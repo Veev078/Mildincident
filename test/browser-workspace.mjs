@@ -97,7 +97,7 @@ try {
   await page.goto(`${origin}/#/discovery`);assert.equal(await page.locator('[data-photo-hunt]').count(),0);checks.push('Discover omits the removed photographic research desk; backend source records remain available');
 
   const id = snapshot.records.stories[0].concept_id;
-  await page.goto(`${origin}/#/story/${id}/publishing`);await page.getByRole('heading',{name:'Your post',exact:true}).waitFor();
+  await page.goto(`${origin}/#/story/${id}/publishing`);await page.getByRole('heading',{name:'Review the story.',exact:true}).waitFor();
   const packet=await (await page.request.get(origin+'/api/stories/'+id+'/production-packet')).json();assert.equal(packet.productionApplied,false);assert.equal(packet.publicationApproved,false);assert.equal(packet.bufferCreateEnabled,false);assert.equal(packet.nativeImportCheck.accepted,false);checks.push('post review shows the selected sequence while the existing backend packet keeps native handoff blocked');
   await page.goto(`${origin}/#/pipeline`);
   await page.getByRole('searchbox', { name: 'Find a story', exact: true }).fill('nothing-matches-this');
@@ -108,7 +108,7 @@ try {
   checks.push('global search filters existing story rows and has an honest empty state');
 
   await page.goto(`${origin}/#/story/${id}/overview`);
-  await page.getByText('Direction, music & working notes',{exact:true}).click();await page.getByRole('heading', { name: 'Source notes', exact: true }).waitFor();
+  await page.getByText('Story direction & private notes',{exact:true}).click();await page.getByRole('heading', { name: 'Source notes', exact: true }).waitFor();
   assert.ok((await page.locator('.existing-source-notes').textContent()).includes('synthetic test fixture'));
   checks.push('existing n8n editorial notes stay visible and separate from local edits');
   await page.goto(`${origin}/#/story/${id}/caption`);

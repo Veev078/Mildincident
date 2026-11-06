@@ -77,6 +77,7 @@ function render({ focusMain = false } = {}) {
   const warnings = source.warnings || [];
   const connection = `<details class="connection-details"><summary><i class="status-dot ${source.stale||warnings.length?'stale':''}" aria-hidden="true"></i>Connection status${source.stale?' · cached':''}</summary><div class="connection-panel"><div class="source-bar"><span>${source.kind==='live_snapshot'?'Connected':source.kind?human(source.kind):'Connecting'}${source.observedAt?`<small>Updated ${esc(date(source.observedAt))} ET</small>`:''}</span><button class="text-button" data-action="refresh" ${source.refreshing?'disabled':''}>${source.refreshing?'Checking…':'Check for updates ↻'}</button></div>${warnings.length?`<ul class="source-warnings">${warnings.map(w=>`<li>${esc(typeof w==='string'?w:w.message||w.code)}</li>`).join('')}</ul>`:''}</div></details>`;
   document.querySelector('#app').innerHTML = `<div class="app-shell"><aside class="sidebar"><a class="masthead" href="#/today" aria-label="MILDINCIDENT Today">MILDINCIDENT<span>Independent visual culture</span></a><div class="sidebar-label">Your publication</div><nav class="primary-nav" aria-label="Main navigation">${nav.map(([id,url,label,num])=>`<a href="#/${url}" ${active===id?'aria-current="page"':''}><span>${num}</span>${label}${id==='pipeline'?`<small>${count}</small>`:''}</a>`).join('')}</nav><div class="sidebar-foot"><details class="sidebar-tools"><summary>Studio tools</summary>${state.workspace?.hosted?`<button class="text-button" data-hosted-backup>Download private backup</button><p class="small">${state.workspace.backupStatus?.lastSuccess?'Backup verified '+esc(date(state.workspace.backupStatus.lastSuccess))+' ET':'First backup pending'}${state.workspace.backupStatus?.state==='failed'?' · backup needs attention':''}<br>Keep an offsite copy.</p>${state.workspace.backupStatus?.id?'<a class="text-link" href="/api/backups/latest/archive">Download last verified copy</a>':''}`:''}<div class="keyboard-hints"><kbd>/</kbd> Find a story<br><kbd>G</kbd> <kbd>H</kbd> Today</div><a href="https://rickywelch.app.n8n.cloud/webhook/founder-command-center" target="_blank" rel="noopener noreferrer">Original Founder Studio ↗</a></details>${state.workspace?.backupStatus?.state==='failed'?'<p class="error-text" role="status">Backup needs attention — open Studio tools.</p>':''}<span class="edition-mark">M / I</span></div></aside><div class="workspace-shell"><header class="topbar"><div class="breadcrumb"><span>MILDINCIDENT</span><span aria-hidden="true">/</span><strong>${esc(viewTitle)}</strong></div><label class="global-search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" placeholder="Find a story…" value="${esc(state.search)}" aria-label="Find a story"><kbd>/</kbd></label>${connection}${state.workspace?.hosted?'<form method="post" action="/auth/logout" data-hosted-logout><button class="text-button" type="submit">Sign out</button></form>':''}</header>${libraryNavigation(current.view)}<main id="main-content" tabindex="-1">${body}</main><footer class="workspace-footer"><span>MILDINCIDENT · Independent visual culture</span><span>Editorial work saves privately · publishing requires approval</span></footer></div></div>${state.compared.length?`<div class="compare-tray"><span>${state.compared.length} images to compare</span><button class="button button-dark" data-action="open-comparison" ${state.compared.length<2?'disabled':''}>Compare images →</button><button class="text-button" data-action="clear-comparison">Clear</button></div>`:''}`;
+  resizeCaption();
   if(current.view==='discovery'&&state.focusDiscoverySetup){state.focusDiscoverySetup=false;document.querySelector('#research-direction')?.scrollIntoView({block:'start'});}
   document.title = current.view === 'story' && storyById(current.id) ? `${storyById(current.id).title} — MILDINCIDENT` : `${viewTitle} — MILDINCIDENT`;
   if ((focusMain||state.pendingRouteFocus)&&!state.loading) {state.pendingRouteFocus=false;focusStoryTask();}
@@ -120,6 +121,8 @@ async function loadWorkspace({ quiet = false } = {}) {
     throw error;
   }
 }
+
+function resizeCaption(){const editor=document.querySelector('#caption-editor');if(!editor||editor.closest('[hidden]'))return;editor.style.height='auto';editor.style.height=Math.min(620,Math.max(200,editor.scrollHeight+2))+'px';}
 
 function showSaveStatus(message, isError = false) {
   for (const label of document.querySelectorAll('[data-save-status]')) { label.textContent = message; label.classList.toggle('error-text', isError); }
@@ -536,6 +539,7 @@ document.addEventListener('input', event => {
   if (input.dataset.draftField) {
     editDraft(input.dataset.story, { [input.dataset.draftField]: input.value });
     if (input.dataset.draftField === 'caption') {
+      resizeCaption();
       const characters = [...input.value].length;
       const counter = document.querySelector('[data-caption-count]');
       if (counter) { counter.textContent = `${characters} / 2,200 characters`; counter.classList.toggle('error-text', characters > 2200); }
@@ -761,7 +765,7 @@ document.addEventListener('keydown', event => {
 document.querySelector('#asset-dialog').addEventListener('click', event => {
   if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) event.currentTarget.close(); }
 });
-window.addEventListener('hashchange', () => { document.querySelector('#asset-dialog').close(); state.pendingRouteFocus=true;render({ focusMain: true }); });
+window.addEventListener('hashchange', () => { document.querySelector('#asset-dialog').close(); const next=route();if(next.view==='story'&&['overview','caption'].includes(next.tab)){state.captionTools ||= {};state.captionTools[next.id]='edit';} state.pendingRouteFocus=true;render({ focusMain: true }); });
 window.addEventListener('beforeunload', event => { if (pending.size || saving.size || imageReviewDrafts.size || Object.keys(state.editorialSetupDrafts||{}).length || Object.keys(state.musicIntentDrafts||{}).length || state.researchDraft?.prompt?.trim()) { event.preventDefault(); event.returnValue = ''; } });
 
 render();
@@ -829,16 +833,24 @@ document.addEventListener('click',async event=>{
   const story=storyById(button.dataset.story);if(!story)throw new Error('Reload this story before continuing.');
   const operation=button.dataset.captionOperation,isVersion=operation==='use-version';
   await api('/api/stories/'+encodeURIComponent(story.id)+'/caption/'+(isVersion?'use':operation),{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,...(isVersion?{versionId:button.dataset.version,confirm:'replace_after_review'}:operation==='use'?{candidateId:story.captionGeneration?.result?.candidateId}:{direction:button.dataset.direction||'initial'})})});
+  if(isVersion){state.captionTools ||= {};state.captionTools[story.id]='edit';}
   state.captionErrors ||= {};delete state.captionErrors[story.id];state.captionVersionLoaded ||= {};delete state.captionVersionLoaded[story.id];await loadWorkspace({quiet:true});announce(isVersion?'Caption version saved. Your earlier copy remains in history.':'One caption request sent. Your current caption and photographs are preserved.');
  }catch(error){state.captionErrors ||= {};state.captionErrors[button.dataset.story]=error.message;render();}finally{button.disabled=false;}
 });
-document.addEventListener('toggle',async event=>{
- const details=event.target;if(!details.matches?.('[data-caption-history]')||!details.open)return;
- const id=details.dataset.captionHistory,story=storyById(id);if(!story)return;const key=story.revision+':'+(story.localDraft?.version||0)+':'+(story.captionGeneration?.versions?.length||0);
- state.captionVersionLoaded ||= {};if(state.captionVersionLoaded[id]===key)return;state.captionVersionLoaded[id]=key;
- try{const result=await api('/api/stories/'+encodeURIComponent(id)+'/caption/versions');state.captionVersions ||= {};state.captionVersions[id]=result.versions;render();}
- catch(error){delete state.captionVersionLoaded[id];const status=details.querySelector('[data-caption-history-status]');if(status)status.textContent=error.message;}
-},true);
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-caption-tool]');if(!button||button.disabled)return;
+ const id=button.dataset.story;button.disabled=true;
+ try{
+  if(!await flushAllDrafts())throw new Error('Save your current edits before comparing or improving.');
+  state.captionTools ||= {};state.captionTools[id]=button.dataset.captionTool;
+  if(button.dataset.captionTool==='compare'){
+   const result=await api('/api/stories/'+encodeURIComponent(id)+'/caption/versions');
+   state.captionVersions ||= {};state.captionVersions[id]=result.versions;
+  }
+  state.captionErrors ||= {};delete state.captionErrors[id];render();
+  document.querySelector(button.dataset.captionTool==='edit'?'#caption-editor':button.dataset.captionTool==='compare'?'.caption-comparison h3':'.caption-improvement h3')?.focus({preventScroll:true});
+ }catch(error){state.captionErrors ||= {};state.captionErrors[id]=error.message;render();}finally{button.disabled=false;}
+});
 document.addEventListener('change',event=>{
  const select=event.target;if(select.matches('[data-caption-choice]')){state.captionChoices ||= {};state.captionChoices[select.dataset.captionChoice]=select.value;render();}
  if(select.matches('[data-caption-direction]')){state.captionDirections ||= {};state.captionDirections[select.dataset.captionDirection]=select.value;render();}

@@ -10,13 +10,13 @@ test('readiness groups repeated production requirements while keeping factual, p
  const before=JSON.stringify(s),summary=productionSummary(s);
  assert.deepEqual(summary.groups.map(g=>g.key),['rights','facts','caption']);assert.equal(summary.groups[0].codes.length,2);assert.equal(summary.codes.length,4);
  assert.equal(summary.requirements.find(r=>r.key==='facts').recorded,true);assert.equal(summary.requirements.find(r=>r.key==='rights').recorded,false);assert.equal(summary.requirements.find(r=>r.key==='approval').recorded,false);
- const html=readinessPanel(s);assert.ok(html.includes('Your post'));assert.ok(!html.includes('What blocks production'));assert.ok(html.includes('needs attention'));assert.equal(JSON.stringify(s),before);
+ const html=readinessPanel(s);assert.ok(html.includes('Your post'));assert.ok(!html.includes('What blocks production'));assert.ok(html.includes('Before approval'));assert.equal(JSON.stringify(s),before);
 });
 test('an editorial exception or empty codes cannot masquerade as image permission or publishing authorization',()=>{
  const s=story({production:{package:{rightsStatus:'reviewed',sourceClaimsReviewed:true,finalApprovalStatus:'approved',finalCaption:'The working caption.'}},media:[{id:'a',rightsStatus:'editorial_exception_authorized',nativeRightsReview:{reviewed:true,kind:'recorded_editorial_exception',rightsGranted:false}}]});
  assert.equal(productionSummary(s).requirements.find(r=>r.key==='rights').recorded,false);
  s.media[0].nativeRightsReview.kind='recorded_human_clearance';assert.equal(productionSummary(s).requirements.find(r=>r.key==='rights').recorded,true);
- const summary=productionSummary(s);assert.equal(summary.publicationApproved,false);assert.equal(summary.productionApplied,false);assert.ok(readinessPanel(s).includes('Studio does not send or schedule this post'));
+ const summary=productionSummary(s);assert.equal(summary.publicationApproved,false);assert.equal(summary.productionApplied,false);assert.ok(readinessPanel(s).includes('Studio does not transfer, approve, send or schedule this post'));
 });
 test('existing or uncertain handoff and stale revision remain the first actions while preserving every other recorded check',()=>{
  const s=story({localDraft:{stale:true},production:{blockers:['UNRESOLVED_PROVIDER_RESULT','PER_IMAGE_RIGHTS_PENDING','UNRECOGNIZED_GATE']},productionDecisions:[{key:'claims',title:'Review sources',detail:'Keep this claim-level review.',tab:'research'},{key:'handoff',title:'Resolve previous handoff',detail:'Never retry an ambiguous create.',tab:'publishing'}]});
