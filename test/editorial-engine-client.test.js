@@ -151,3 +151,8 @@ test('publication context freezes with the queued native request and does not be
 test('founder inspection retains a larger captured photographic set rather than silently truncating it to the drafting context',()=>{
  const job='418e3861-610b-400a-9cc6-e0635ce6003d',id='DEV-'+job+'-1';const raw={id,jobId:job,story:{title:'Synthetic photographic series'},media:Array.from({length:24},(_,i)=>({asset_id:'frame-'+i,thumb_url:'https://example.org/frame-'+i+'.jpg',source_page_url:'https://example.org/session'})),provenance:{kind:'discovery',executionId:'1000',generatedAt:new Date().toISOString()}};const candidate=sanitizeDevelopmentCandidate({job_id:job,candidate_id:id,status:'ready_to_review',candidate_json:JSON.stringify(raw)});assert.equal(candidate.media.length,24);assert.equal(candidate.media[23].id,'frame-23');assert.ok(candidate.media.every(p=>p.rightsStatus==='preview_unreviewed'));
 });
+
+test('complete native history reads are not capped at five pages and repeated cursors fail closed without writes',async()=>{
+ const f=fake();let page=0;f.client.verifyTables=async()=>{};f.client.api=async()=>({data:[{id:++page}],nextCursor:page<7?'cursor-'+page:null});assert.equal((await f.client.rows('devjobs')).length,7);assert.equal(f.state.posts,0);
+ f.client.api=async()=>({data:[{id:1}],nextCursor:'stuck'});await assert.rejects(f.client.rows('devjobs'),{code:'ENGINE_SCAN_INCOMPLETE'});assert.equal(f.state.posts,0);
+});

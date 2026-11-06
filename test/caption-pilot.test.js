@@ -228,3 +228,9 @@ test('operation allowlist, changed source binding, durable disable and legacy by
  const r=f.research.create({kind:'discovery',prompt:'An original direction that must stay exact.'},[]);await f.pilot.prepareStory(r.id);f.research.db.prepare('UPDATE research_requests SET prompt=? WHERE id=?').run('A different direction after review.',r.id);await assert.rejects(f.pilot.confirmStory(r.id,{confirm:true}),{code:'EDIT_CONFLICT'});assert.equal(f.state.dispatches,0);
  f.pilot.disable();const next=f.research.create({kind:'discovery',prompt:'A fresh direction while future starts are disabled.'},[]);await f.pilot.prepareStory(next.id);await assert.rejects(f.pilot.confirmStory(next.id,{confirm:true}));assert.throws(()=>f.pilot.guardLegacyStart(next.id),{code:'CAPTION_POLICY_DISABLED'});assert.equal(f.state.dispatches,0);
 });
+
+test('source stories and older caption drafts remain available beyond the recent activity window',async t=>{
+ const f=await fixture(t),source=f.research.create({kind:'brief',prompt:'A retained source story before many later operations.'},[]);f.research.claimEngineQueue(source.id,'a'.repeat(64));f.research.recordEngineState(source.id,'ready_to_review',{executionId:'2353',candidates:[{id:'DEV-'+source.id+'-1',captionDraft:'Retained original caption.'}]});
+ for(let i=0;i<105;i++)f.research.create({kind:'brief',prompt:'A later saved direction number '+i+'.'},[]);
+ assert.equal(f.research.all().length,100);assert.ok(!f.research.all().some(r=>r.id===source.id));assert.ok(f.research.workspaceRequests().some(r=>r.id===source.id));assert.equal(f.research.workspaceRequests().length,101);
+});

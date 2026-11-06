@@ -113,6 +113,7 @@ async function loadWorkspace({ quiet = false } = {}) {
         const baseRevision = prior?.draft?.baseRevision || prior?.revision || story.localDraft?.baseRevision;
         story.localDraft = { ...(story.localDraft || {}), ...(prior?.draft || {}), ...changes, baseRevision,
           version: versions.get(story.id) || 0, stale: !baseRevision || baseRevision !== story.revision };
+        invalidatePreparedApproval(story);
       }
     }
     for(const story of workspace.stories){
@@ -139,11 +140,16 @@ function showSaveStatus(message, isError = false) {
   for (const label of document.querySelectorAll('[data-save-status]')) { label.textContent = message; label.classList.toggle('error-text', isError); }
 }
 
+function invalidatePreparedApproval(story){
+ if(story.approvalRequest)story.approvalRequest={...story.approvalRequest,state:'changed',unchanged:false,nativePreflightAccepted:false,message:'The working copy changed. Your earlier review handoff is preserved; save and prepare the current version before handing it over.'};
+}
+
 function editDraft(id, changes, { rerender = false, immediate = false } = {}) {
   const story = storyById(id);
   if (!story || story.localDraft?.stale) { toast('The source changed. Review and export the existing local proposal before editing.', { error: true }); return; }
   const existing = story.localDraft || {};
   story.localDraft = { ...existing, ...changes, baseRevision: existing.baseRevision || story.revision, version: versions.get(id) || 0, updatedAt: new Date().toISOString() };
+  invalidatePreparedApproval(story);
   pending.set(id, { ...(pending.get(id) || {}), ...changes });
   for (const control of document.querySelectorAll('[data-proposal-for]')) if (control.dataset.proposalFor === id) {
     control.innerHTML = proposalContent(story, control.dataset.proposalLabel, control.dataset.proposalClass);
@@ -195,6 +201,8 @@ async function flushDraft(id) {
       if (result.readiness) current.readiness=result.readiness;
       if(result.productionDecisions)current.productionDecisions=result.productionDecisions;
       if(result.productionPreparation)current.productionPreparation=result.productionPreparation;
+      if(Object.hasOwn(result,'approvalRequest'))current.approvalRequest=result.approvalRequest;
+      if(pending.has(id))invalidatePreparedApproval(current);
       if (result.readiness) {const panel=document.querySelector('[data-readiness-panel]');if(panel&&route().id===id)panel.innerHTML=route().tab==='overview'?views.workingReviewSummary(current):views.readinessPanel(current);}
       if (result.sourceSequencePlan) current.sourceSequencePlan=result.sourceSequencePlan;
       const sequenceIssues = document.querySelector('[data-direction-sequence-issues]');
@@ -343,6 +351,8 @@ async function rebaseDraft(story) {
     if (!Number.isInteger(draft.version)) throw new Error('The source review did not return a new local version.');
     versions.set(story.id, draft.version);
     story.localDraft = { ...draft, ...(pending.get(story.id) || {}) };
+    if(Object.hasOwn(result,'approvalRequest'))story.approvalRequest=result.approvalRequest;
+    if(pending.has(story.id))invalidatePreparedApproval(story);
     if (result.intelligence) story.intelligence = result.intelligence;
     if (result.musicRecommendations) story.musicRecommendations = result.musicRecommendations;
     if (result.editorialDirection) story.editorialDirection = result.editorialDirection;
@@ -795,8 +805,8 @@ document.addEventListener('submit',async event=>{
 document.addEventListener('click',async event=>{
  const button=event.target.closest('[data-photo-continuation]');if(!button)return;button.disabled=true;
  button.dataset.requestKey ||= crypto.randomUUID();
- try{if(!await flushAllDrafts())throw new Error('Save pending edits before preparing image research.');const result=await api('/api/stories/'+encodeURIComponent(button.dataset.story)+'/photo-research',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({intent:button.dataset.photoContinuation,assetId:button.dataset.asset,sourceRevision:button.dataset.revision,workingVersion:Number(button.dataset.working),previewSha256:button.dataset.previewHash,idempotencyKey:button.dataset.requestKey})});
- document.querySelector('#asset-dialog')?.close();await loadWorkspace({quiet:true});announce('Photograph request saved on this story. Retrieval awaits authorization.');
+ try{if(!await flushAllDrafts())throw new Error('Save pending edits before preparing image research.');const result=await api('/api/stories/'+encodeURIComponent(button.dataset.story)+'/photo-research',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({intent:button.dataset.photoContinuation,assetId:button.dataset.asset,sourceRevision:button.dataset.revision,workingVersion:Number(button.dataset.working),previewSha256:button.dataset.previewHash,idempotencyKey:button.dataset.requestKey,photoSource:state.photoSources?.[button.dataset.story]||'commons'})});
+ document.querySelector('#asset-dialog')?.close();await loadWorkspace({quiet:true});announce('Photograph request prepared. Review the archive search on this story.');
  }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
 });
 
@@ -939,4 +949,23 @@ document.addEventListener('click',async event=>{
   await loadWorkspace({quiet:true});toast(disable?'Future AI starts disabled. Accepted work may still finish.':'Story request confirmed once. Check its recorded progress.');
  }catch(error){toast(error.message+(confirm?' Check results; no automatic resubmission was made.':''),{error:true});}
  finally{state.storyConfirmBusy=false;render();}
+});
+
+document.addEventListener('change',event=>{const select=event.target.closest('[data-photo-source]');if(!select)return;state.photoSources ||= {};state.photoSources[select.dataset.photoSource]=select.value;});
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-photo-search]');if(!button||button.disabled)return;const id=button.dataset.story;
+ state.photoSearchBusy ||= {};if(state.photoSearchBusy[id])return;state.photoSearchBusy[id]=true;button.disabled=true;
+ try{if(!await flushAllDrafts())throw new Error('Save pending edits before searching.');const story=storyById(id);
+  const result=await api('/api/stories/'+encodeURIComponent(id)+'/photo-research/'+button.dataset.photoSearch+'/search',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,confirm:true})});
+  await loadWorkspace({quiet:true});toast(result.photoRequest.state==='complete'?'Photograph references saved to this story. Review identity and permissions before selecting.':result.photoRequest.message,{error:result.photoRequest.state!=='complete'});
+ }catch(error){toast(error.message+' No automatic repeat was made.',{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}
+ finally{state.photoSearchBusy[id]=false;render();}
+});
+
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-approval-prepare]');if(!button||button.disabled)return;const id=button.dataset.approvalPrepare;if(captionRequestLocks.has('approval:'+id))return;captionRequestLocks.add('approval:'+id);button.disabled=true;
+ try{if(!await flushAllDrafts())throw new Error('Save pending edits before preparing approval review.');const story=storyById(id);state.approvalKeys ||= {};const binding=JSON.stringify([id,story.revision,story.localDraft?.version||0,story.productionPreparation?.digest]);const key=state.approvalKeys[binding] ||= crypto.randomUUID();
+  const result=await api('/api/stories/'+encodeURIComponent(id)+'/approval-requests',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:key,confirm:'prepare_review_only'})});
+  story.approvalRequest=result.approvalRequest;render();toast('Exact review handoff saved privately. Native approval and publishing remain separate.');
+ }catch(error){toast(error.message,{error:true});}finally{captionRequestLocks.delete('approval:'+id);button.disabled=false;}
 });

@@ -364,8 +364,8 @@ try {
   const requestsBeforePhotoResearch=research.all().length,jobsBeforePhotoResearch=engineFixture.jobs.length;
   await page.getByText('Explore this photograph further',{exact:true}).click();
   await page.getByRole('button',{name:'Investigate this photograph',exact:true}).click();
-  await page.getByText('Photograph request saved',{exact:true}).waitFor();
-  assert.ok(page.url().endsWith('/'+devStoryId+'/images'));await page.getByText('Photograph request saved',{exact:true}).waitFor();const photoRequest=research.all().find(r=>r.continuation);assert.ok(photoRequest);assert.equal(photoRequest.continuation.origin.assetId,'dev-photo-1');assert.equal(photoRequest.continuation.origin.storyId,devStoryId);assert.equal(photoRequest.continuation.routes[0].url,'https://example.org/project');assert.equal(photoRequest.handoffUrl,null);
+  await page.getByText('Ready to search',{exact:true}).waitFor();
+  assert.ok(page.url().endsWith('/'+devStoryId+'/images'));await page.getByText('Ready to search',{exact:true}).waitFor();const photoRequest=research.all().find(r=>r.continuation);assert.ok(photoRequest);assert.equal(photoRequest.continuation.origin.assetId,'dev-photo-1');assert.equal(photoRequest.continuation.origin.storyId,devStoryId);assert.equal(photoRequest.continuation.routes[0].url,'https://example.org/project');assert.equal(photoRequest.handoffUrl,null);
   assert.equal(research.all().length,requestsBeforePhotoResearch+1);assert.equal(engineFixture.jobs.length,jobsBeforePhotoResearch);
   await page.reload();assert.equal(research.get(photoRequest.id).continuation.routes[0].url,'https://example.org/project');assert.equal(await page.locator('[data-research-handoff]').count(),0);
   checks.push('exact-image research preparation retains series directions across reload without a model, queue or legacy-form transfer');

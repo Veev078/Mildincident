@@ -1,4 +1,10 @@
-# Current checkpoint — recurring founder-confirmed AI operations
+# Current checkpoint — operational integration, locally verified
+
+[Completed integration and activation roadmap](V12_OPERATIONAL_INTEGRATION.md). Checkpoint 907233f implements recurring founder-confirmed Generate/Improve with no daily quotas, one shared in-flight slot and durable single-use grants/receipts. The continuation finishes story-bound photographic request/receipt/inspection/arrangement and immutable exact-content Prepare Approval. It preserves caption versions, source/rights evidence and uploaded-byte hashes, invalidating a prepared handoff when the working copy changes. Retained-Marcie desktop/mobile simulations exercise the joined journey, duplicate protection, restart and failed/uncertain outcomes. These are local implementation proofs; earlier real 2359/2360 remain the paid native evidence. Hosted stays 7fdbd32, policy revoked, worker inactive af24832e. New two-node wording/budget refinement graph 0e1777e5… is prepared only. Release, exact worker/standing policy installation, legitimate source access and native approval/Buffer writes remain separate gates.
+
+---
+
+# Earlier checkpoint — recurring founder-confirmed AI operations
 
 [Operational integration and activation plan](V12_OPERATIONAL_INTEGRATION.md). The founder confirms real caption 2360 and hosted preservation/cleanup. This sprint implements recurring per-use caption/story requests with explicit confirmation, no daily quotas, one shared in-flight slot, durable receipts/estimated usage and operator maintenance. Local retained-data browser simulations are distinct from live operation. The recurring policy and native worker remain uninstalled/inactive for this sprint; deployment and paid execution require separate approval.
 

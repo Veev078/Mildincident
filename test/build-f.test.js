@@ -20,6 +20,16 @@ test('caption originals, founder edits and selected-version provenance remain di
  const restored=new LocalDraftStore(root+'/drafts.sqlite');try{const local=restored.get(story.id);assert.deepEqual(local.selectedAssetIds,['frame','cover']);const packet=prepareProductionPacket({...story,localDraft:local});assert.equal(packet.editorial.captionEvidence.editedSinceSelection,true);assert.equal(packet.editorial.captionEvidence.executionId,'100');assert.equal(packet.productionApplied,false);assert.equal(packet.bufferCreateEnabled,false);assert.throws(()=>restored.save(story,{baseRevision:story.revision,expectedVersion:2,captionSource:{executionId:'forged'}}));}finally{restored.close();}
 });
 
+test('Compare keeps a correlated native improvement when captured passages exceed the candidate preview limit',async t=>{
+ const {research,drafts}=await setup(t),story=shape(),job=randomUUID(),passage=story.research[0].capturedTextExcerpt.repeat(10);
+ story.research[0].capturedTextExcerpt=passage;
+ const candidate={id:'DEV-'+job+'-1',jobId:job,status:'needs_research',captionDraft:'A distinct, supported improvement.',claims:[{claim:story.research[0].claim,url:story.research[0].url}],sourceEvidence:[{claimIndex:0,url:story.research[0].url,access:'source_text_captured',textExcerpt:passage.slice(0,1800)}],recovery:{mode:'draft_only',sourceJobId:story.engineJobId,sourceCandidateId:story.engineCandidateId,sourceExecutionId:'100',sourceRevision:story.revision,evidenceSha256:'a'.repeat(64)},provenance:{executionId:'101',generatedAt:new Date().toISOString()}};
+ const requests=[{engineJob:{candidates:[candidate]}}],variants=()=>captionVersions(story,requests,drafts);
+ assert.ok(variants().some(v=>v.candidateId===candidate.id));assert.equal(story.research[0].capturedTextExcerpt,passage);
+ candidate.sourceEvidence[0].textExcerpt='Unrelated evidence';assert.ok(!variants().some(v=>v.candidateId===candidate.id));
+ candidate.sourceEvidence[0].textExcerpt=passage.slice(0,1800);candidate.recovery.sourceExecutionId='999';assert.ok(!variants().some(v=>v.candidateId===candidate.id));
+});
+
 test('hosted private authorization can be read again without a restart; expired files revoke execution while preserving saved work',async t=>{
  const {root,research}=await setup(t),story=shape(),b=bound(story),env={N8N_API_KEY:'synthetic'},config={hosted:true,dataRoot:root};let mutationCalls=0;
  const createClient=({connection})=>({connection,readOnly:connection.mode==='read_only',inspect:async()=>({configured:true,readOnly:connection.mode==='read_only',generationAvailable:connection.generationEnabled===true,generationApproved:connection.generationEnabled===true}),dispatch:()=>mutationCalls++});

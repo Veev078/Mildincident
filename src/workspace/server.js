@@ -1,3 +1,4 @@
+import {ApprovalRequests} from './approval-requests.js';
 import {pipeline} from 'node:stream/promises';
 import {buildWorkspace,WORKSPACE_TABLES} from './model.js';
 import {possibleVariants} from '../photography/fingerprint.js';
@@ -62,12 +63,12 @@ async function imageBody(request) {
 
 export function createWorkspaceServer({ source, drafts, previews, research, engine, captionPilot=null, photography=research?new PhotographyService(research):null, founderReviews=research?new FounderReviewStore(research):null, feeds=research?new PublicationFeeds(research):null, access=null,backups=null,delivery=null,serverFactory=http.createServer, webRoot = WEB_ROOT }) {
   if(captionPilot&&engine)engine.captionPilot=captionPilot;
-  const themes=research?new StudioThemes(research):null;
+  const themes=research?new StudioThemes(research):null,approvalRequests=research?new ApprovalRequests(research):null;
   const view = () => {
     const workspace = source.snapshot?source.view(drafts.all()):buildWorkspace({records:Object.fromEntries(Object.keys(WORKSPACE_TABLES).map(k=>[k,[]])),buffer:{posts:[],complete:false,observedAt:null},observedAt:new Date().toISOString(),warnings:[]});
     if(!source.snapshot)workspace.source={...workspace.source,kind:'disconnected',observedAt:null,bufferObservedAt:null,stale:true,unavailable:true,warnings:['No authoritative production snapshot is available. Private photographic research remains usable; connect n8n/Buffer or restore your private backup to inspect existing stories.'],refreshError:{code:'SOURCE_UNAVAILABLE',message:'Production observations unavailable; no example stories were substituted.'}};
     workspace.hosted=Boolean(access);workspace.backupStatus=backups?.status()||null;
-    workspace.researchRequests = research?.all() || [];
+    workspace.researchRequests = research?.workspaceRequests() || [];
     workspace.researchPresets=themes?themes.catalog(editorialPresetCatalog(source.snapshot)):editorialPresetCatalog(source.snapshot);workspace.studioThemes=themes?.all()||[];
     workspace.aiUsage=captionPilot?.usageSummary?.()||null;
     for(const request of workspace.researchRequests)if(captionPilot)request.generationProposal=captionPilot.storyStatus?.(request.id);
@@ -82,11 +83,13 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     for(const story of workspace.stories){
       story.captionGeneration=engine?.captionStatus(story,workspace.researchRequests)||captionGenerationState(story,workspace.researchRequests,null,{});
       if(story.captionGeneration.result&&!story.hookOptions?.length)story.hookOptions=story.captionGeneration.result.hookOptions;
-      story.photoRequests=workspace.researchRequests.filter(r=>r.continuation?.origin?.storyId===story.id).map(r=>({id:r.id,state:['approved','concept_approved'].includes(story.approvalStatus)?'authorization_required':'approval_required',message:['approved','concept_approved'].includes(story.approvalStatus)?'Request saved. A separately authorized native connection is needed before searching.':'Request saved. Native sourcing is waiting for this story’s existing editorial approval; no search has started.',createdAt:r.createdAt}));
+      const photoRequests=photography?.storyRequestsFor(story)||[];
+      story.photoRequests=[...photoRequests,...workspace.researchRequests.filter(r=>r.continuation?.origin?.storyId===story.id&&!photoRequests.some(p=>p.id===r.id)).map(r=>({id:r.id,state:'authorization_required',message:'Earlier request preserved. Prepare a new exact story request for an archive search; native sourcing still needs separate approval.',createdAt:r.createdAt}))];
+      for(const photo of photography?.storyMedia(story)||[])if(!story.media.some(m=>m.id===photo.id))story.media.push(photo);
     }
-    for(const story of workspace.stories){const result=story.captionGeneration?.result;if(result){const version=workspace.stories.find(s=>s.id===result.storyId);if(version)version.recoveryOfStoryId=story.id;}}
+    for(const story of workspace.stories){if(story.draftRecovery?.sourceJobId){const original='CON-DEV-'+story.draftRecovery.sourceJobId;if(workspace.stories.some(s=>s.id===original))story.recoveryOfStoryId=original;}const result=story.captionGeneration?.result;if(result){const version=workspace.stories.find(s=>s.id===result.storyId);if(version)version.recoveryOfStoryId=story.id;}}
     attachLocalPreviews(workspace,previews);
-    for (const story of workspace.stories) { story.organization=drafts.organization(story.id);story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.sourceSequencePlan = buildSourceSequencePlan(story); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity}; }
+    for (const story of workspace.stories) { story.organization=drafts.organization(story.id);story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.sourceSequencePlan = buildSourceSequencePlan(story); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity};story.approvalRequest=approvalRequests?.status(story)||null; }
     workspace.photoHunts=photography?.all()||[];
     workspace.founderReviews=founderReviews?.all()||{};
     workspace.sourceInputs={publications:feeds?.status()||[],leads:feeds?.list()||[]};
@@ -120,8 +123,19 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       const backupRoute=url.pathname.match(/^\/api\/backups\/([^/]+)\/archive$/);
       if(backupRoute&&request.method==='GET'){requireThat(access&&backups,'BACKUP_UNAVAILABLE','Hosted backups are unavailable.');const backupId=backupRoute[1]==='latest'?backups.status().id:backupRoute[1];requireThat(backupId,'BACKUP_UNAVAILABLE','No verified backup is available yet.');const stream=await backups.archive(backupId);response.writeHead(200,{'Content-Type':'application/gzip','Content-Disposition':'attachment; filename="mildincident-private-backup-'+backupRoute[1]+'.tar.gz"'});await pipeline(stream,response);return;}
       const continuationRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/photo-research$/);
-      if(continuationRoute&&request.method==='POST'){requireThat(research,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request),workspace=view(),story=workspace.stories.find(s=>s.id===decodeURIComponent(continuationRoute[1]));const saved=research.createPhotoContinuation(story,input,workspace.stories);json(response,201,{request:saved,scope:'private_research_only',networkRequests:0,paidCalls:0,productionApplied:false});return;}
+      if(continuationRoute&&request.method==='POST'){requireThat(research,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request),workspace=view(),story=workspace.stories.find(s=>s.id===decodeURIComponent(continuationRoute[1]));const {photoSource,...direction}=input;const saved=research.createPhotoContinuation(story,direction,workspace.stories),photoRequest=photography?.prepareStoryRequest(story,saved,{source:photoSource||'commons'});json(response,201,{request:saved,photoRequest,scope:'private_research_only',networkRequests:0,paidCalls:0,productionApplied:false});return;}
       if(url.pathname==='/api/generation/disable'&&request.method==='POST'){requireThat(captionPilot,'CAPTION_POLICY_DISABLED','No pilot policy is configured.');requireThat(Object.keys(await body(request)).length===0,'INVALID_CAPTION_REQUEST','Disable future starts without other changes.');json(response,200,{pilot:captionPilot.disable(),productionApplied:false});return;}
+      const photoSearch=url.pathname.match(/^\/api\/stories\/([^/]+)\/photo-research\/([a-f0-9-]{36})\/search$/);
+      if(photoSearch&&request.method==='POST'){
+        requireThat(photography,'RESEARCH_UNAVAILABLE','Photographic research is unavailable.');const id=decodeURIComponent(photoSearch[1]),readStory=()=>view().stories.find(s=>s.id===id),story=readStory();requireThat(story,'STORY_NOT_FOUND','Open the original story.');
+        const photoRequest=await photography.searchStoryRequest(story,photoSearch[2],await body(request),{readStory});json(response,200,{photoRequest,productionApplied:false,paidCalls:0});return;
+      }
+      const approvalRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/approval-requests(?:\/([a-f0-9-]{36}))?$/);
+      if(approvalRoute&&['GET','POST'].includes(request.method)){
+        requireThat(approvalRequests,'APPROVAL_UNAVAILABLE','Private native-review preparation is unavailable.');const input=request.method==='POST'?await body(request):null,story=view().stories.find(s=>s.id===decodeURIComponent(approvalRoute[1]));requireThat(story,'STORY_NOT_FOUND','Open an existing story.');
+        if(request.method==='POST'){requireThat(!approvalRoute[2],'INVALID_APPROVAL_REQUEST','Prepare a new immutable review request.');json(response,201,{approvalRequest:approvalRequests.prepare(story,input),productionApplied:false});}
+        else{requireThat(approvalRoute[2],'INVALID_APPROVAL_REQUEST','Choose a prepared review request.');response.setHeader('Content-Disposition','attachment; filename="'+story.id+'-native-review-request.json"');json(response,200,approvalRequests.download(story,approvalRoute[2]));}return;
+      }
       const captionAction=url.pathname.match(/^\/api\/stories\/([^/]+)\/caption\/(prepare|confirm)$/);
       if(captionAction&&request.method==='POST'){
         requireThat(captionPilot,'CAPTION_POLICY_DISABLED','The caption pilot is not configured.');const id=decodeURIComponent(captionAction[1]),readStory=()=>view().stories.find(s=>s.id===id),story=readStory();requireThat(story,'STORY_NOT_FOUND','Open an existing story.');const input=await body(request);
@@ -129,10 +143,10 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       }
       const captionRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/caption\/(generate|use|versions)$/);
       if(captionRoute&&['GET','POST'].includes(request.method)){
-        const story=view().stories.find(s=>s.id===decodeURIComponent(captionRoute[1]));requireThat(story,'STORY_NOT_FOUND','Open an existing story.');if(captionRoute[2]==='versions'){requireThat(request.method==='GET','METHOD_NOT_ALLOWED','Read saved caption versions.');json(response,200,{versions:captionVersions(story,research?.all()||[],drafts)});return;}requireThat(request.method==='POST','METHOD_NOT_ALLOWED','Use the story caption action.');const input=await body(request);
+        const story=view().stories.find(s=>s.id===decodeURIComponent(captionRoute[1]));requireThat(story,'STORY_NOT_FOUND','Open an existing story.');if(captionRoute[2]==='versions'){requireThat(request.method==='GET','METHOD_NOT_ALLOWED','Read saved caption versions.');json(response,200,{versions:captionVersions(story,research?.workspaceRequests()||[],drafts)});return;}requireThat(request.method==='POST','METHOD_NOT_ALLOWED','Use the story caption action.');const input=await body(request);
         if(captionRoute[2]==='generate'){requireThat(engine,'ENGINE_NOT_CONFIGURED','Caption generation requires a separately authorized native connection.');const job=await engine.generateCaption(story,input);json(response,202,{job,scope:'draft_only',productionApplied:false});return;}
         requireThat(input&&Object.keys(input).every(k=>['sourceRevision','workingVersion','candidateId','versionId','confirm'].includes(k))&&!story.localDraft?.stale&&input.sourceRevision===story.revision&&input.workingVersion===(story.localDraft?.version||0),'EDIT_CONFLICT','The story changed. Reload and review the generated caption before using it.');
-        const result=input.versionId?captionVersions(story,research?.all()||[],drafts).find(v=>v.id===input.versionId):story.captionGeneration?.result;
+        const result=input.versionId?captionVersions(story,research?.workspaceRequests()||[],drafts).find(v=>v.id===input.versionId):story.captionGeneration?.result;
         requireThat(result&&(input.versionId||input.candidateId===result.candidateId)&&result.applicable!==false,'INVALID_ENGINE_RESULT','Choose an exact saved version supported by the current source revision.');
         const current=story.localDraft?.caption??story.caption??'';
         requireThat(!current.trim()||input.versionId&&input.confirm==='replace_after_review','CAPTION_ALREADY_SAVED','Review the version and explicitly choose to use it. Your current caption remains in history.');
@@ -245,7 +259,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
           requireThat(current, 'STORY_NOT_FOUND', 'Story was removed from the source snapshot.');
           const draft = drafts.save(current, input);
           const updated = view().stories.find(s => s.id === id);
-          json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, editorialDirection: updated.editorialDirection, editorialAudit:updated.editorialAudit, readiness:updated.readiness, sourceSequencePlan:updated.sourceSequencePlan, productionPreparation:updated.productionPreparation, productionDecisions:updated.productionDecisions, scope: 'local_only', productionApplied: false }); return;
+          json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, editorialDirection: updated.editorialDirection, editorialAudit:updated.editorialAudit, readiness:updated.readiness, sourceSequencePlan:updated.sourceSequencePlan, productionPreparation:updated.productionPreparation, productionDecisions:updated.productionDecisions, approvalRequest:updated.approvalRequest, scope: 'local_only', productionApplied: false }); return;
         }
         if (operation === 'draft/history' && request.method === 'GET') { json(response, 200, { versions: drafts.history(id), scope: 'local_only' }); return; }
         if (operation === 'draft/rebase' && request.method === 'POST') {
@@ -254,7 +268,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
           requireThat(current, 'STORY_NOT_FOUND', 'Story was removed from the source snapshot.');
           const draft = drafts.rebase(current, input);
           const updated = view().stories.find(s => s.id === id);
-          json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, editorialDirection: updated.editorialDirection, editorialAudit:updated.editorialAudit, readiness:updated.readiness, sourceSequencePlan:updated.sourceSequencePlan, productionPreparation:updated.productionPreparation, productionDecisions:updated.productionDecisions, scope: 'local_only', productionApplied: false }); return;
+          json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, editorialDirection: updated.editorialDirection, editorialAudit:updated.editorialAudit, readiness:updated.readiness, sourceSequencePlan:updated.sourceSequencePlan, productionPreparation:updated.productionPreparation, productionDecisions:updated.productionDecisions, approvalRequest:updated.approvalRequest, scope: 'local_only', productionApplied: false }); return;
         }
         if(operation==='production-packet/check'&&request.method==='POST'){const input=await body(request);const current=view().stories.find(s=>s.id===id);requireThat(current,'STORY_NOT_FOUND','Story is no longer available.');json(response,200,validatePacketImport(input.packet,prepareProductionPacket(current)));return;}
         if(operation==='production-packet'&&request.method==='GET'){response.setHeader('Content-Disposition',`attachment; filename="${id}-production-review.json"`);json(response,200,prepareProductionPacket(story));return;}

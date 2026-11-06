@@ -31,6 +31,8 @@ export class LocalResearchStore {
       continuation:JSON.parse(this.db.prepare('SELECT context_json FROM research_continuations WHERE request_id=?').get(row.id)?.context_json||'null'),preset:JSON.parse(this.db.prepare('SELECT preset_json FROM research_presets WHERE request_id=?').get(row.id)?.preset_json||'null'),engineJob:this.engineJob(row.id),executionConfirmed:false,productionApplied:false};
   }
   all(){return this.db.prepare('SELECT id FROM research_requests ORDER BY rowid DESC LIMIT 100').all().map(row=>this.get(row.id));}
+  // Recent activity stays bounded; source stories and saved draft versions must not vanish after 100 new requests.
+  workspaceRequests(){return this.db.prepare(`SELECT r.id FROM research_requests r WHERE r.id IN (SELECT id FROM research_requests ORDER BY rowid DESC LIMIT 100) OR EXISTS(SELECT 1 FROM research_engine_jobs j WHERE j.request_id=r.id AND json_array_length(j.data_json,'$.candidates')>0) ORDER BY r.rowid DESC`).all().map(row=>this.get(row.id));}
   create(input,stories,{reuseDefault=false,preset=null}={}){requireThat(input&&Object.keys(input).every(k=>['kind','prompt','sourceUrl','idempotencyKey'].includes(k)),'INVALID_RESEARCH_REQUEST','Unsupported research request fields.');
     requireThat(['discovery','brief'].includes(input.kind),'INVALID_RESEARCH_REQUEST','Choose discovery or creative brief.');
     const prompt=String(input.prompt||'').trim();requireThat(prompt.length>=12&&prompt.length<=2000&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(prompt),'INVALID_RESEARCH_REQUEST','Use a direction between 12 and 2000 characters.');

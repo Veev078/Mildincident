@@ -1,3 +1,9 @@
+# November 6, 2026 — preserve exact content before native approval
+
+Prepare Approval saves an immutable private request through the existing production packet/preflight contract. Bind exact source/package/caption version, photograph order, source/rights evidence and uploaded-byte hashes; preserve the original request and invalidate its status after edits. Durable aliases cannot be rebound to different content. A development proposal cannot invent a production identity, approval or Buffer claim. Reuse the existing native authority; direct transfer remains separately gated. Story-bound photo receipts use existing adapters and never imply identity, pixel inspection or rights clearance. Local retained-data browser simulations remain distinct from real paid/hosted proof. [Implementation and gates](release/V12_OPERATIONAL_INTEGRATION.md).
+
+---
+
 # November 6, 2026 — recurring founder confirmation, not daily quotas
 
 Version-2 private approval may authorize unlimited manually confirmed caption/story operations, paid per actual use. Preserve version-1 bounded permits; never silently upgrade them. Reuse the same worker, action/grant ledger and exact source/request/graph checks, with one shared in-flight slot and no automatic resubmission. Persistent approval is operator-installed once; the browser can only confirm individual actions or disable future starts. Full recurring live activation remains unapproved in this sprint.

@@ -2,6 +2,9 @@ import {requireThat} from '../errors.js';
 import {separateEditorialCopy} from '../editorial-principles.js';
 
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
+// Native candidate previews are bounded; captured execution evidence keeps the full passage.
+// Compare the same projection without altering the retained packet or its hash.
+export const captionSourceExcerpt=value=>typeof value==='string'?value.slice(0,1800):'';
 /** Operator-installed binding. Never accept a model input, URL or execution ID from the browser. */
 export function validateCaptionBinding(binding,fingerprint){
  const b=binding,r=b?.request;
@@ -15,7 +18,7 @@ export function recoveredDrafts(story,requests){
  if(!story.engineJobId||!story.engineCandidateId||!story.engineProvenance?.executionId)return [];
  return requests.flatMap(r=>(r.engineJob?.candidates||[]).filter(c=>{
   const line=c.recovery;
-  return c.status!=='rejected'&&c.captionDraft?.trim()&&line?.mode==='draft_only'&&line.sourceJobId===story.engineJobId&&line.sourceCandidateId===story.engineCandidateId&&line.sourceExecutionId===story.engineProvenance.executionId&&c.jobId!==story.engineJobId&&/^[a-f0-9]{64}$/.test(line.evidenceSha256)&&c.claims.length===(story.research||[]).length&&c.claims.every((claim,i)=>claim.url===story.research[i].url&&claim.claim===story.research[i].claim)&&(c.sourceEvidence||[]).filter(s=>s.access==='source_text_captured').length===story.research.filter(s=>s.capturedAccess==='source_text_captured').length&&c.sourceEvidence?.every(s=>s.url===story.research[s.claimIndex]?.url&&s.textExcerpt===(story.research[s.claimIndex]?.capturedTextExcerpt||''));
+  return c.status!=='rejected'&&c.captionDraft?.trim()&&line?.mode==='draft_only'&&line.sourceJobId===story.engineJobId&&line.sourceCandidateId===story.engineCandidateId&&line.sourceExecutionId===story.engineProvenance.executionId&&c.jobId!==story.engineJobId&&/^[a-f0-9]{64}$/.test(line.evidenceSha256)&&c.claims.length===(story.research||[]).length&&c.claims.every((claim,i)=>claim.url===story.research[i].url&&claim.claim===story.research[i].claim)&&(c.sourceEvidence||[]).filter(s=>s.access==='source_text_captured').length===story.research.filter(s=>s.capturedAccess==='source_text_captured').length&&c.sourceEvidence?.every(s=>s.url===story.research[s.claimIndex]?.url&&captionSourceExcerpt(s.textExcerpt)===captionSourceExcerpt(story.research[s.claimIndex]?.capturedTextExcerpt));
  }).map(candidate=>({request:r,candidate})));
 }
 

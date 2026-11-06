@@ -162,7 +162,7 @@ export class CaptionPilot{
  async prepareStory(id,input={}){
   requireThat(Object.keys(input).length===0&&uuid(id),'INVALID_RESEARCH_REQUEST','Review one saved discovery request.');
   const existing=this.raw(id);if(existing){requireThat(existing.operation==='story','EDIT_CONFLICT','This identity belongs to another action.');await this.inspect();return this.proposal(existing);}
-  const request=this.research.get(id);requireThat(request&&!request.engineJob&&!request.linkedStoryId,'ENGINE_ALREADY_DISPATCHED','Use a new saved direction; existing or uncertain operations are never resent.');
+  const request=this.research.get(id);requireThat(request&&!request.engineJob&&!request.linkedStoryId&&!request.continuation,'ENGINE_ALREADY_DISPATCHED','Use a new saved direction; existing or uncertain operations are never resent.');
   const editorialContext=this.engine.editorialContext(request),now=this.now();
   const p={id,operation:'story',storyId:'request:'+id,sourceLabel:request.preset?.name||(request.kind==='discovery'?'Surprise Me — current editorial direction':request.prompt),createdAt:new Date(now).toISOString(),expiresAt:new Date(now+20*60000).toISOString(),requestBinding:this.storyBinding(request),editorialContext,requestHash:requestFingerprint({...request,editorialContext})};
   this.research.db.prepare('INSERT OR IGNORE INTO studio_generation_actions VALUES(?,?,?,?,NULL,NULL,?)').run(id,'story:'+id,p.storyId,p.createdAt,JSON.stringify(p));

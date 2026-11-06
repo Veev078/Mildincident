@@ -141,6 +141,7 @@ export function captionReviewSignals(caption) {
   const text=String(caption||'');const issues=[];
   if(/for (?:a |the )?(?:younger|wider|modern) audience|the appeal is|target audience/i.test(text))issues.push({code:'AUDIENCE_PITCH_IN_CAPTION',message:'Move audience-positioning language out of the finished caption.'});
   if(/(?:image details and credits|publication permissions)\s+(?:still\s+)?(?:need|require)\s+(?:verification|review).*before (?:production|publication)/i.test(text))issues.push({code:'INTERNAL_NOTE_IN_CAPTION',message:'Move production verification reminders to private production notes.'});
+  if(/what makes (?:this|the) (?:image|story) (?:idea|concept) (?:strong|compelling)/i.test(text))issues.push({code:'EDITORIAL_PROCESS_IN_CAPTION',message:'Replace commentary about the story idea with the supported observation itself.'});
   if(!text.trim())issues.push({code:'MISSING_CAPTION',message:'A sourced working caption is still needed.'});
   if([...text].length>2200)issues.push({code:'CAPTION_TOO_LONG',message:'The working caption exceeds the Instagram text limit.'});
   if(/\b(?:tag (?:a|your) friend|share (?:this|it) with|drop (?:a |your )?comment|let us know (?:in|below)|what do you think\??|save this (?:post|for later)|you won.t believe)\b/i.test(text))issues.push({code:'FORCED_ENGAGEMENT_IN_CAPTION',message:'Remove forced engagement or clickbait language; let the supported observation carry the caption.'});

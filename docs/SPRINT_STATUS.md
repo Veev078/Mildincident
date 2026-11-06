@@ -1,4 +1,10 @@
-# Current checkpoint — recurring founder-confirmed AI operations
+# Current checkpoint — operational integration, locally verified
+
+[Completed integration and activation roadmap](release/V12_OPERATIONAL_INTEGRATION.md). Preserved checkpoint 907233f adds recurring, explicitly founder-confirmed caption/story operations without daily quotas. The continuation connects story-bound photographic requests/receipts and immutable exact-content approval preparation. Review binds caption/version, ordered images, source/rights evidence and private pixel hashes; later edits invalidate the prepared copy without replacing history. Integrated desktop/mobile testing uses retained Marcie evidence and labeled simulated operations in disposable storage. No new paid result, hosted deployment or live workflow change is claimed. Hosted remains 7fdbd32; worker remains restored inactive af24832e. Proposed refined native graph 0e1777e5… needs separate approval, as do recurring live authorization, source access and any native approval/Buffer writer.
+
+---
+
+# Earlier checkpoint — recurring founder-confirmed AI operations
 
 [Operational integration and activation plan](release/V12_OPERATIONAL_INTEGRATION.md). The founder confirms real caption 2360 and hosted preservation/cleanup. This sprint implements recurring per-use caption/story requests with explicit confirmation, no daily quotas, one shared in-flight slot, durable receipts/estimated usage and operator maintenance. Local retained-data browser simulations are distinct from live operation. The recurring policy and native worker remain uninstalled/inactive for this sprint; deployment and paid execution require separate approval.
 
