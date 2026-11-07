@@ -2,6 +2,7 @@ import {recordedSourceEvidence,providerWebSearchUsage,attributionReviewSignals} 
 import {createHash} from 'node:crypto';
 import {requireThat} from './errors.js';
 import {safePhotoReference} from './n8n/photo-url-guard.js';
+import {storyPhotoIdentity,recordedProjectTrails} from './photography/story-intelligence.js';
 
 /** Self-contained for the n8n Code sandbox. Metadata matching never implies pixel review or rights. */
 export function photoEvidenceTools(publicReference) {
@@ -111,6 +112,8 @@ export function captureEditorialEvidence(execution,{workerId,jobId,requestHash,c
   const scan=nodeItems(data,'Prepare First-Party Page Scan')[0];const page=nodeItems(data,'Fetch First-Party Page Metadata')[0];
   const rawHtml=page?.body??page?.data??'';const context={id:'DEV-'+jobId,subject:candidate.subject,title:candidate.title};const images=scan?inspectPhotoSource(rawHtml,scan.source_page_url,context):[];
   for(let index=0;index<requests.length;index++){if(sources[index]?.access!=='source_text_captured')continue;const response=responses[index]||{};for(const image of inspectPhotoSource(response.body??response.data??'',requests[index].url,context)){if(!images.some(existing=>existing.url===image.url))images.push(image);}}
+  const identity=storyPhotoIdentity({subject:candidate.subject,research:sources.map(s=>({...s,capturedAccess:s.access,capturedTextExcerpt:s.textExcerpt}))}),projectLinks=[];
+  for(let index=0;index<requests.length;index++){if(sources[index]?.access!=='source_text_captured')continue;const response=responses[index]||{};for(const trail of recordedProjectTrails(response.body??response.data??'',requests[index].url,identity))if(!projectLinks.some(p=>p.url===trail.url))projectLinks.push(trail);}
   const additionalMedia=[];
   for(const image of images){const existing=candidate.media.find(m=>m.previewUrl===image.url);if(existing)image.assetId=existing.id;
     else if(image.relation==='subject_caption_match'&&additionalMedia.length<Math.max(0,40-candidate.media.length)){image.assetId=image.id;image.additionalSourceReference=true;additionalMedia.push({id:image.id,title:image.caption.slice(0,180)||'Source image reference',creator:image.creator,sourceUrl:image.sourceUrl,previewUrl:image.url,provider:'captured_source_page_image',rightsStatus:'preview_unreviewed',license:'UNKNOWN — source visibility is not publication permission',width:null,height:null});}}
@@ -133,7 +136,7 @@ export function captureEditorialEvidence(execution,{workerId,jobId,requestHash,c
   const related=images.filter(m=>m.relation==='subject_caption_match'&&m.assetId);
   const target=candidate.format==='single_image'?1:candidate.targetSlideCount||5;
   const selectionProposal={assetIds:related.slice(0,target).map(m=>m.assetId),basis:'source_caption_metadata_match',requiresHumanVisualReview:true};
-  return {executionId:String(execution.id),capturedAt,sources,images,additionalMedia,selectionProposal,usage:{models,inputTokens:complete?measured.reduce((n,m)=>n+m.inputTokens,0):null,outputTokens:complete?measured.reduce((n,m)=>n+m.outputTokens,0):null,price:null,priceVerified:false},fingerprint:digest(JSON.stringify({executionId:execution.id,sourceHashes:sources.map(s=>s.contentHash),images,selectionProposal}))};
+  return {executionId:String(execution.id),capturedAt,sources,images,additionalMedia,projectLinks,selectionProposal,usage:{models,inputTokens:complete?measured.reduce((n,m)=>n+m.inputTokens,0):null,outputTokens:complete?measured.reduce((n,m)=>n+m.outputTokens,0):null,price:null,priceVerified:false},fingerprint:digest(JSON.stringify({executionId:execution.id,sourceHashes:sources.map(s=>s.contentHash),images,projectLinks,selectionProposal}))};
 }
 
 /** Source-independent writing checks; review signals, not an automatic author-quality score. */

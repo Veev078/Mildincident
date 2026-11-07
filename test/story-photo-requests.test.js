@@ -25,3 +25,12 @@ test('forged native receipts and native version/target mismatches cannot become 
  assert.throws(()=>f.service.acceptStoryNativeResult(p.id,{...execution,workflowVersionId:'other'},review,{readStory:()=>f.story}),{code:'INVALID_PHOTO_RECEIPT'});
  const good=f.service.acceptStoryNativeResult(p.id,execution,review,{readStory:()=>f.story});assert.equal(good.executionVerified,true);assert.equal(good.executionId,'700');assert.equal(f.service.storyMedia(f.story)[0].rightsGranted,false);assert.equal(f.service.acceptStoryNativeResult(p.id,execution,review,{readStory:()=>f.story}).photoCount,1);
 });
+
+test('additional pages keep the original query and history, deduplicate references and never replace the carousel',async t=>{
+ const pages=[],f=await setup(t,async(source,query,page)=>{pages.push(page);const first=found(source,query).photos[0];return {photos:page===1?[first]:[first,{...first,id:source+':102',previewUrl:'https://example.org/second.jpg',fileUrl:'https://example.org/second-original.jpg'}],hasMore:page<2};});
+ const p=f.service.prepareStoryRequest(f.story,f.request,{direction:'archive'});await f.service.searchStoryRequest(f.story,p.id,confirm(f.story));
+ const nextRequest=f.research.createPhotoContinuation(f.story,{intent:'alternatives',assetId:'original',sourceRevision:'r1',workingVersion:2,previewSha256:'',idempotencyKey:randomUUID()},[]);
+ const next=f.service.prepareStoryRequest(f.story,nextRequest,{parentId:p.id});assert.equal(next.page,2);assert.equal(next.query,p.query);assert.equal(pages.length,1);
+ const readStory=()=>({...f.story,media:[...f.story.media,...f.service.storyMedia(f.story)]});await Promise.all([f.service.searchStoryRequest(f.story,next.id,confirm(f.story),{readStory}),f.service.searchStoryRequest(f.story,next.id,confirm(f.story),{readStory})]);
+ assert.deepEqual(pages,[1,2]);const result=f.service.storyRequestsFor(f.story)[0];assert.equal(result.newPhotoCount,1);assert.equal(result.duplicateCount,1);assert.equal(result.hasMore,false);assert.equal(f.service.storyMedia(f.story).length,2);assert.deepEqual(f.story.selectedAssetIds,['original']);assert.equal(f.story.caption,'Founder writing remains intact.');
+});

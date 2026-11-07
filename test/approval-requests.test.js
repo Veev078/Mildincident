@@ -9,7 +9,7 @@ test('approval preparation is durable, duplicate-safe, exact and private, withou
 });
 test('caption edits, photo order, preview bytes, source revision and native rights changes invalidate prepared handoff without replacing history',async t=>{
  const f=await setup(t),first=f.store.prepare(f.story,input(f.story)),saved=JSON.stringify(f.store.get(first.id));
- for(const edit of [s=>s.localDraft.caption+=' Changed',s=>s.localDraft.selectedAssetIds.reverse(),s=>s.media[0].localPreview.sha256='c'.repeat(64),s=>s.revision='changed',s=>s.media[0].rightsStatus='cleared']){const s=structuredClone(f.story);edit(s);assert.equal(f.store.status(s).state,'changed');assert.equal(JSON.stringify(f.store.get(first.id)),saved);}
+ for(const edit of [s=>s.localDraft.caption+=' Changed',s=>s.localDraft.selectedAssetIds.reverse(),s=>s.media[0].localPreview.sha256='c'.repeat(64),s=>s.revision='changed',s=>s.media[0].rightsStatus='cleared',s=>s.media[0].sourceCaption='Another photographer and project',s=>s.media[0].localReview={version:1,decision:'reject',reason:'Wrong project for this story.'}]){const s=structuredClone(f.story);edit(s);assert.equal(f.store.status(s).state,'changed');assert.equal(JSON.stringify(f.store.get(first.id)),saved);}
 });
 test('a development story cannot fabricate native identity or carry approval flags through a review request',async t=>{
  const f=await setup(t);f.story.origin='n8n_development';f.story.production={};const p=f.store.prepare(f.story,input(f.story));assert.equal(p.nativeTargetAvailable,false);assert.equal(p.nativePreflightAccepted,false);assert.match(p.message,/development story/);

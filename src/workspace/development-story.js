@@ -40,7 +40,7 @@ export function developmentCandidateStory(candidate,{request=null,soundtrack=[],
   story.production=projectProduction({row:{concept_id:id},records:{packages:[],imports:[],archives:[],exports:[],proofs:[],guardedHandoffs:[]},buffer:{posts:[],complete:false,observedAt:candidate.provenance.generatedAt},observedAt:candidate.provenance.generatedAt,safeUrl:browserUrl});
   story.continuationOf=continuation?{...continuation.origin,intent:continuation.intent}:null;
   story.researchDirection=request?.kind==='brief'?{prompt:request.prompt,sourceUrl:request.sourceUrl,preset:request.preset||request.engineJob?.editorialContext?.preset||null}:null;
-  story.generationUsage=evidence?.usage||null;
+  story.recordedProjectLinks=evidence?.projectLinks||[];story.generationUsage=evidence?.usage||null;
   story.origin='n8n_development';story.engineCandidateId=candidate.id;story.engineJobId=candidate.jobId;story.engineProvenance=candidate.provenance;story.developmentDecision=decision;
   return story;
 }
