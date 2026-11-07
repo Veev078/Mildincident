@@ -51,6 +51,11 @@ test('custom prompts, sources, native identities and legacy requests never merge
  ])assert.notEqual(store.create(input,[],reuse).id,store.create(input,[],reuse).id);
  assert.equal(store.get(legacy.id).id,nativeInput.idempotencyKey);assert.equal(store.all().length,9);
 });
+test('the new founder-brief discovery retains unstarted deduplication across restart without merging identical custom or native requests',async t=>{
+ const {store,filename}=await setup(t),options={reuseDefault:true,editorialDiscovery:true},input={kind:'brief',prompt:DEFAULT_DISCOVERY_PROMPT,idempotencyKey:randomUUID()},baseline=[{id:'retained-story',revision:'r1'}],first=store.create(input,baseline,options),retry={...input,idempotencyKey:randomUUID()};
+ assert.equal(store.create(retry,baseline,options).id,first.id);assert.notEqual(store.create({...input,idempotencyKey:randomUUID()},baseline,reuse).id,first.id);assert.notEqual(store.create({...input,idempotencyKey:randomUUID()},baseline).id,first.id);
+ store.event(first.id,{event:'handoff_requested',expectedVersion:0},baseline);const reopened=new LocalResearchStore(filename);try{assert.equal(reopened.create(retry,baseline,options).id,first.id);assert.notEqual(reopened.create({...input,idempotencyKey:randomUUID()},baseline,options).id,first.id);}finally{reopened.close();}
+});
 
 test('requests with existing events, engine ownership, continuation or engine history cannot be reused',async t=>{
  const {store}=await setup(t);

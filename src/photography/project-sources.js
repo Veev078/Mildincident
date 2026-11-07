@@ -1,7 +1,7 @@
 import {createHash} from 'node:crypto';
 import {safePhotoReference} from '../n8n/photo-url-guard.js';
 import {inspectPhotoSource} from '../editorial-evidence.js';
-import {storyPhotoIdentity,planStoryPhotos,photoRelevance} from './story-intelligence.js';
+import {storyPhotoIdentity,planStoryPhotos,photoRelevance,recordedProjectTrails} from './story-intelligence.js';
 import {requireThat} from '../errors.js';
 
 // Page readers, not an image proxy or arbitrary URL downloader. Only exact URLs
@@ -40,5 +40,5 @@ export function projectPageReferences(story,{url,html,direction='best',basis='fe
  const identity=storyPhotoIdentity(story),images=inspectPhotoSource(html,url,story),capturedAt=new Date().toISOString();
  const photos=images.map(m=>({id:'project:'+digest(url+'|'+m.url).slice(0,32),source:'project',query:identity.subject,title:m.caption||'Uncaptioned source-page reference',creator:m.creator||m.imageMetadata?.creatorReported||'',date:m.years.join(', '),description:m.caption,series:'',sourceUrl:url,previewUrl:m.url,fileUrl:'',rightsLabel:'Unknown — source reference only',rightsGranted:false,publicationApproved:false,sourceRelation:m.relation,creatorBasis:m.creatorBasis,sourceCredit:m.credit||m.imageMetadata?.creditReported||'',copyrightHolder:m.copyrightHolder||m.imageMetadata?.copyrightHolderReported||'',licenseUrl:m.imageMetadata?.licenseReportedUrl||'',sourceYears:m.years,sourceCaptionBasis:m.captionBasis,sourceResearchLinks:m.researchLinks,materialType:m.materialType,dateContext:m.dateContext,imageMetadata:m.imageMetadata,captureCoverage:m.captureCoverage,referenceVariants:m.referenceVariants,reportedWidth:m.reportedWidth,reportedHeight:m.reportedHeight,photoExplorationDirection:direction,sourceCaptureBasis:basis,pixelAnalysisPerformed:false,originalDownloadVerified:false}));
  const ranked=photos.sort((a,b)=>photoRelevance({...b,sourceCaption:b.description},identity).score-photoRelevance({...a,sourceCaption:a.description},identity).score);
- return {photos:ranked,sourceCapture:{url,sha256:digest(html),capturedAt,basis,html,coverage:images[0]?.captureCoverage||null,networkFetched:basis==='fetched_project_page',pixelInspectionPerformed:false,rightsGranted:false}};
+ return {photos:ranked,sourceCapture:{url,sha256:digest(html),capturedAt,basis,html,identity,projectTrails:recordedProjectTrails(html,url,identity),coverage:images[0]?.captureCoverage||null,networkFetched:basis==='fetched_project_page',pixelInspectionPerformed:false,rightsGranted:false}};
 }

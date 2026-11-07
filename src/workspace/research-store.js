@@ -33,7 +33,7 @@ export class LocalResearchStore {
   all(){return this.db.prepare('SELECT id FROM research_requests ORDER BY rowid DESC LIMIT 100').all().map(row=>this.get(row.id));}
   // Recent activity stays bounded; source stories and saved draft versions must not vanish after 100 new requests.
   workspaceRequests(){return this.db.prepare(`SELECT r.id FROM research_requests r WHERE r.id IN (SELECT id FROM research_requests ORDER BY rowid DESC LIMIT 100) OR EXISTS(SELECT 1 FROM research_engine_jobs j WHERE j.request_id=r.id AND json_array_length(j.data_json,'$.candidates')>0) ORDER BY r.rowid DESC`).all().map(row=>this.get(row.id));}
-  create(input,stories,{reuseDefault=false,preset=null}={}){requireThat(input&&Object.keys(input).every(k=>['kind','prompt','sourceUrl','idempotencyKey'].includes(k)),'INVALID_RESEARCH_REQUEST','Unsupported research request fields.');
+  create(input,stories,{reuseDefault=false,preset=null,editorialDiscovery=false}={}){requireThat(input&&Object.keys(input).every(k=>['kind','prompt','sourceUrl','idempotencyKey'].includes(k)),'INVALID_RESEARCH_REQUEST','Unsupported research request fields.');
     requireThat(['discovery','brief'].includes(input.kind),'INVALID_RESEARCH_REQUEST','Choose discovery or creative brief.');
     const prompt=String(input.prompt||'').trim();requireThat(prompt.length>=12&&prompt.length<=2000&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(prompt),'INVALID_RESEARCH_REQUEST','Use a direction between 12 and 2000 characters.');
     const sourceUrl=String(input.sourceUrl||'').trim();requireThat(!sourceUrl||browserUrl(sourceUrl),'INVALID_RESEARCH_REQUEST','Use an HTTPS source link without credentials.');
@@ -56,7 +56,9 @@ export class LocalResearchStore {
         requireThat(result,'EDIT_CONFLICT','The original request is unavailable. Preserve this request identity.');
         this.db.exec(outer?'COMMIT':'RELEASE create_research_request');return result;
       }
-      const defaultKey=reuseDefault?defaultDiscoveryKey({kind:input.kind,prompt,sourceUrl}):null;
+      // A Studio entry marker only deduplicates unpaid saves; it is never native
+      // authorization and cannot turn a saved theme into another request class.
+      const defaultKey=reuseDefault?defaultDiscoveryKey({kind:input.kind,prompt,sourceUrl},{founderBrief:editorialDiscovery&&!preset}):null;
       const baselineContext=JSON.stringify(stories.map(s=>[s.id,s.revision??null,s.localDraft?.version??0]).sort((a,b)=>a[0].localeCompare(b[0])));
       const equivalent=defaultKey?this.db.prepare(`SELECT r.id FROM research_requests r JOIN research_request_equivalence q ON q.request_id=r.id
         WHERE q.default_key=? AND q.baseline_context=?

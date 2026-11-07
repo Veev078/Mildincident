@@ -689,7 +689,7 @@ async function createResearchRequest(input, {start=false,defaultDiscovery=false}
   if(start&&state.workspace.engine?.founderPolicy?.mode!=='founder_confirmed'&&!window.confirm('Start one authorized research run? It may charge for one research and one draft call. Proceed only under a separately approved spend limit; the provider price is not shown here. It will not publish or grant rights.'))return false;
   const keyField = defaultDiscovery?'discoveryRequestKey':input.preset?'presetRequestKey':input.kind==='brief' ? 'briefRequestKey' : 'discoveryRequestKey';
   state[keyField] ||= crypto.randomUUID();
-  const result = await api('/api/research/requests', {method:'POST', headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({...input,idempotencyKey:state[keyField]})});
+  const result = await api('/api/research/requests', {method:'POST', headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit',...(defaultDiscovery?{'X-Mildincident-Discovery':'founder-brief-v14'}:{})},body:JSON.stringify({...input,idempotencyKey:state[keyField]})});
   state[keyField] = null;
   if (input.kind==='brief'&&!input.preset&&!defaultDiscovery) state.researchDraft = {};
   if(route().view==='home')location.hash='#/discovery';

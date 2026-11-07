@@ -86,6 +86,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       story.captionGeneration=engine?.captionStatus(story,workspace.researchRequests)||captionGenerationState(story,workspace.researchRequests,null,{});
       if(story.captionGeneration.result&&!story.hookOptions?.length)story.hookOptions=story.captionGeneration.result.hookOptions;
       const photoRequests=photography?.storyRequestsFor(story)||[];
+      story.recordedProjectLinks=[...new Map([...(story.recordedProjectLinks||[]),...(photography?.storyProjectTrails(story)||[])].map(l=>[l.url,l])).values()].slice(0,8);
       story.photoRequests=[...photoRequests,...workspace.researchRequests.filter(r=>r.continuation?.origin?.storyId===story.id&&!photoRequests.some(p=>p.id===r.id)).map(r=>({id:r.id,state:'authorization_required',message:'Earlier request preserved. Prepare a new exact story request for an archive search; native sourcing still needs separate approval.',createdAt:r.createdAt}))];
       for(const photo of photography?.storyMedia(story)||[])if(!story.media.some(m=>m.id===photo.id))story.media.push(photo);
     }
@@ -95,7 +96,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     workspace.photoHunts=photography?.all()||[];
     workspace.founderReviews=founderReviews?.all()||{};
     workspace.sourceInputs={publications:feeds?.status()||[],leads:feeds?.list()||[]};
-    for(const story of workspace.stories)story.tasteCase=editorialTasteCase(story);
+    for(const story of workspace.stories)story.tasteCase=editorialTasteCase(story,{founderReview:workspace.founderReviews[story.id]});
     workspace.discovery = buildDiscoveryDesk(workspace.stories);
     workspace.researchHandoffAvailable = Boolean(research);
     return workspace;
@@ -188,7 +189,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
         requireThat(research, 'RESEARCH_UNAVAILABLE', 'The private research request store is unavailable.');
         const input = await body(request); const workspace = view();
         const resolved=resolvePresetRequest(input,workspace.researchPresets,input.idempotencyKey?research.get(input.idempotencyKey):null);
-        json(response, 201, { request: research.create(resolved.input, workspace.stories, {reuseDefault:true,preset:resolved.preset}), scope: 'local_only', productionApplied: false }); return;
+        json(response, 201, { request: research.create(resolved.input, workspace.stories, {reuseDefault:true,preset:resolved.preset,editorialDiscovery:request.headers['x-mildincident-discovery']==='founder-brief-v14'}), scope: 'local_only', productionApplied: false }); return;
       }
       if (url.pathname === '/api/research/engine/refresh' && request.method === 'POST') {
         requireThat(engine,'ENGINE_NOT_CONFIGURED','Private development engine connection is unavailable.');
