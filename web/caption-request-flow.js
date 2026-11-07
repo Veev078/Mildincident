@@ -1,5 +1,6 @@
-/** Browser presentation only. The server owns policy, allowance, identity and spend claims. */
-export const CAPTION_IMPROVEMENTS=Object.freeze({alternate_angle:'Another editorial angle',concise:'More concise',narrative:'More narrative',discovery_opening:'Stronger opening',supported_perspective:'Different supported perspective'});
+import {WRITING_DIRECTION_LABELS} from './writing-directions.js';
+/** Browser presentation only. Stable native identifiers and server policy are preserved. */
+export const CAPTION_IMPROVEMENTS=WRITING_DIRECTION_LABELS;
 export const captionRequestPending=proposal=>['queued','running','dispatching','generating','uncertain','dispatch_uncertain','queue_uncertain'].includes(proposal?.state);
 export const captionRequestLabel=proposal=>({prepared:'Ready to review',queued:'Request queued',running:'Draft in progress',dispatching:'Starting · awaiting confirmation',generating:'Draft in progress',completed:'New draft received',failed:'Draft request failed',uncertain:'Outcome needs checking',dispatch_uncertain:'Outcome needs checking',queue_uncertain:'Outcome needs checking',disabled:'Future starts disabled',expired:'Request expired',rejected:'Request needs review'}[proposal?.state]||'Request status unconfirmed');
 export function captionRequestProposal(story,state={}){

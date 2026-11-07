@@ -3,7 +3,7 @@ import {hashDistance} from './fingerprint.js';
 import {safePhotoReference} from '../n8n/photo-url-guard.js';
 const text=v=>String(v||'').trim(),normal=v=>text(v).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 const contains=(hay,needle)=>Boolean(needle)&&(' '+normal(hay)+' ').includes(' '+normal(needle)+' ');
-export const PHOTO_DIRECTIONS={series:'More from this series',archive:'Rare archival finds',candid:'More candid',striking:'Visually striking',behind:'Behind the scenes',context:'Broader context',custom:'Custom direction'};
+export const PHOTO_DIRECTIONS={best:'Find the best ones',series:'More from this project',archive:'Rarer finds',candid:'More candid',striking:'Visually striking',behind:'Behind the scenes',surprise:'Surprise me',context:'Broader context',custom:'My own direction'};
 
 /** Names are anchored in recorded source passages, never guessed from a library recommendation. */
 export function storyPhotoIdentity(story){
@@ -19,10 +19,10 @@ export function planStoryPhotos(story,{direction='series',custom='',source='comm
  if(!Object.hasOwn(PHOTO_DIRECTIONS,direction)||!['commons','loc','aic'].includes(source)||!Number.isInteger(page)||page<1||page>1000||typeof custom!=='string'||custom.length>300||direction==='custom'&&custom.trim().length<2)throw Object.assign(Error('Choose a supported photo direction, archive and page.'),{code:'INVALID_PHOTO_QUERY'});
  const identity=storyPhotoIdentity(story),quote=s=>'"'+s.replace(/["\r\n]/g,' ').trim()+'"';
  const anchor=[identity.photographer,identity.series].filter(Boolean).map(quote).join(' ')||quote(identity.subject.slice(0,180));
- const qualifiers={series:'',archive:'archive contact sheet',candid:'candid documentary',striking:'photographic composition',behind:'behind the scenes contact sheet',context:'historical context',custom:custom.trim()};
+ const qualifiers={best:'',series:'',archive:'archive contact sheet',candid:'candid documentary',striking:'photographic composition',behind:'behind the scenes contact sheet',surprise:'outtakes alternate frames',context:'cultural context',custom:custom.trim()};
  const founderDirection=text(story.localDraft?.creativeBrief?.notes).slice(0,180);
  const query=[direction==='context'&&identity.photographer?quote(identity.photographer):anchor,qualifiers[direction],founderDirection].filter(Boolean).join(' ').slice(0,500);
- return {version:1,identity,direction,label:PHOTO_DIRECTIONS[direction],source,page,query,founderDirection,scope:direction==='context'?'contextual_exploration':'project_first',basis:'source_named_anchors_plus_explicit_founder_direction',sourceLinks:identity.sourceUrls,projectTrails:story.recordedProjectLinks||[],catalogueLinks:catalogueLinks(query),aestheticInspectionPerformed:false,rightsGranted:false};
+ return {version:1,identity,direction,custom:direction==='custom'?custom.trim():'',label:PHOTO_DIRECTIONS[direction],source,page,query,founderDirection,scope:direction==='context'?'contextual_exploration':'project_first',basis:'source_named_anchors_plus_explicit_founder_direction',sourceLinks:identity.sourceUrls,projectTrails:story.recordedProjectLinks||[],catalogueLinks:catalogueLinks(query),aestheticInspectionPerformed:false,rightsGranted:false};
 }
 /** Follow no links: retain exact project-labelled anchors from already captured publisher HTML. */
 export function recordedProjectTrails(html,sourceUrl,identity){
@@ -42,7 +42,8 @@ export function photoRelevance(asset,identity){
  const direct=!nonPhotographic&&(identity.series?series&&(named||asset.sourceRelation==='subject_caption_match'):identity.photographer?named&&asset.sourceRelation!=='page_cover':asset.sourceRelation==='subject_caption_match');
  const category=direct?'direct':named||asset.photoExplorationDirection==='context'?'context':'unconfirmed';
  const width=asset.localPreview?.originalWidth||asset.reportedWidth||asset.width,height=asset.localPreview?.originalHeight||asset.reportedHeight||asset.height;
- return {category,label:direct?'Project reference':category==='context'?'Context / exploration':'Other project or unconfirmed',basis:nonPhotographic?'source_reports_nonphotographic_medium':direct?'image_caption_correspondence':named?'same_reported_creator_not_project_identity':category==='context'?'explicit_broader_context_search':'page_membership_is_not_story_evidence',score:(direct?100:named?35:0)+(asset.previewUrl?5:0)+(asset.localPreview?4:0)+(asset.localReview?.decision==='shortlist'?8:0)+(width>=1080&&height>=1350?3:0),resolutionBasis:asset.localPreview?'decoded_private_file_dimensions':width&&height?'source_reported_dimensions':'not_recorded',pixelInspectionPerformed:false,identityVerified:false};
+ const direction=asset.photoExplorationDirection||'best',hints={archive:/contact sheet|archive|unpublished|outtake/i,candid:/candid|unstaged|street|off.guard/i,behind:/behind.the.scenes|backstage|studio|contact sheet|making.of/i,striking:/composition|close.up|detail|contrast/i,surprise:/outtake|alternative|unpublished|rare|experiment/i},customWords=normal(asset.photoCustomDirection).split(' ').filter(t=>t.length>=4),directionMatch=direction==='custom'?customWords.some(t=>contains(caption,t)):Boolean(hints[direction]?.test(caption));
+ return {category,label:direct?'Project reference':category==='context'?'Context / exploration':'Other project or unconfirmed',basis:nonPhotographic?'source_reports_nonphotographic_medium':direct?'image_caption_correspondence':named?'same_reported_creator_not_project_identity':category==='context'?'explicit_broader_context_search':'page_membership_is_not_story_evidence',score:(direct?100:named?35:0)+(asset.previewUrl?5:0)+(asset.localPreview?4:0)+(asset.localReview?.decision==='shortlist'?8:0)+(width>=1080&&height>=1350?3:0)+(directionMatch?12:0),directionMatch,directionBasis:directionMatch?'image_specific_source_description':'not_established',resolutionBasis:asset.localPreview?'decoded_private_file_dimensions':width&&height?'source_reported_dimensions':'not_recorded',pixelInspectionPerformed:false,identityVerified:false};
 }
 export function photoFileKeys(asset){
  const keys=[];if(asset.localPreview?.originalSha256)keys.push('sha256:'+asset.localPreview.originalSha256);

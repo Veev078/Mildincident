@@ -1,4 +1,5 @@
 import {photoDesk} from "../photography/story-intelligence.js";
+import {editorialDirectionV14,editorialTasteCase} from '../editorial-v14.js';
 import {ApprovalRequests} from './approval-requests.js';
 import {pipeline} from 'node:stream/promises';
 import {buildWorkspace,WORKSPACE_TABLES} from './model.js';
@@ -68,7 +69,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
   const view = () => {
     const workspace = source.snapshot?source.view(drafts.all()):buildWorkspace({records:Object.fromEntries(Object.keys(WORKSPACE_TABLES).map(k=>[k,[]])),buffer:{posts:[],complete:false,observedAt:null},observedAt:new Date().toISOString(),warnings:[]});
     if(!source.snapshot)workspace.source={...workspace.source,kind:'disconnected',observedAt:null,bufferObservedAt:null,stale:true,unavailable:true,warnings:['No authoritative production snapshot is available. Private photographic research remains usable; connect n8n/Buffer or restore your private backup to inspect existing stories.'],refreshError:{code:'SOURCE_UNAVAILABLE',message:'Production observations unavailable; no example stories were substituted.'}};
-    workspace.hosted=Boolean(access);workspace.backupStatus=backups?.status()||null;
+    workspace.hosted=Boolean(access);workspace.backupStatus=backups?.status()||null;workspace.editorialDirection=editorialDirectionV14();
     workspace.researchRequests = research?.workspaceRequests() || [];
     workspace.researchPresets=themes?themes.catalog(editorialPresetCatalog(source.snapshot)):editorialPresetCatalog(source.snapshot);workspace.studioThemes=themes?.all()||[];
     workspace.aiUsage=captionPilot?.usageSummary?.()||null;
@@ -94,6 +95,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     workspace.photoHunts=photography?.all()||[];
     workspace.founderReviews=founderReviews?.all()||{};
     workspace.sourceInputs={publications:feeds?.status()||[],leads:feeds?.list()||[]};
+    for(const story of workspace.stories)story.tasteCase=editorialTasteCase(story);
     workspace.discovery = buildDiscoveryDesk(workspace.stories);
     workspace.researchHandoffAvailable = Boolean(research);
     return workspace;
@@ -123,10 +125,24 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       if(url.pathname==='/api/backups'&&request.method==='POST'){requireThat(access&&backups,'BACKUP_UNAVAILABLE','Hosted backups are unavailable.');requireThat(Object.keys(await body(request)).length===0,'INVALID_BACKUP','Back up the configured private workspace only.');json(response,201,{backup:await backups.create()});return;}
       const backupRoute=url.pathname.match(/^\/api\/backups\/([^/]+)\/archive$/);
       if(backupRoute&&request.method==='GET'){requireThat(access&&backups,'BACKUP_UNAVAILABLE','Hosted backups are unavailable.');const backupId=backupRoute[1]==='latest'?backups.status().id:backupRoute[1];requireThat(backupId,'BACKUP_UNAVAILABLE','No verified backup is available yet.');const stream=await backups.archive(backupId);response.writeHead(200,{'Content-Type':'application/gzip','Content-Disposition':'attachment; filename="mildincident-private-backup-'+backupRoute[1]+'.tar.gz"'});await pipeline(stream,response);return;}
+      const discoveryPhotos=url.pathname.match(/^\/api\/stories\/([^/]+)\/photo-discovery$/);
+      if(discoveryPhotos&&request.method==='POST'){
+        requireThat(photography,'RESEARCH_UNAVAILABLE','Private photographic research is unavailable.');
+        const input=await body(request,4200000),id=decodeURIComponent(discoveryPhotos[1]),story=view().stories.find(s=>s.id===id);
+        requireThat(story,'STORY_NOT_FOUND','This story is unavailable.');
+        const prepared=photography.prepareDiscovery(story,input);
+        const result=await photography.searchStoryRequest(story,prepared.id,{sourceRevision:input.sourceRevision,workingVersion:input.workingVersion,confirm:true},{readStory:()=>view().stories.find(s=>s.id===id)});
+        json(response,201,{photoRequest:result,paidCalls:0,productionApplied:false});return;
+      }
       const continuationRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/photo-research$/);
       if(continuationRoute&&request.method==='POST'){requireThat(research,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request),workspace=view(),story=workspace.stories.find(s=>s.id===decodeURIComponent(continuationRoute[1]));const {photoSource,photoDirection,photoCustom,photoParent,...direction}=input;const saved=research.createPhotoContinuation(story,direction,workspace.stories),photoRequest=photography?.prepareStoryRequest(story,saved,{source:photoSource||'commons',direction:photoDirection||'series',custom:photoCustom||'',parentId:photoParent||null});json(response,201,{request:saved,photoRequest,scope:'private_research_only',networkRequests:0,paidCalls:0,productionApplied:false});return;}
       if(url.pathname==='/api/generation/disable'&&request.method==='POST'){requireThat(captionPilot,'CAPTION_POLICY_DISABLED','No pilot policy is configured.');requireThat(Object.keys(await body(request)).length===0,'INVALID_CAPTION_REQUEST','Disable future starts without other changes.');json(response,200,{pilot:captionPilot.disable(),productionApplied:false});return;}
       const photoSearch=url.pathname.match(/^\/api\/stories\/([^/]+)\/photo-research\/([a-f0-9-]{36})\/search$/);
+      const closePhotoSearch=url.pathname.match(/^\/api\/stories\/([^/]+)\/photo-research\/([a-f0-9-]{36})\/close-interrupted$/);
+      if(closePhotoSearch&&request.method==='POST'){
+        requireThat(photography,'RESEARCH_UNAVAILABLE','Photographic research is unavailable.');const story=view().stories.find(s=>s.id===decodeURIComponent(closePhotoSearch[1]));requireThat(story,'STORY_NOT_FOUND','Open the original story.');
+        json(response,200,{photoRequest:photography.closeInterruptedDiscovery(story,closePhotoSearch[2],await body(request)),sourceCalls:0,paidCalls:0,productionApplied:false});return;
+      }
       if(photoSearch&&request.method==='POST'){
         requireThat(photography,'RESEARCH_UNAVAILABLE','Photographic research is unavailable.');const id=decodeURIComponent(photoSearch[1]),readStory=()=>view().stories.find(s=>s.id===id),story=readStory();requireThat(story,'STORY_NOT_FOUND','Open the original story.');
         const photoRequest=await photography.searchStoryRequest(story,photoSearch[2],await body(request),{readStory});json(response,200,{photoRequest,productionApplied:false,paidCalls:0});return;

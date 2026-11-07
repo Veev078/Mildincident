@@ -2,7 +2,7 @@ import {storyProposal} from './ai-operations.js';
 import {researchAccess} from './discovery-flow.js';
 import {CAPTION_IMPROVEMENTS,captionRequestProposal,canConfirmCaption} from './caption-request-flow.js';
 import {launchSavedResearch} from './research-launch.js';
-import {DEFAULT_DISCOVERY_PROMPT} from './discovery-request.js';
+import {editorialDiscoveryRequest} from './discovery-request.js';
 import { esc, date, human, storyUrl, effective, mediaFor, proposalContent } from './components.js';
 import * as views from './views.js';
 import {navigation,resolveRoute,destination,libraryNavigation} from './navigation.js';
@@ -428,7 +428,7 @@ document.addEventListener('click', event => {
     case 'rehearse-step': if (rehearsal) showRehearsal(storyById(rehearsal.storyId), rehearsal.index + Number(button.dataset.step), rehearsal.fit); break;
     case 'prepare-discovery':
       button.disabled = true;
-      createResearchRequest({kind:'discovery',prompt:DEFAULT_DISCOVERY_PROMPT,sourceUrl:''}).catch(error=>toast(error.message,{error:true})).finally(()=>{button.disabled=false;}); break;
+      createResearchRequest(editorialDiscoveryRequest(),{defaultDiscovery:true}).catch(error=>toast(error.message,{error:true})).finally(()=>{button.disabled=false;}); break;
     case 'reload': loadWorkspace().catch(() => {}); break;
     case 'refresh': refreshSource(); break;
     case 'close-toast': document.querySelector('#toast').hidden = true; break;
@@ -684,14 +684,14 @@ document.addEventListener('error', event => {
   const retry = photo.querySelector('.preview-retry'); if (retry) retry.hidden = false;
 }, true);
 
-async function createResearchRequest(input, {start=false}={}) {
+async function createResearchRequest(input, {start=false,defaultDiscovery=false}={}) {
   if(start&&!researchAccess(state.workspace?.engine).canReview)throw new Error(researchAccess(state.workspace?.engine).message);
   if(start&&state.workspace.engine?.founderPolicy?.mode!=='founder_confirmed'&&!window.confirm('Start one authorized research run? It may charge for one research and one draft call. Proceed only under a separately approved spend limit; the provider price is not shown here. It will not publish or grant rights.'))return false;
-  const keyField = input.preset?'presetRequestKey':input.kind==='brief' ? 'briefRequestKey' : 'discoveryRequestKey';
+  const keyField = defaultDiscovery?'discoveryRequestKey':input.preset?'presetRequestKey':input.kind==='brief' ? 'briefRequestKey' : 'discoveryRequestKey';
   state[keyField] ||= crypto.randomUUID();
   const result = await api('/api/research/requests', {method:'POST', headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({...input,idempotencyKey:state[keyField]})});
   state[keyField] = null;
-  if (input.kind==='brief'&&!input.preset) state.researchDraft = {};
+  if (input.kind==='brief'&&!input.preset&&!defaultDiscovery) state.researchDraft = {};
   if(route().view==='home')location.hash='#/discovery';
   const reused=state.workspace.researchRequests.some(r=>r.id===result.request.id);
   if (!reused) state.workspace.researchRequests.unshift(result.request);
@@ -718,9 +718,9 @@ document.addEventListener('submit', async event => {
   const status=form.querySelector('[data-research-status]');status.textContent='Saving…';const fields=form.querySelector('[data-discovery-fields]');if(fields)fields.disabled=true;
   try {
     if(form.matches('[data-research-form]')) {
-      const custom=!form.hasAttribute('data-discovery-setup')||form.dataset.mode==='custom';let input=custom?{kind:'brief',prompt:form.elements.prompt.value,sourceUrl:form.elements.sourceUrl.value}:{kind:'discovery',prompt:DEFAULT_DISCOVERY_PROMPT,sourceUrl:''};
+      const custom=!form.hasAttribute('data-discovery-setup')||form.dataset.mode==='custom';let input=custom?{kind:'brief',prompt:form.elements.prompt.value,sourceUrl:form.elements.sourceUrl.value}:editorialDiscoveryRequest();
       if(form.dataset.mode==='preset'){const option=form.elements.presetKey.selectedOptions[0],preset=state.workspace.researchPresets?.items.find(p=>p.key===option?.value&&p.version===option?.dataset.version);if(!preset)throw new Error('Choose an available recorded theme.');input={kind:'brief',prompt:preset.direction,sourceUrl:'',preset:{key:preset.key,version:preset.version}};}
-      const result=await createResearchRequest(input,{start:event.submitter?.value==='start'});if(result===false)status.textContent='Nothing was started or saved.';
+      const result=await createResearchRequest(input,{start:event.submitter?.value==='start',defaultDiscovery:!custom&&form.dataset.mode!=='preset'});if(result===false)status.textContent='Nothing was started or saved.';
     }
   }catch(error){const current=document.querySelector('[data-research-status]');if(current)current.textContent=error.message;toast(error.message,{error:true});}finally{state.discoverySubmitting=false;button.disabled=false;const fields=document.querySelector('[data-discovery-fields]');if(fields)fields.disabled=false;}
 });
@@ -832,6 +832,13 @@ document.addEventListener('click',event=>{
 document.addEventListener('change',event=>{
  const select=event.target.closest('#discovery-preset');if(!select||state.discoverySubmitting)return;
  state.presetChoice={key:select.value,version:select.selectedOptions[0]?.dataset.version};state.presetRequestKey=null;render();document.querySelector('#discovery-preset')?.focus();
+});
+document.addEventListener('click',event=>{
+ const button=event.target.closest('[data-editorial-lens]');if(!button||state.discoverySubmitting)return;
+ const lens=state.workspace?.editorialDirection?.lenses.find(l=>l.key===button.dataset.editorialLens),input=document.querySelector('#discovery-prompt');if(!lens||!input)return;
+ const previous=input.value.trim(),value=previous&&previous!==state.lastEditorialLens?previous+'\n\n'+lens.brief:lens.brief;
+ if(value.length>2000){toast('Your current direction is preserved. Make room before adding another starting point.',{error:true});return;}
+ state.lastEditorialLens=lens.brief;state.briefRequestKey=null;state.researchDraft={...(state.researchDraft||{}),prompt:value};input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();announce('Editorial direction added. No research has started.');
 });
 document.addEventListener('click',async event=>{
  const button=event.target.closest('[data-start-saved-research]');if(!button||state.discoverySubmitting)return;
@@ -952,6 +959,28 @@ document.addEventListener('click',async event=>{
 });
 
 document.addEventListener('change',event=>{const select=event.target.closest('[data-photo-source]');if(!select)return;state.photoSources ||= {};state.photoSources[select.dataset.photoSource]=select.value;});
+async function discoverStoryPhotos(id,button,sourcePage=null){
+ state.photoSearchBusy ||= {};if(state.photoSearchBusy[id])return;state.photoSearchBusy[id]=true;button.disabled=true;
+ button.dataset.requestKey ||= crypto.randomUUID();button.textContent=sourcePage?'Importing references…':'Finding photographs…';
+ try{
+  if(!await flushAllDrafts())throw Error('Save pending edits before finding photographs.');
+  const story=storyById(id),input={sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:button.dataset.requestKey,direction:state.photoDirections?.[id]||'best',custom:state.photoCustom?.[id]||'',...(sourcePage||{})};
+  const result=await api('/api/stories/'+encodeURIComponent(id)+'/photo-discovery',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(input)});
+  await loadWorkspace({quiet:true});toast(result.photoRequest.message,{error:result.photoRequest.state!=='complete'});
+ }catch(error){toast(error.message+' Check the recorded result before another request. No automatic repeat was made.',{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}
+ finally{state.photoSearchBusy[id]=false;render();}
+}
+document.addEventListener('click',event=>{const button=event.target.closest('[data-photo-discover]');if(button&&!button.disabled)discoverStoryPhotos(button.dataset.photoDiscover,button);});
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-photo-close]');if(!button||button.disabled)return;button.disabled=true;
+ try{if(!await flushAllDrafts())throw Error('Save pending edits before closing this search.');const story=storyById(button.dataset.story);await api('/api/stories/'+encodeURIComponent(story.id)+'/photo-research/'+button.dataset.photoClose+'/close-interrupted',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,confirm:'close_interrupted_search'})});await loadWorkspace({quiet:true});toast('Interrupted search closed. No source request was repeated.');}
+ catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
+});
+document.addEventListener('submit',async event=>{
+ const form=event.target.closest('[data-photo-page-import]');if(!form)return;event.preventDefault();const button=form.querySelector('button[type=submit]');if(button.disabled)return;
+ try{const file=form.elements.pageFile.files[0];if(file&&file.size>2000000)throw Error('Choose a saved HTML page up to 2 MB.');const html=file?await file.text():form.elements.html.value;if(html.trim().length<20)throw Error('Choose a saved HTML page or paste its original HTML.');await discoverStoryPhotos(form.dataset.photoPageImport,button,{sourceUrl:form.elements.sourceUrl.value.trim(),html});}
+ catch(error){toast(error.message,{error:true});}
+});
 document.addEventListener('click',async event=>{
  const button=event.target.closest('[data-photo-search]');if(!button||button.disabled)return;const id=button.dataset.story;
  state.photoSearchBusy ||= {};if(state.photoSearchBusy[id])return;state.photoSearchBusy[id]=true;button.disabled=true;

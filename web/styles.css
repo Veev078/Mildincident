@@ -2,18 +2,18 @@
 @import url("./develop.css");
 @import url("./readiness.css");
 :root {
-  --paper:#f5f8fc;
+  --paper:#f6f4ee;
   --surface:#ffffff;
   --white:#ffffff;
-  --ink:#172339;
-  --quiet:#596a82;
-  --line:#cbd6e5;
-  --soft-line:#e2e9f2;
-  --accent:#254fba;
-  --accent-soft:#e8efff;
+  --ink:#242721;
+  --quiet:#62675d;
+  --line:#d6d9cf;
+  --soft-line:#e9ebe4;
+  --accent:#3e613d;
+  --accent-soft:#e8eddf;
   --rust:#9b4b32;
   --warn-soft:#f3e9df;
-  --sidebar:#edf3fb;
+  --sidebar:#eeefe7;
   --serif:Georgia,'Times New Roman',serif;
   --sans:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   font-family:var(--sans);
@@ -4297,3 +4297,81 @@ dialog:has(>.image-inspector) { padding:24px; max-height:calc(100vh - 40px); }
 .photo-desk .photo-request-panel {max-width:none;}
 .photo-desk .photo-request-panel .field {max-width:none;}
 .photo-desk-grid .asset-actions .text-button {min-height:36px;}
+
+/* V14: photographs and a single source-led action take precedence over setup. */
+.photo-desk>.section-heading {margin-bottom:12px;}
+.photo-desk-intro {font-size:14px;margin-bottom:20px;max-width:75ch;}
+.photo-desk .photo-request-panel {padding:24px 28px;margin-bottom:30px;border-left:3px solid var(--accent);}
+.photo-discovery-main {display:flex;gap:28px;align-items:center;justify-content:space-between;}
+.photo-discovery-main h2 {font:32px/1.15 var(--serif);margin:0 0 8px;letter-spacing:-.5px;}
+.photo-discovery-main p:not(.eyebrow) {font-size:14px;line-height:1.6;margin-bottom:12px;max-width:65ch;}
+.photo-find-primary {flex:none;min-height:48px;}
+.photo-direction-row {display:flex;align-items:center;gap:22px;margin:12px 0;}
+.photo-direction-row>.field {min-width:220px;max-width:280px!important;margin:0;}
+.photo-direction-row>.small {margin:20px 0 0;max-width:45ch;}
+.photo-direction-row>.photo-custom-field {flex:1;max-width:none!important;}
+.photo-source-assist,.photo-search-advanced {font-size:13px;line-height:1.6;border-top:1px solid var(--line);padding:12px 0 0;margin:12px 0 0;}
+.photo-source-assist>summary,.photo-search-advanced>summary {cursor:pointer;color:var(--quiet);}
+.photo-source-assist form {max-width:660px;padding-top:12px;}
+.photo-source-assist textarea {width:100%;resize:vertical;font:12px/1.5 monospace;}
+.photo-source-assist input[type=file] {font-size:13px;}
+.photo-search-advanced>.field {max-width:340px!important;margin-top:16px;}
+.photo-result-note {background:var(--paper);padding:14px 18px;margin:18px 0;}
+.photo-result-note>span {margin-left:12px;color:var(--quiet);font-size:13px;}
+.photo-result-note>p {margin:6px 0;}
+.photo-result-note details {font-size:12px;color:var(--quiet);}
+.photo-desk-grid .asset-card .photo {height:330px;background:var(--soft-line);}
+.photo-desk-grid .asset-card {border-color:var(--line);}
+.story-heading h1 {letter-spacing:-1.4px;max-width:none;}
+.photo-discovery-layout {display:grid;grid-template-columns:minmax(0,1.35fr) minmax(320px,1fr);gap:30px;align-items:start;margin-bottom:28px;}
+.photo-discovery-layout .photo-current {border-bottom:0;margin:0;padding:0;}
+.photo-discovery-layout .photo-discovery-main {display:block;}
+.photo-discovery-layout .photo-find-primary {width:100%;margin:8px 0 16px;}
+.photo-discovery-layout .photo-direction-row {display:block;}
+.photo-discovery-layout .photo-direction-row>.field {max-width:none!important;}
+.photo-discovery-layout .photo-direction-row>.small {margin-top:12px;}
+.photo-discovery-layout .photo-current .photo-desk-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
+.photo-discovery-layout .photo-current[data-selected-count="1"] .photo-desk-grid {grid-template-columns:minmax(0,1fr);}
+.photo-discovery-layout .photo-current .asset-card .photo {height:390px;}
+.caption-writing-surface {border-top:3px solid var(--accent);}
+.caption-context .writing-hero .photo {max-height:360px;background:var(--soft-line);}
+.caption-writing-surface .caption-editor {background:var(--white);font:21px/1.75 var(--serif);min-height:350px;}
+.writing-brief-note {margin:14px 0 18px;padding:14px 16px;background:var(--paper);font-size:14px;line-height:1.7;border-left:2px solid var(--accent);}
+.discovery-frame {font:32px/1.2 var(--serif);letter-spacing:-.7px;margin:6px 0 16px;}
+.editorial-lenses {margin:12px 0 22px;max-width:760px;}
+.editorial-lenses .small-button {margin:0 7px 9px 0;min-height:42px;}
+.taste-case {padding:18px 0;}
+@media(min-width:1101px){.photo-desk-grid{grid-template-columns:repeat(3,minmax(0,1fr));}.photo-desk-grid .asset-card .photo{height:360px;}}
+@media(max-width:700px){
+ .sidebar {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;padding:12px 18px 0;background:var(--sidebar);}
+ .sidebar .masthead {grid-column:1;grid-row:1;padding:0;font-size:21px;align-self:center;}
+ .sidebar .masthead span {display:none;}
+ .sidebar .sidebar-foot {grid-column:2;grid-row:1;display:block;margin:0;padding:0;}
+ .sidebar .sidebar-tools {margin:0;padding:0;}
+ .sidebar .sidebar-tools[open] {max-width:190px;}
+ .sidebar .primary-nav {grid-column:1/-1;grid-row:2;}
+ .sidebar .primary-nav a {min-height:40px;padding-top:9px;padding-bottom:9px;}
+ .story-heading .eyebrow {display:none;}
+ .story-heading .story-next-step {display:none;}
+ .story-heading h1 {font-size:28px;}
+ .story-stage-context {display:none;}
+ .story-tools-row {display:flex;flex-wrap:wrap;gap:8px 16px;padding:7px 0;}
+ .story-tools-row summary {font-size:11px;}
+ .photo-desk>.section-heading {align-items:start;}
+ .photo-desk>.section-heading h2 {font-size:26px;}
+ .photo-discovery-layout {display:flex;flex-direction:column;gap:14px;}
+ .photo-discovery-layout>.photo-request-panel {order:-1;width:100%;margin-bottom:0;}
+ .photo-discovery-layout>.photo-current {width:100%;}
+ .photo-discovery-layout .photo-current .photo-desk-grid {grid-template-columns:minmax(0,1fr);}
+ .photo-discovery-main {display:block;}
+ .photo-find-primary {width:100%;margin:6px 0 12px;}
+ .photo-direction-row {display:block;}
+ .photo-direction-row>.field {max-width:none!important;}
+ .photo-direction-row>.small {margin:12px 0;}
+ .photo-desk .photo-request-panel {padding:20px 16px;}
+ .photo-discovery-main h2 {font-size:28px;}
+ .photo-desk-intro {display:none;}
+ .story-heading h1 {letter-spacing:-.7px;}
+ .caption-writing-surface .caption-editor {font-size:19px;min-height:310px;}
+ .caption-context .writing-hero .photo {max-height:390px;}
+}

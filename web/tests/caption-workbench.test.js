@@ -16,3 +16,7 @@ test('caption length and internal-marker warnings remain accurate and stored tex
  const html=captionWorkspace({}, {...story,localDraft:{caption:'<script>DO NOT PUBLISH</script>'}});assert.match(html,/&lt;script&gt;DO NOT PUBLISH&lt;\/script&gt;/);assert.ok(!html.includes('<script>'));assert.ok(!html.includes('data-caption-warning class="inline-warning" hidden'));
  const long=captionWorkspace({}, {...story,localDraft:{caption:'x'.repeat(2201)}});assert.match(long,/2201 \/ 2,200 characters/);assert.match(long,/data-caption-count class="error-text"/);
 });
+test('an unselected story can show a project reference without replacing an explicitly chosen cover or claiming selection',()=>{
+ const s={...story,selectedAssetIds:[],media:[{id:'roundup-cover',creator:'Other project',previewUrl:'https://example.org/roundup.jpg'},{id:'project-frame',creator:'Project photographer',previewUrl:'https://example.org/project.jpg',photoRelevance:{category:'direct'}}]},before=JSON.stringify(s),html=captionWorkspace({},s);
+ assert.match(html,/src="https:\/\/example.org\/project.jpg"/);assert.ok(!html.includes('src="https://example.org/roundup.jpg"'));assert.match(html,/Reference only · no photograph selected/);assert.equal(JSON.stringify(s),before);
+});

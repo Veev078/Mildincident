@@ -83,9 +83,10 @@ try {
   await page.getByRole('button',{name:'Surprise Me',exact:true}).click();await page.getByRole('button',{name:'Save direction',exact:true}).click();
   await page.getByText('Direction saved. Research has not started.',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Custom Direction',exact:true}).click();assert.equal(await page.getByLabel('Creative direction',{exact:true}).inputValue(),'Keep this unsaved creative direction while preparing discovery');
-  assert.equal(research.all()[0].kind,'discovery');
+  assert.equal(research.all()[0].kind,'brief');
+  assert.match(research.all()[0].prompt,/Things you never knew you missed/);
   await page.getByLabel('Creative direction',{exact:true}).fill('');
-  checks.push('discovery uses the same persistent research handoff and existing n8n preset without scheduled or paid browser execution');
+  checks.push('discovery uses the supported native founder-brief input so its editorial direction is consumed, preserving unsaved custom text without paid execution');
 
 
   for (const view of ['discovery', 'home', 'pipeline', 'library', 'publishing', 'archive', 'analytics']) {
