@@ -1,4 +1,6 @@
-# V12 operational integration — local checkpoints, activation gated
+# V12 operational integration — implementation record
+
+**Later verified state:** hosted79d20fb and recurring founder-confirmed policy are operational on worker d12b183b / exact graph0e1777e5…, with real successful caption2361. The inactive/uninstalled descriptions below record the earlier implementation checkpoint. Do not repeat activation. [Current V13 photographic build and release boundary](V13_PHOTOGRAPHY.md).
 
 November 6, 2026 (America/New_York). Continues `7fdbd32` on `development/photography-review-20261029`. This sprint authorizes implementation, read-only inspection, isolated simulations and pushes only. No deployment, environment/credential change, workflow installation/activation, paid operation or Buffer write is performed.
 

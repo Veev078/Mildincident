@@ -148,7 +148,7 @@ try {
   assert.ok((await page.getByRole('dialog').textContent()).includes('Compare the evidence.'));
   await page.getByRole('button', { name: 'Close image comparison' }).click();
   checks.push('image comparison opens provenance-aware accessible dialog');
-  await page.locator('[data-action="inspect"]').first().click();
+  await page.locator('[data-action="inspect"][data-asset="asset-1"]').first().click();
   await page.getByText('Attach a private preview',{exact:true}).click();
   const upload = page.locator('[data-preview-upload]');
   const bytes = await sharp({ create: { width: 900, height: 1200, channels: 3, background: '#2451a4' } }).jpeg().toBuffer();
@@ -159,12 +159,12 @@ try {
   await page.waitForFunction(() => { const img = document.querySelector('#asset-dialog img'); return img?.complete && img.naturalWidth === 900; });
   assert.equal(source.snapshot.records.media[0].rights_status, 'preview_unreviewed');
   await page.reload();
-  await page.locator('[data-action="inspect"]').first().click();
+  await page.locator('[data-action="inspect"][data-asset="asset-1"]').first().click();
   await page.getByRole('dialog').getByText(/Private local preview ·/).waitFor();
   await page.waitForFunction(() => { const img = document.querySelector('#asset-dialog img'); return img?.complete && img.naturalWidth === 900; });
   await page.getByRole('button', { name: 'Close image details' }).click();
   checks.push('private preview upload renders actual decoded bytes, persists on reload and preserves source rights');
-  await page.locator('[data-action="inspect"]').first().click();
+  await page.locator('[data-action="inspect"][data-asset="asset-1"]').first().click();
   const reviewForm=page.locator('[data-image-review]');
   await reviewForm.getByLabel('Editorial decision').selectOption('reject');
   await reviewForm.getByLabel('Why this image?').fill('This image has less narrative presence than the other opening choice.');
@@ -173,15 +173,17 @@ try {
   checks.push('image-dialog taste reaches subsequent native context with the exact reviewed preview and source revision');
   await page.getByText('This rejected image is still in the carousel.',{exact:false}).waitFor();
   assert.deepEqual(drafts.get(id).selectedAssetIds,['asset-2','asset-1']);
-  await page.reload();await page.locator('[data-action="inspect"]').first().click();
+  await page.reload();await page.locator('[data-action="inspect"][data-asset="asset-1"]').first().click();
   await page.getByText('Editorial review history (1 versions)',{exact:true}).waitFor();
   assert.equal(await page.getByLabel('Editorial decision').inputValue(),'reject');
   await page.getByRole('button',{name:'Close image details'}).click();
   checks.push('image taste feedback persists with explicit rejection warning while source rights and selected slides remain unchanged');
   await page.getByLabel('Editorial view',{exact:true}).selectOption('reject');
-  assert.equal(await page.locator('.asset-card').count(),1);
+  assert.equal(await page.locator('.photo-current .asset-card').count(),2);
+  assert.equal(await page.locator('.photo-collection:not(.photo-current) .asset-card').count(),0);
   await page.getByLabel('Editorial view',{exact:true}).selectOption('shortlist');
-  assert.equal(await page.locator('.asset-card').count(),0);
+  assert.equal(await page.locator('.photo-current .asset-card').count(),2);
+  assert.equal(await page.locator('.photo-collection:not(.photo-current) .asset-card').count(),0);
   await page.getByLabel('Editorial view',{exact:true}).selectOption('all');
   assert.equal(await page.locator('.asset-card').count(),3);
   checks.push('editorial image filters surface saved decisions without changing source rights or selection');
@@ -351,6 +353,8 @@ try {
   await page.getByText('A labeled source-text fixture, not real editorial research.',{exact:true}).waitFor();
   checks.push('native captured-source packet opens in Studio research without another fetch or asserting human verification');
   await page.goto(`${origin}/#/story/${devStoryId}/images`);
+  await page.locator('[data-story-task="images"]').waitFor();
+  for(const collection of await page.locator('details.photo-collection').all())if(!await collection.evaluate(d=>d.open))await collection.locator('summary').click();
   await page.locator('[data-action="inspect"]').first().click();
   await page.getByText('Full source record',{exact:true}).click();
   await page.getByRole('dialog').getByText('Copyright holder recorded; the photographer is not established by that credit.',{exact:true}).waitFor();
@@ -360,6 +364,8 @@ try {
   await page.goto(`${origin}/#/story/${devStoryId}/research`);
   checks.push('source photograph inspection distinguishes copyright, explicit series trails and incomplete page coverage');
   await page.goto(`${origin}/#/story/${devStoryId}/images`);
+  await page.locator('[data-story-task="images"]').waitFor();
+  for(const collection of await page.locator('details.photo-collection').all())if(!await collection.evaluate(d=>d.open))await collection.locator('summary').click();
   await page.locator('[data-action="inspect"]').first().click();
   const requestsBeforePhotoResearch=research.all().length,jobsBeforePhotoResearch=engineFixture.jobs.length;
   await page.getByText('Explore this photograph further',{exact:true}).click();
@@ -399,6 +405,8 @@ try {
   await page.goto(`${origin}/#/discovery`);
   await page.locator('[data-review-card]').getByRole('button',{name:'Review draft',exact:true}).click();await page.waitForURL('**/overview');checks.push('one founder decision opens the same editable story without a separate research approval form');
   await page.goto(`${origin}/#/story/${devStoryId}/images`);
+  await page.locator('[data-story-task="images"]').waitFor();
+  for(const collection of await page.locator('details.photo-collection').all())if(!await collection.evaluate(d=>d.open))await collection.locator('summary').click();
   await page.locator('[data-action="inspect"]').first().click();
   // Original source context remains available alongside later captured image captions.
   await page.getByText('Full source record',{exact:true}).click();

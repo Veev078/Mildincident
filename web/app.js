@@ -805,7 +805,7 @@ document.addEventListener('submit',async event=>{
 document.addEventListener('click',async event=>{
  const button=event.target.closest('[data-photo-continuation]');if(!button)return;button.disabled=true;
  button.dataset.requestKey ||= crypto.randomUUID();
- try{if(!await flushAllDrafts())throw new Error('Save pending edits before preparing image research.');const result=await api('/api/stories/'+encodeURIComponent(button.dataset.story)+'/photo-research',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({intent:button.dataset.photoContinuation,assetId:button.dataset.asset,sourceRevision:button.dataset.revision,workingVersion:Number(button.dataset.working),previewSha256:button.dataset.previewHash,idempotencyKey:button.dataset.requestKey,photoSource:state.photoSources?.[button.dataset.story]||'commons'})});
+ try{if(!await flushAllDrafts())throw new Error('Save pending edits before preparing image research.');const currentStory=storyById(button.dataset.story),currentAsset=currentStory?.media.find(a=>a.id===button.dataset.asset);if(!currentAsset)throw Error('Reopen this photograph before searching.');const result=await api('/api/stories/'+encodeURIComponent(button.dataset.story)+'/photo-research',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({intent:button.dataset.photoContinuation,assetId:button.dataset.asset,sourceRevision:currentStory.revision,workingVersion:currentStory.localDraft?.version||0,previewSha256:currentAsset.localPreview?.sha256||'',idempotencyKey:button.dataset.requestKey,photoSource:state.photoSources?.[button.dataset.story]||'commons',photoDirection:state.photoDirections?.[button.dataset.story]||'series',photoCustom:state.photoCustom?.[button.dataset.story]||''})});
  document.querySelector('#asset-dialog')?.close();await loadWorkspace({quiet:true});announce('Photograph request prepared. Review the archive search on this story.');
  }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
 });
@@ -968,4 +968,20 @@ document.addEventListener('click',async event=>{
   const result=await api('/api/stories/'+encodeURIComponent(id)+'/approval-requests',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:key,confirm:'prepare_review_only'})});
   story.approvalRequest=result.approvalRequest;render();toast('Exact review handoff saved privately. Native approval and publishing remain separate.');
  }catch(error){toast(error.message,{error:true});}finally{captionRequestLocks.delete('approval:'+id);button.disabled=false;}
+});
+
+document.addEventListener('change',event=>{const select=event.target.closest('[data-photo-direction]');if(!select)return;state.photoDirections ||= {};state.photoDirections[select.dataset.photoDirection]=select.value;render();});
+document.addEventListener('input',event=>{const input=event.target.closest('[data-photo-custom]');if(!input)return;state.photoCustom ||= {};state.photoCustom[input.dataset.photoCustom]=input.value;});
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-photo-more]');if(!button||button.disabled)return;button.disabled=true;
+ try{if(!await flushAllDrafts())throw Error('Save pending edits first.');const story=storyById(button.dataset.story),parent=story.photoRequests.find(p=>p.id===button.dataset.photoMore),anchor=story.media.find(a=>a.id===effective(story).selectedAssetIds[0])||story.media[0];if(!parent||!anchor)throw Error('Reopen this story before continuing.');button.dataset.requestKey ||= crypto.randomUUID();
+ await api('/api/stories/'+encodeURIComponent(story.id)+'/photo-research',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({intent:'alternatives',assetId:anchor.id,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,previewSha256:anchor.localPreview?.sha256||'',idempotencyKey:button.dataset.requestKey,photoSource:parent.source,photoParent:parent.id})});await loadWorkspace({quiet:true});announce('Next page prepared. Review before searching; no source request has started.');
+ }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
+});
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-photo-shortlist],[data-photo-cover]');if(!button||button.disabled)return;button.disabled=true;
+ try{if(!await flushAllDrafts())throw Error('Save pending edits first.');const story=storyById(button.dataset.story),asset=story.media.find(a=>a.id===(button.dataset.photoShortlist||button.dataset.photoCover));if(!asset)throw Error('Reopen this photograph.');
+ if(button.dataset.photoCover){const ids=effective(story).selectedAssetIds;if(!ids.includes(asset.id))throw Error('Add the photograph before making it the cover.');editDraft(story.id,{selectedAssetIds:[asset.id,...ids.filter(id=>id!==asset.id)]},{rerender:true,immediate:true});await flushDraft(story.id);announce('Cover changed. The previous sequence remains in history.');}
+ else{await api('/api/stories/'+encodeURIComponent(story.id)+'/assets/'+encodeURIComponent(asset.id)+'/review',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({expectedVersion:asset.localReview?.version||0,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,previewSha256:asset.localPreview?.sha256||'',decision:'shortlist',reason:'Shortlisted for closer photographic inspection.',basis:'story_potential'})});await loadWorkspace({quiet:true});announce('Shortlisted for this story. Source identity and rights remain separate.');}
+ }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
 });

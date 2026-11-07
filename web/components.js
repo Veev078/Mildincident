@@ -61,7 +61,8 @@ export function previewUrl(value) {
 export function leadPhoto(story) {
   const selected=mediaFor(story),candidates=story.media||[];
   const available=assets=>assets.find(asset=>previewUrl(asset.previewUrl).startsWith('/api/stories/'))||assets.find(asset=>previewUrl(asset.previewUrl));
-  return available(selected)||available(candidates)||selected[0]||candidates[0];
+  const direct=candidates.filter(a=>a.photoRelevance?.category==='direct');
+  return available(selected)||available(direct)||available(candidates)||selected[0]||direct[0]||candidates[0];
 }
 export function image(asset, { className = '', index, storyId, eager = false, compact = false } = {}) {
   const url = previewUrl(asset?.previewUrl);

@@ -1,3 +1,9 @@
+# November 7, 2026 — Publisher-page membership is not photographic project identity
+
+A multi-project roundup supplied Sophy's references and other artists' images. Preserve the source history and selected IDs, but separate project-caption correspondence, context and unconfirmed material in Studio. Searches retain source-named anchors; broader context is an explicit direction, not an automatic substitute. Reuse existing source adapters, guarded receipts, private pixels and approval contracts. Cached publisher anchors can expose a better project source without fetching it. Never label metadata ranking as visual inspection or source visibility as permission. V13 is local; the working recurring AI policy/worker remain unchanged. [Evidence and release boundary](release/V13_PHOTOGRAPHY.md).
+
+---
+
 # November 6, 2026 — preserve exact content before native approval
 
 Prepare Approval saves an immutable private request through the existing production packet/preflight contract. Bind exact source/package/caption version, photograph order, source/rights evidence and uploaded-byte hashes; preserve the original request and invalidate its status after edits. Durable aliases cannot be rebound to different content. A development proposal cannot invent a production identity, approval or Buffer claim. Reuse the existing native authority; direct transfer remains separately gated. Story-bound photo receipts use existing adapters and never imply identity, pixel inspection or rights clearance. Local retained-data browser simulations remain distinct from real paid/hosted proof. [Implementation and gates](release/V12_OPERATIONAL_INTEGRATION.md).

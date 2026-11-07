@@ -1,3 +1,9 @@
+# Current checkpoint — V13 photographic desk, local release pending
+
+[Evidence, implementation and source-access boundaries](release/V13_PHOTOGRAPHY.md). The Sophy problem was a retained multi-project publisher page rendered as one grid: four project-caption references among40, with unrelated projects already tagged context_only. New local work adds source-bound query directions/pagination, retained project-specific publisher trails, duplicate-safe receipts, separated visual collections and explicit curation. Exact approval includes photographic context and image-review changes. Hosted remains79d20fb; recurring AI stays active at d12b183b / graph0e1777e5… after real2361. No policy/native mutation, paid call or deployment in this build. Real retained metadata, simulated retrieval and synthetic pixel tests are distinguished; fresh photographic/source access remains restricted.
+
+---
+
 # Current checkpoint — operational integration, locally verified
 
 [Completed integration and activation roadmap](release/V12_OPERATIONAL_INTEGRATION.md). Preserved checkpoint 907233f adds recurring, explicitly founder-confirmed caption/story operations without daily quotas. The continuation connects story-bound photographic requests/receipts and immutable exact-content approval preparation. Review binds caption/version, ordered images, source/rights evidence and private pixel hashes; later edits invalidate the prepared copy without replacing history. Integrated desktop/mobile testing uses retained Marcie evidence and labeled simulated operations in disposable storage. No new paid result, hosted deployment or live workflow change is claimed. Hosted remains 7fdbd32; worker remains restored inactive af24832e. Proposed refined native graph 0e1777e5… needs separate approval, as do recurring live authorization, source access and any native approval/Buffer writer.

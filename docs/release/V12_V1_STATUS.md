@@ -1,3 +1,9 @@
+# Current continuation — V13 photographic desk
+
+See [V13 photographic desk evidence and release boundary](V13_PHOTOGRAPHY.md). Live79d20fb and recurring worker d12b183b / graph0e1777e5… remain operational, with founder-accepted real caption2361. V13 photographic planning, source trails, collections and curation are local and undeployed. The older inactive/revoked descriptions below are historical V12 checkpoints, not the current operating state.
+
+---
+
 # Current checkpoint — operational integration, locally verified
 
 [Completed integration and activation roadmap](V12_OPERATIONAL_INTEGRATION.md). Checkpoint 907233f implements recurring founder-confirmed Generate/Improve with no daily quotas, one shared in-flight slot and durable single-use grants/receipts. The continuation finishes story-bound photographic request/receipt/inspection/arrangement and immutable exact-content Prepare Approval. It preserves caption versions, source/rights evidence and uploaded-byte hashes, invalidating a prepared handoff when the working copy changes. Retained-Marcie desktop/mobile simulations exercise the joined journey, duplicate protection, restart and failed/uncertain outcomes. These are local implementation proofs; earlier real 2359/2360 remain the paid native evidence. Hosted stays 7fdbd32, policy revoked, worker inactive af24832e. New two-node wording/budget refinement graph 0e1777e5… is prepared only. Release, exact worker/standing policy installation, legitimate source access and native approval/Buffer writes remain separate gates.
