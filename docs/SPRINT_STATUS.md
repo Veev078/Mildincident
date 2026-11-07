@@ -1,4 +1,10 @@
-# Current checkpoint — V13 photographic desk, local release pending
+# Current checkpoint — V14 creative workspace, local release pending
+
+[V14 implementation, verification and release boundaries](release/V14_CREATIVE_WORKSPACE.md). Pushed code checkpoint `ad6631ff2adf092bbb83091a7035d5e55188fb1c` adds original-source photographic discovery and inert saved-page recovery using the existing photo ledger, secondary archive controls, story-bound deduplication/curation, broader editorial starting points and a clearer writing/mobile workspace. Surprise Me uses the existing founder-brief input so its new guidance actually reaches the native research prompt. A four-node writing patch is prepared, not installed. 471 regressions, 40 browser groups, 11 HTTPS fixture groups and retained Sophy/Marcie/Duolingo journeys pass. Render remains `79d20fb`; all four live workflow snapshots match their pre-build graphs/settings. Recurring AI remains on active `d12b183b` / `0e1777e5…`, unchanged. Fresh external photographic pixels and new AI writing quality remain unverified under current access/paid-execution boundaries. The founder confirmed an offsite backup; its archive was not independently accessible or restore-tested here. All implementation writes were isolated.
+
+---
+
+# Earlier checkpoint — V13 photographic desk, local release pending
 
 [Evidence, implementation and source-access boundaries](release/V13_PHOTOGRAPHY.md). The Sophy problem was a retained multi-project publisher page rendered as one grid: four project-caption references among40, with unrelated projects already tagged context_only. New local work adds source-bound query directions/pagination, retained project-specific publisher trails, duplicate-safe receipts, separated visual collections and explicit curation. Exact approval includes photographic context and image-review changes. Hosted remains79d20fb; recurring AI stays active at d12b183b / graph0e1777e5… after real2361. No policy/native mutation, paid call or deployment in this build. Real retained metadata, simulated retrieval and synthetic pixel tests are distinguished; fresh photographic/source access remains restricted.
 

@@ -1,4 +1,10 @@
-# Current continuation — V13 photographic desk
+# Current continuation — V14 creative workspace
+
+[V14 release notes](V14_CREATIVE_WORKSPACE.md). Code checkpoint `ad6631ff2adf092bbb83091a7035d5e55188fb1c` is pushed with `[skip render]`: project-first page retrieval, saved-page photographic recovery, unchanged version-1 native archive contracts, broader founder briefs that reach the current worker, modern writing directions and compact desktop/mobile curation. Actual rendered before/after screenshots are private local artifacts. Retained-data/simulated journeys and 471 regressions pass; no fresh real photo retrieval, paid caption, native installation or hosted browser success is claimed. Hosted remains `79d20fb`; recurring AI stays active at `d12b183b` / `0e1777e5…`. All four native workflow graphs/settings compare unchanged. Separate code release, real-photo access and approval of the proposed four-node writing update remain the next gates.
+
+---
+
+# Earlier continuation — V13 photographic desk
 
 See [V13 photographic desk evidence and release boundary](V13_PHOTOGRAPHY.md). Live79d20fb and recurring worker d12b183b / graph0e1777e5… remain operational, with founder-accepted real caption2361. V13 photographic planning, source trails, collections and curation are local and undeployed. The older inactive/revoked descriptions below are historical V12 checkpoints, not the current operating state.
 
@@ -274,7 +280,7 @@ Updated **November 5, 2026, America/New_York**. **Real preliminary editorial dra
 
 | Evidence | Verified result |
 | --- | --- |
-| Original research | Execution **2353**, original job `9a3bfd8f-326e-4680-87d2-965da15e0f8a`, candidate `DEV-9a3bfd8f-326e-4680-87d2-965da15e0f8a-1`. Two substantive [Photographers' Gallery passages](https://thephotographersgallery.org.uk/photography-culture/story-behind-photograph-marcie-docherty) support London club/youth culture and relationships formed on nights out. Its third, interpretive claim stays excluded from drafting facts. Original native candidate JSON was read back and remains byte-for-byte unchanged. |
+| Original research | Execution **2353**, original job `9a3bfd8f-326e-4710-87d2-965da15e0f8a`, candidate `DEV-9a3bfd8f-326e-4710-87d2-965da15e0f8a-1`. Two substantive [Photographers' Gallery passages](https://thephotographersgallery.org.uk/photography-culture/story-behind-photograph-marcie-docherty) support London club/youth culture and relationships formed on nights out. Its third, interpretive claim stays excluded from drafting facts. Original native candidate JSON was read back and remains byte-for-byte unchanged. |
 | New recovery identity | Job **38b01282-9e80-42b8-ac7b-a96bfb12124a**, execution **2355**, candidate `DEV-38b01282-9e80-42b8-ac7b-a96bfb12124a-1`. Original research IDs, capture time and evidence SHA256 **6cbc15f805f4e7028b89d0fcd360c59f05ac2972e5408eee8f470c8c6fb25af7** are retained as explicit recovery lineage. No original job, claim or founder edit was reset. |
 | Reviewed execution | Founder separately authorized temporary recovery graph **65d64d6a6fafa3689fa72c5966d0b29548755bfd89c197a0845035f16c5c28ee** in the same worker. Native temporary version **0f6aaf68-a5e6-4456-86ef-4ef33a75bc01** was activated for that one exact job, then deactivated. The existing standard worker was saved inactive afterward. Rollback snapshots remain private. |
 | Actual model input | Repaired native template rendered **21355 characters**. The executed input hashes identically to the reviewed input. Only original claim indices **0 and1** qualified; source passages and captured Brand Brain were reused. Photographic metadata was not promoted to inspected pixels. |
