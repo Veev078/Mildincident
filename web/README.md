@@ -1,6 +1,10 @@
 # Editorial workspace frontend
 
-Vanilla browser ES modules, reusable rendering helpers and views, no build step or external fonts. `app.js` manages routing, data access, local-save queues and interactions; `components.js` provides escaped reusable components; `views.js` contains the editorial screens; `styles.css` supplies the responsive design system.
+Vanilla browser ES modules, reusable rendering helpers and views, no build step or external fonts. `app.js` manages routing, data access, local-save queues and interactions; `components.js` provides escaped reusable components; `views.js` contains the editorial screens. `photo-desk.js` owns gallery/selected-sequence rendering, `photo-requests.js` the guarded source-search controls, and `inspector.js` full-image inspection and feedback.
+
+`styles.css` supplies shared tokens and feature styles. `workstation.css`, loaded afterward, is the sole owner of shell/navigation, photo grid/selection, inspector/comparison and writing-workspace layout. The corresponding old rules have been removed from `styles.css`, `workflow.css` and `develop.css`; edit the owning component rules rather than appending another override block. The shared language uses neutral surfaces, dark navigation, serif headings, system sans controls, 4px component radii and an 8px-based spacing scale.
+
+For a safe visual review, run `npm run workspace:design-review` and open its printed loopback URL. This uses disposable SQLite stores and clearly labelled generated images without live APIs or AI calls. Ctrl+C deletes the fixture. `npm run test:workstation` captures nine rendered screens and tests selection, comparison, feedback context, autosave and responsive widths from 1440 to 320 pixels. Images and logs stay ignored in `.local/workstation/`. See [the review evidence](../docs/release/VISUAL_WORKSTATION_REVIEW.md) for the preserved before/after artifacts and limitations; generated-image screenshots do not prove photographic discovery or rights clearance.
 
 ## Working interactions
 
@@ -9,6 +13,7 @@ Vanilla browser ES modules, reusable rendering helpers and views, no build step 
 - Story workspace: source dossier and claims, image candidates/provenance, ordered carousel, caption, working notes, music direction and publishing evidence under one source identity.
 - Direction: a complete local creative brief with one chosen narrative hook, specific angle, visual intention, case preference, roles/notes on actual selected images, broader source-lane searches and four manual taste ratings. Case choice never rewrites a caption; ratings never grant publication approval. The inspiration study is labeled historical and unverified, not used as current account-performance or posting-time evidence.
 - Image library: candidate/creator/story search, rights filtering, source directory, provenance dialogs and side-by-side comparison of up to three actual previews.
+- Photographs: grouped direction/search controls, a gallery and selected-sequence panel (a compact strip on mobile). Source tools/history stay accessible in disclosures. Inspector and comparison support explicit sequence selection. Compared reference IDs survive refresh within the tab until explicitly cleared; unavailable references remain identified. Closing an inspector returns focus to its launcher. Unsaved image feedback survives sequence changes and requires explicit confirmation of its new working context.
 - Carousel: accessible earlier/later controls, removal/addition and drag/drop ordering. Changes are saved only to a local proposal.
 - Caption/notes: debounced local autosave, visible confirmation/error, retry, character count, internal-test marker check, retained source caption and a reusable research checklist.
 - Existing founder, production and source-review notes from n8n remain visible read-only beside local working notes. They are never replaced by an empty local editor.
