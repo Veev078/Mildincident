@@ -5,7 +5,7 @@ import {requireThat} from '../errors.js';
 import {safePhotoReference} from '../n8n/photo-url-guard.js';
 import {makePhotoPacket,validatePhotoReceipt,photoDigest,targetPhotoPacket} from './native-contract.js';
 import {captureTargetedPhotoResult} from '../n8n/studio-photo-adapter.js';
-import {automaticPhotoPlan,fetchProjectPage,projectPageReferences} from './project-sources.js';
+import {automaticPhotoPlan,fetchProjectPage,projectPageReferences,permittedProjectPage} from './project-sources.js';
 export class PhotographyService extends PhotoResearch {
  constructor(research,{retrieve=fetchPhotoPage,readProjectPage=fetchProjectPage}={}){super(research);this.retrieve=retrieve;this.readProjectPage=readProjectPage;this.db.exec('CREATE TABLE IF NOT EXISTS photo_page_cache(source TEXT,query TEXT,page INTEGER,data_json TEXT,cached_at TEXT,PRIMARY KEY(source,query,page))');}
  async page(source,query,page){const prior=this.db.prepare('SELECT * FROM photo_page_cache WHERE source=? AND query=? AND page=?').get(source,query,page);if(prior&&Date.now()-Date.parse(prior.cached_at)<86400000)return JSON.parse(prior.data_json);const photos=await this.retrieve(source,query,page);this.db.prepare('INSERT INTO photo_page_cache VALUES(?,?,?,?,?) ON CONFLICT(source,query,page) DO UPDATE SET data_json=excluded.data_json,cached_at=excluded.cached_at').run(source,query,page,JSON.stringify(photos),new Date().toISOString());return photos;}
@@ -17,9 +17,12 @@ export class PhotographyService extends PhotoResearch {
  storyProjectTrails(story){
   this.storyTables();const identity=storyPhotoIdentity(story),trails=[],seen=new Set();
   for(const row of this.db.prepare("SELECT request_id FROM photo_story_requests WHERE story_id=? AND state='complete' ORDER BY rowid DESC").all(story.id)){
-   const p=this.storyRequest(row.request_id),capture=p.sourceCapture;
-   if(p.packet.payload.target.sourceRevision!==story.revision||!capture?.identity||capture.identity.photographer!==identity.photographer||capture.identity.series!==identity.series)continue;
-   for(const link of capture.projectTrails||[])if(!seen.has(link.url)){seen.add(link.url);trails.push(link);if(trails.length===8)return trails;}
+   const p=this.storyRequest(row.request_id);
+   if(p.packet.payload.target.sourceRevision!==story.revision)continue;
+   for(const capture of p.sourceCaptures||[p.sourceCapture]){
+    if(!capture?.identity||capture.identity.photographer!==identity.photographer||capture.identity.series!==identity.series)continue;
+    for(const link of capture.projectTrails||[])if(!seen.has(link.url)){seen.add(link.url);trails.push(link);if(trails.length===8)return trails;}
+   }
   }return trails;
  }
  photoContextMatches(story,target){return story?.id===target.storyId&&story.revision===target.sourceRevision&&!story.localDraft?.stale&&(story.localDraft?.version||0)===target.workingVersion&&(target.scope==='story_source'&&target.assetId===null||story.media?.some(m=>m.id===target.assetId&&(m.localPreview?.sha256||null)===target.previewSha256));}
@@ -34,7 +37,7 @@ export class PhotographyService extends PhotoResearch {
   if(imported){requireThat(safePhotoReference(input.sourceUrl)&&typeof input.html==='string'&&Buffer.byteLength(input.html)<=2000000&&input.html.length>=20,'INVALID_PHOTO_SOURCE','Choose an original public URL and its saved HTML page, up to 2 MB.');Object.assign(plan,{source:'project',sourceUrl:input.sourceUrl,route:'saved_page',reason:'Inspect the saved page you supplied. Its origin and captions remain unverified; no network request is made.',sourceCalls:0});}
   else requireThat(input.sourceUrl===undefined,'PHOTO_SOURCE_NOT_BOUND','Automatic discovery follows only source URLs already retained on this story.');
   const target={storyId:story.id,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,assetId:null,previewSha256:null,scope:'story_source'};
-  const payload={purpose:'private_story_photo_discovery',requestId:input.idempotencyKey,target,direction:{source:plan.source,query:plan.query,page:1,photographicDirection:plan.direction,custom:plan.custom},sourceUrl:plan.sourceUrl,route:plan.route,htmlSha256:imported?createHash('sha256').update(input.html).digest('hex'):null,budget:{sourceCalls:plan.sourceCalls,automaticRetries:0,paidCalls:0,remoteWrites:0},rightsGranted:false};
+  const payload={purpose:'private_story_photo_discovery',requestId:input.idempotencyKey,target,direction:{source:plan.source,query:plan.query,page:1,photographicDirection:plan.direction,custom:plan.custom},sourceUrl:plan.sourceUrl,route:plan.route,relevancePolicy:plan.relevancePolicy,htmlSha256:imported?createHash('sha256').update(input.html).digest('hex'):null,budget:{sourceCalls:plan.sourceCalls,automaticRetries:0,paidCalls:0,remoteWrites:0},rightsGranted:false};
   const packet={schemaVersion:2,payload,digest:photoDigest(payload)},prior=this.storyRequest(input.idempotencyKey);
   if(prior){requireThat(prior.packet.digest===packet.digest,'EDIT_CONFLICT','This request is already bound to another source or story version.');return this.storyRequestView(prior);}
   requireThat(!this.db.prepare("SELECT request_id FROM photo_story_requests WHERE story_id=? AND state='fetching'").get(story.id),'EDIT_CONFLICT','A photograph request is already in progress or needs reconciliation. It will not be repeated.');
@@ -47,22 +50,41 @@ export class PhotographyService extends PhotoResearch {
   if(p.state!=='prepared')return this.storyRequestView(p);
   requireThat(input.sourceRevision===story.revision&&input.workingVersion===(story.localDraft?.version||0)&&this.photoContextMatches(readStory(),p.packet.payload.target),'EDIT_CONFLICT','The story changed. Save it before a new photograph request.');
   const payload=p.packet.payload;
-  requireThat(photoDigest(payload)===p.packet.digest&&payload.requestId===p.id&&payload.purpose==='private_story_photo_discovery'&&payload.direction.source===p.plan.source&&payload.direction.query===p.plan.query&&payload.direction.photographicDirection===p.plan.direction&&payload.direction.custom===p.plan.custom&&payload.sourceUrl===p.plan.sourceUrl&&payload.route===p.plan.route&&payload.budget.sourceCalls===p.plan.sourceCalls&&payload.budget.paidCalls===0&&payload.budget.automaticRetries===0&&payload.budget.remoteWrites===0&&payload.rightsGranted===false,'INVALID_PHOTO_RECEIPT','The saved photo request changed. No source request was made.');
+  requireThat(photoDigest(payload)===p.packet.digest&&payload.requestId===p.id&&payload.purpose==='private_story_photo_discovery'&&payload.direction.source===p.plan.source&&payload.direction.query===p.plan.query&&payload.direction.photographicDirection===p.plan.direction&&payload.direction.custom===p.plan.custom&&payload.sourceUrl===p.plan.sourceUrl&&payload.route===p.plan.route&&payload.relevancePolicy===p.plan.relevancePolicy&&payload.budget.sourceCalls===p.plan.sourceCalls&&payload.budget.paidCalls===0&&payload.budget.automaticRetries===0&&payload.budget.remoteWrites===0&&payload.rightsGranted===false,'INVALID_PHOTO_RECEIPT','The saved photo request changed. No source request was made.');
   if(p.plan.route==='saved_page')requireThat(typeof p.savedHtml==='string'&&createHash('sha256').update(p.savedHtml).digest('hex')===payload.htmlSha256,'INVALID_PHOTO_RECEIPT','The saved page differs from the reviewed request.');
-  p.startedAt=new Date().toISOString();const cache=p.plan.source!=='project'&&this.db.prepare('SELECT cached_at FROM photo_page_cache WHERE source=? AND query=? AND page=1').get(p.plan.source,p.plan.query);p.sourceCalls=cache&&Date.now()-Date.parse(cache.cached_at)<86400000?0:p.plan.sourceCalls;
+  p.startedAt=new Date().toISOString();const cache=p.plan.source!=='project'&&this.db.prepare('SELECT cached_at FROM photo_page_cache WHERE source=? AND query=? AND page=1').get(p.plan.source,p.plan.query);p.sourceCalls=p.plan.source==='project'||cache&&Date.now()-Date.parse(cache.cached_at)<86400000?0:p.plan.sourceCalls;
   if(!this.db.prepare("UPDATE photo_story_requests SET state='fetching',data_json=? WHERE request_id=? AND state='prepared'").run(JSON.stringify(p),p.id).changes)return this.storyRequestView(this.storyRequest(p.id));
   this.running.add(p.id);
   try{
    if(p.plan.route==='source_assisted')throw Error('SOURCE_READER_UNAVAILABLE');
    let found,sourceCapture=null;
    if(p.plan.source==='project'){
-    const html=p.plan.route==='saved_page'?p.savedHtml:await this.readProjectPage(story,p.plan.sourceUrl);
-    ({photos:found,sourceCapture}=projectPageReferences(story,{url:p.plan.sourceUrl,html,direction:p.plan.direction,basis:p.plan.route==='saved_page'?'founder_supplied_saved_page':'fetched_project_page'}));
+    const captures=[],visited=new Set();
+    const read=async(context,url)=>{
+     requireThat(permittedProjectPage(context,url),'PHOTO_SOURCE_NOT_BOUND','Only an exact recorded project link on a supported source can be followed.');
+     requireThat(!visited.has(url)&&p.sourceCalls<payload.budget.sourceCalls&&this.photoContextMatches(readStory(),payload.target),'INVALID_PHOTO_TARGET','The source budget or story changed. No further page was read.');
+     visited.add(url);p.sourceCalls++;p.sourceAttempts=[...(p.sourceAttempts||[]),{url,startedAt:new Date().toISOString()}];
+     this.db.prepare("UPDATE photo_story_requests SET data_json=? WHERE request_id=?").run(JSON.stringify(p),p.id);
+     const html=await this.readProjectPage(context,url),result=projectPageReferences(story,{url,html,direction:p.plan.direction});captures.push(result.sourceCapture);p.sourceCaptures=[...captures];p.sourceCapture=result.sourceCapture;p.sourceAttempts.at(-1).status='captured';
+     this.db.prepare("UPDATE photo_story_requests SET data_json=? WHERE request_id=?").run(JSON.stringify(p),p.id);return result;
+    };
+    const initialContext={...story,recordedProjectLinks:[...(story.recordedProjectLinks||[]),...this.storyProjectTrails(story)]};
+    let result=p.plan.route==='saved_page'?projectPageReferences(story,{url:p.plan.sourceUrl,html:p.savedHtml,direction:p.plan.direction,basis:'founder_supplied_saved_page'}):await read(initialContext,p.plan.sourceUrl);
+    found=result.photos;sourceCapture=result.sourceCapture;
+    if(p.plan.route!=='saved_page'&&p.sourceCalls<payload.budget.sourceCalls){
+     const context={...story,recordedProjectLinks:[...(story.recordedProjectLinks||[]),...(sourceCapture.projectTrails||[])]};
+     const link=sourceCapture.projectTrails?.find(link=>!visited.has(link.url)&&permittedProjectPage(context,link.url));
+     if(link){result=await read(context,link.url);const byId=new Map([...found,...result.photos].map(photo=>[photo.id,photo]));found=[...byId.values()].sort((a,b)=>photoRelevance(b,p.plan.identity).score-photoRelevance(a,p.plan.identity).score).slice(0,40);sourceCapture=result.sourceCapture;}
+    }
    }else{const page=await this.page(p.plan.source,p.plan.query,1);found=Array.isArray(page)?page:page.photos;}
    requireThat(Array.isArray(found)&&found.length<=40,'INVALID_PHOTO_RECEIPT','The source result exceeds the bounded reference count.');
    const receipt={schemaVersion:2,purpose:'private_story_photo_result',requestId:p.id,inputDigest:p.packet.digest,target:p.packet.payload.target,source:p.plan.source,query:p.plan.query,page:1,status:'ok',photos:found,hasMore:false,observedAt:new Date().toISOString(),executionId:null,remoteWrites:0,paidCalls:0,rightsGranted:false};
    return this.storeStoryReceipt({...p,sourceCapture,savedHtml:undefined},receipt,{readStory,executionVerified:false});
-  }catch(error){p.errorCode=/^(?:SOURCE|ARCHIVE)_[A-Z0-9_]+$/.test(error.message||'')?error.message:'SOURCE_UNAVAILABLE';this.db.prepare("UPDATE photo_story_requests SET state='unavailable',data_json=? WHERE request_id=?").run(JSON.stringify(p),p.id);return this.storyRequestView(this.storyRequest(p.id));}
+  }catch(error){
+   p.errorCode=/^(?:SOURCE|ARCHIVE)_[A-Z0-9_]+$/.test(error.message||'')?error.message:'SOURCE_UNAVAILABLE';
+   const pending=p.sourceAttempts?.find(attempt=>!attempt.status);if(pending){pending.status='failed';pending.errorCode=p.errorCode;p.failedSourceUrl=pending.url;}
+   this.db.prepare("UPDATE photo_story_requests SET state='unavailable',data_json=? WHERE request_id=?").run(JSON.stringify(p),p.id);return this.storyRequestView(this.storyRequest(p.id));
+  }
   finally{this.running.delete(p.id);}
  }
  closeInterruptedDiscovery(story,id,input){
@@ -86,7 +108,11 @@ export class PhotographyService extends PhotoResearch {
  }
  storyRequestView(p){const messages={prepared:'Review the direction, then search one archive page. No AI or native workflow starts.',fetching:'One source request is in progress. It will not be repeated automatically.',complete:'Photograph references are saved to this story. Preview, identity and rights review remain separate.',unavailable:'The source could not be reached or its response was unusable. No automatic retry was made.',review_required:'Results are retained, but the story changed during retrieval. Review the saved context before using them.'};
   const denied=p.errorCode?.match(/^(?:SOURCE|ARCHIVE)_HTTP_(401|403)$/);
-  return {id:p.id,state:p.state==='fetching'&&!this.running.has(p.id)?'uncertain':p.state,source:p.packet.payload.direction.source,query:p.packet.payload.direction.query,createdAt:p.createdAt,sourceRevision:p.packet.payload.target.sourceRevision,workingVersion:p.packet.payload.target.workingVersion,photoCount:p.receipt?.photos?.length||0,newPhotoCount:p.displayPhotoIds?.length??p.receipt?.photos?.length??0,duplicateCount:p.duplicateCount||0,relevanceCounts:p.relevanceCounts||null,page:p.packet.payload.direction.page,hasMore:p.state==='complete'&&p.receipt?.hasMore===true,plan:p.plan||null,sourceCapture:p.sourceCapture?{url:p.sourceCapture.url,sha256:p.sourceCapture.sha256,basis:p.sourceCapture.basis,capturedAt:p.sourceCapture.capturedAt,networkFetched:p.sourceCapture.networkFetched,coverage:p.sourceCapture.coverage,projectTrails:p.sourceCapture.projectTrails||[]}:null,executionVerified:p.executionVerified===true,executionId:p.receipt?.executionId||null,errorCode:p.errorCode||null,message:p.errorCode==='SOURCE_READER_UNAVAILABLE'?'Bring a saved copy of the original page below. No source request or AI call was made; generic archive results would not establish this project.':denied?'The source denied access (HTTP '+denied[1]+'). Open the original page and import a saved copy below. No automatic retry was made.':p.state==='fetching'&&!this.running.has(p.id)?'The source request outcome needs checking after restart. It will not be resent.':p.state==='complete'&&p.sourceCapture?.projectTrails?.length&&!p.plan?.projectTrails?.length?'A more specific project page was recovered. Find more photos will follow it on your next request. Your caption and carousel are unchanged.':p.state==='complete'&&(p.displayPhotoIds?.length??p.receipt?.photos?.length??0)===0?'No new references found. Repeated files stay in the receipt; try a different direction or bring an original page.':p.state==='prepared'&&p.packet.schemaVersion===2?'One source selected from this story. No AI call.':messages[p.state]||'Outcome needs checking; do not resend this request.',sourceCalls:p.sourceCalls||0,paidCalls:0,rightsGranted:false};
+  const captureView=c=>({url:c.url,sha256:c.sha256,basis:c.basis,capturedAt:c.capturedAt,networkFetched:c.networkFetched,coverage:c.coverage,projectTrails:c.projectTrails||[]});
+  const filtered=p.plan?.relevancePolicy==='project_evidence_v1',newCount=p.displayPhotoIds?.length??p.receipt?.photos?.length??0,excludedCount=p.excludedPhotoIds?.length||0;
+  const kind=p.plan?.direction==='context'?'context':'project',excluded=`${excludedCount} unrelated or unconfirmed reference${excludedCount===1?'':'s'} kept out of suggestions.`;
+  const completionMessage=newCount?`${newCount} new ${kind} reference${newCount===1?'':'s'}. ${excluded} Visual review and permissions still need checking.`:`No new ${kind} references. ${excluded} No visual review has run.`;
+  return {id:p.id,state:p.state==='fetching'&&!this.running.has(p.id)?'uncertain':p.state,source:p.packet.payload.direction.source,query:p.packet.payload.direction.query,createdAt:p.createdAt,sourceRevision:p.packet.payload.target.sourceRevision,workingVersion:p.packet.payload.target.workingVersion,photoCount:p.receipt?.photos?.length||0,newPhotoCount:newCount,duplicateCount:p.duplicateCount||0,excludedCount,relevanceCounts:p.relevanceCounts||null,page:p.packet.payload.direction.page,hasMore:p.state==='complete'&&p.receipt?.hasMore===true,plan:p.plan||null,sourceCapture:p.sourceCapture?captureView(p.sourceCapture):null,sourcePages:(p.sourceCaptures||[]).map(captureView),executionVerified:p.executionVerified===true,executionId:p.receipt?.executionId||null,errorCode:p.errorCode||null,failedSourceUrl:p.failedSourceUrl||null,message:p.errorCode==='SOURCE_READER_UNAVAILABLE'?'Bring a saved copy of the original page below. No source request or AI call was made; generic archive results would not establish this project.':denied?'The source denied access (HTTP '+denied[1]+'). Open the original page and import a saved copy below. No automatic retry was made.':p.state==='fetching'&&!this.running.has(p.id)?'The source request outcome needs checking after restart. It will not be resent.':p.state==='complete'&&filtered?completionMessage:p.state==='complete'&&p.sourceCapture?.projectTrails?.length&&!p.plan?.projectTrails?.length?'A more specific project page was recovered. Find more photos will follow it on your next request. Your caption and carousel are unchanged.':p.state==='complete'&&newCount===0?'No new references found. Repeated files stay in the receipt; try a different direction or bring an original page.':p.state==='prepared'&&p.packet.schemaVersion===2?`Read up to ${p.packet.payload.budget.sourceCalls} recorded source page(s). No AI call.`:messages[p.state]||'Outcome needs checking; do not resend this request.',sourceCalls:p.sourceCalls||0,paidCalls:0,rightsGranted:false};
  }
  storyRequestsFor(story){this.storyTables();return this.db.prepare('SELECT request_id FROM photo_story_requests WHERE story_id=? ORDER BY rowid DESC').all(story.id).map(r=>this.storyRequestView(this.storyRequest(r.request_id)));}
  async searchStoryRequest(story,id,input,{readStory=()=>story}={}){
@@ -106,10 +132,18 @@ export class PhotographyService extends PhotoResearch {
   else requireThat(receipt.schemaVersion===2&&receipt.inputDigest===p.packet.digest&&receipt.requestId===p.id&&JSON.stringify(receipt.target)===JSON.stringify(p.packet.payload.target)&&receipt.source===p.plan.source&&receipt.query===p.plan.query&&receipt.photos.length<=40&&receipt.rightsGranted===false&&receipt.remoteWrites===0&&receipt.paidCalls===0&&receipt.executionId===null&&!executionVerified,'INVALID_PHOTO_RECEIPT','Local page references cannot change their originating context or claim native execution.');
   const state=this.photoContextMatches(readStory(),p.packet.payload.target)?'complete':'review_required';
   this.put(receipt.photos.map(photo=>({...photo,rightsStatus:'unreviewed',rightsGranted:false,publicationApproved:false,sourceConfidence:p.sourceCapture?.basis==='founder_supplied_saved_page'?'founder_supplied_saved_page_unverified':'source_metadata_not_identity_verification',technicalStatus:photo.previewUrl?'reference_not_decoded':'no_preview_reference',contextBasis:p.sourceCapture?'story_bound_source_page':'story_bound_archive_receipt',nativeExecutionId:executionVerified?receipt.executionId:null})),p.id);
-  const current=readStory(),known=new Set([...(current?.media||[]),...this.storyMedia(current||{id:p.storyId})].flatMap(photoFileKeys)),displayPhotoIds=[];let duplicateCount=0;for(const photo of receipt.photos){const keys=photoFileKeys(photo),duplicate=keys.some(k=>known.has(k));keys.forEach(k=>known.add(k));if(duplicate){duplicateCount++;continue;}displayPhotoIds.push(photo.id);}
-  const relevanceCounts={direct:0,context:0,unconfirmed:0},identity=storyPhotoIdentity(current||{});for(const photo of receipt.photos)if(displayPhotoIds.includes(photo.id))relevanceCounts[photoRelevance({...photo,sourceCaption:photo.description,photoExplorationDirection:p.plan?.direction},identity).category]++;
+  const current=readStory(),known=new Set([...(current?.media||[]),...this.storyMedia(current||{id:p.storyId})].flatMap(photoFileKeys)),displayPhotoIds=[],excludedPhotoIds=[],identity=storyPhotoIdentity(current||{});
+  const relevanceCounts={direct:0,context:0,unconfirmed:0},observedRelevanceCounts={direct:0,context:0,unconfirmed:0};let duplicateCount=0;
+  for(const photo of receipt.photos){
+   const category=photoRelevance({...photo,sourceCaption:photo.description,photoExplorationDirection:p.plan?.direction},identity).category;observedRelevanceCounts[category]++;
+   const keys=photoFileKeys(photo),duplicate=keys.some(k=>known.has(k));keys.forEach(k=>known.add(k));if(duplicate){duplicateCount++;continue;}
+   // Only new reviewed-policy requests are filtered. Earlier receipts, native
+   // contracts, founder selections and their authorization history stay intact.
+   if(p.packet.schemaVersion===2&&p.plan?.relevancePolicy==='project_evidence_v1'&&category!=='direct'&&p.plan.direction!=='context'){excludedPhotoIds.push(photo.id);continue;}
+   displayPhotoIds.push(photo.id);relevanceCounts[category]++;
+  }
   this.db.prepare('UPDATE photo_hunts SET page=?,state=? WHERE id=?').run(receipt.page+1,receipt.hasMore?'paused':'complete',p.id);
-  const data={...p,receipt,displayPhotoIds,duplicateCount,relevanceCounts,executionVerified:executionVerified===true};this.db.prepare('UPDATE photo_story_requests SET state=?,data_json=? WHERE request_id=?').run(state,JSON.stringify(data),p.id);return this.storyRequestView(this.storyRequest(p.id));
+  const data={...p,receipt,displayPhotoIds,excludedPhotoIds,duplicateCount,relevanceCounts,observedRelevanceCounts,executionVerified:executionVerified===true};this.db.prepare('UPDATE photo_story_requests SET state=?,data_json=? WHERE request_id=?').run(state,JSON.stringify(data),p.id);return this.storyRequestView(this.storyRequest(p.id));
  }
  acceptStoryNativeResult(id,execution,review,{readStory}){
   const p=this.storyRequest(id);requireThat(p?.packet.schemaVersion===1&&review?.workflowId==='Zouc5I3MQwRJhfXG'&&review.requestId===id&&review.inputDigest===p.packet.digest,'INVALID_PHOTO_RECEIPT','Use the separately reviewed original sourcing request and exact execution.');

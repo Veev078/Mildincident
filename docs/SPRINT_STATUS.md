@@ -1,4 +1,10 @@
-# Current checkpoint — V14 creative workspace, local release pending
+# Current checkpoint — V14 live; photographic intelligence continuation
+
+V14 `108a7e88ce3f61844f4a3c45ec3530c604738448` is live. The founder completed hosted acceptance: interface/previews work, but nine new references and ten repeats were not relevant/compelling enough; no AI visual research occurred. Do not repeat acceptance or redeploy that commit. [Focused source/image diagnosis and implementation plan](release/PHOTO_INTELLIGENCE_NEXT.md) records the next work. Local development now filters unrelated references from **new** project-first requests, follows one exact project link within a two-page claim, retains private source captures/exclusions and deduplicates responsive encodings. Existing selections/history and live recurring AI are untouched. This is not yet intelligent image discovery: source acquisition/CDN binding, decoded-image visual review and a separately approved native photo-operation branch remain necessary. No deployment or paid operation is authorized by this continuation.
+
+---
+
+# Earlier checkpoint — V14 creative workspace, local release pending
 
 [V14 implementation, verification and release boundaries](release/V14_CREATIVE_WORKSPACE.md). Pushed code checkpoint `ad6631ff2adf092bbb83091a7035d5e55188fb1c` adds original-source photographic discovery and inert saved-page recovery using the existing photo ledger, secondary archive controls, story-bound deduplication/curation, broader editorial starting points and a clearer writing/mobile workspace. Surprise Me uses the existing founder-brief input so its new guidance actually reaches the native research prompt. A four-node writing patch is prepared, not installed. 471 regressions, 40 browser groups, 11 HTTPS fixture groups and retained Sophy/Marcie/Duolingo journeys pass. Render remains `79d20fb`; all four live workflow snapshots match their pre-build graphs/settings. Recurring AI remains on active `d12b183b` / `0e1777e5…`, unchanged. Fresh external photographic pixels and new AI writing quality remain unverified under current access/paid-execution boundaries. The founder confirmed an offsite backup; its archive was not independently accessible or restore-tested here. All implementation writes were isolated.
 

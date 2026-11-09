@@ -7,6 +7,7 @@ import {randomUUID} from 'node:crypto';
 import {LocalResearchStore} from '../src/workspace/research-store.js';
 import {PhotographyService} from '../src/photography/service.js';
 import {automaticPhotoPlan,permittedProjectPage,fetchProjectPage,projectPageReferences} from '../src/photography/project-sources.js';
+import {photoDigest} from '../src/photography/native-contract.js';
 
 const url='https://www.dazeddigital.com/art-photography/article/123/1/test-project';
 const html=`<html><h1>SYNTHETIC TEST SOURCE — NOT REAL PHOTOGRAPHY</h1><figure><img src="https://example.org/test.jpg" width="1500" height="1800"><figcaption>Test Maker, Test Project. Photos by Test Maker. Backstage contact sheet.</figcaption></figure><figure><img src="https://example.org/other.jpg"><figcaption>Different creator, unrelated project.</figcaption></figure><script>throw Error('NEVER EXECUTE SOURCE SCRIPTS')</script></html>`;
@@ -36,14 +37,63 @@ test('a contemporary original source without a supported reader leads to source-
 });
 test('source-first discovery works without a fabricated image anchor, duplicate clicks read once and restart preserves the receipt',async t=>{
  let calls=0;const {research,service}=await setup(t,{readProjectPage:async()=>{calls++;return html;}}),story=makeStory(),before=JSON.stringify(story),input=request(story),p=service.prepareDiscovery(story,input);
- assert.equal(service.storyRequest(p.id).packet.payload.target.assetId,null);await Promise.all([service.searchStoryRequest(story,p.id,confirm(story)),service.searchStoryRequest(story,p.id,confirm(story))]);assert.equal(calls,1);assert.equal(service.storyMedia(story).length,2);assert.equal(JSON.stringify(story),before);
+ assert.equal(service.storyRequest(p.id).packet.payload.target.assetId,null);await Promise.all([service.searchStoryRequest(story,p.id,confirm(story)),service.searchStoryRequest(story,p.id,confirm(story))]);assert.equal(calls,1);assert.equal(service.storyMedia(story).length,1);assert.equal(service.storyRequest(p.id).receipt.photos.length,2);assert.equal(service.storyRequestView(service.storyRequest(p.id)).excludedCount,1);assert.equal(JSON.stringify(story),before);
  const restarted=new PhotographyService(research,{readProjectPage:()=>{throw Error('NO RETRY');}});await restarted.searchStoryRequest(story,p.id,confirm(story));assert.equal(restarted.storyRequestsFor(story)[0].state,'complete');assert.equal(restarted.storyMedia(story)[0].receiptBasis,'fetched_project_page');assert.equal(restarted.storyMedia(story)[0].rightsStatus,'unreviewed');assert.equal(JSON.stringify(restarted.storyRequestsFor(story)).includes('<script>'),false);
 });
 test('blocked source stops after one request; saved-page import recovers and deduplicates references in the same ledger',async t=>{
  let calls=0;const {service}=await setup(t,{readProjectPage:async()=>{calls++;throw Error('SOURCE_HTTP_403');},retrieve:()=>{throw Error('NO FALLBACK FETCH');}}),story=makeStory();
  const first=service.prepareDiscovery(story,request(story));const denied=await service.searchStoryRequest(story,first.id,confirm(story));assert.equal(denied.state,'unavailable');assert.match(denied.message,/HTTP 403/);await service.searchStoryRequest(story,first.id,confirm(story));assert.equal(calls,1);
- const input=request(story,{sourceUrl:url,html}),p=service.prepareDiscovery(story,input);const recovered=await service.searchStoryRequest(story,p.id,confirm(story));assert.equal(recovered.sourceCalls,0);assert.equal(recovered.newPhotoCount,2);assert.equal(recovered.sourceCapture.basis,'founder_supplied_saved_page');assert.equal(calls,1);
- const again=service.prepareDiscovery(story,request(story,{sourceUrl:url,html})),duplicate=await service.searchStoryRequest(story,again.id,confirm(story));assert.equal(duplicate.newPhotoCount,0);assert.equal(duplicate.duplicateCount,2);assert.equal(service.storyMedia(story).length,2);assert.throws(()=>service.prepareDiscovery(story,{...input,html:html+'different'}),{code:'EDIT_CONFLICT'});
+ const input=request(story,{sourceUrl:url,html}),p=service.prepareDiscovery(story,input);const recovered=await service.searchStoryRequest(story,p.id,confirm(story));assert.equal(recovered.sourceCalls,0);assert.equal(recovered.newPhotoCount,1);assert.equal(recovered.excludedCount,1);assert.equal(recovered.sourceCapture.basis,'founder_supplied_saved_page');assert.equal(calls,1);
+ const again=service.prepareDiscovery(story,request(story,{sourceUrl:url,html})),duplicate=await service.searchStoryRequest(story,again.id,confirm(story));assert.equal(duplicate.newPhotoCount,0);assert.equal(duplicate.duplicateCount,1);assert.equal(duplicate.excludedCount,1);assert.equal(service.storyMedia(story).length,1);assert.throws(()=>service.prepareDiscovery(story,{...input,html:html+'different'}),{code:'EDIT_CONFLICT'});
+});
+
+test('a recorded roundup follows one exact project link within the same claim and retains excluded evidence',async t=>{
+ const project='https://www.dazeddigital.com/art-photography/article/124/1/test-maker-test-project',calls=[];
+ const roundup=html+`<a href="${project}">Test Maker, Test Project</a>`;
+ const projectHtml=html+'<figure><img src="https://example.org/new-project.jpg"><figcaption>Test Maker, Test Project. Photographs by Test Maker.</figcaption></figure><a href="https://www.climaxbooks.com/third">Test Maker, Test Project</a>';
+ const {service,research}=await setup(t,{readProjectPage:async(context,target)=>{calls.push(target);assert(permittedProjectPage(context,target));return target===url?roundup:projectHtml;}}),story=makeStory(),before=JSON.stringify(story),p=service.prepareDiscovery(story,request(story));
+ assert.equal(p.plan.sourceCalls,2);
+ const [result]=await Promise.all([service.searchStoryRequest(story,p.id,confirm(story)),service.searchStoryRequest(story,p.id,confirm(story))]);
+ assert.deepEqual(calls,[url,project]);assert.equal(result.sourceCalls,2);assert.equal(result.sourcePages.length,2);assert.equal(result.sourceCapture.url,project);assert.equal(result.newPhotoCount,2);assert.equal(result.excludedCount,1);assert.equal(result.duplicateCount,2);
+ assert.equal(service.storyMedia(story).length,2);assert.equal(service.storyProjectTrails(story).length,2);assert.equal(JSON.stringify(result).includes('<figure>'),false);assert.equal(JSON.stringify(story),before);
+ const stored=service.storyRequest(p.id);assert.equal(stored.sourceCaptures[0].html,roundup);assert.equal(stored.sourceCaptures[1].html,projectHtml);assert(stored.receipt.photos.some(p=>p.id===stored.excludedPhotoIds[0]));
+ const restarted=new PhotographyService(research,{readProjectPage:()=>{throw Error('NO REPEAT');}});await restarted.searchStoryRequest(story,p.id,confirm(story));assert.equal(restarted.storyMedia(story).length,2);assert.equal(restarted.storyRequestsFor(story)[0].excludedCount,1);
+});
+
+test('a denied exact project stops without retry or fallback and preserves its first captured page',async t=>{
+ const project='https://www.dazeddigital.com/art-photography/article/124/1/test-maker-test-project',calls=[];
+ const roundup=html+`<a href="${project}">Test Maker, Test Project</a>`;
+ const {service}=await setup(t,{readProjectPage:async(s,u)=>{calls.push(u);if(u===project)throw Error('SOURCE_HTTP_401');return roundup;}}),story=makeStory(),before=JSON.stringify(story),p=service.prepareDiscovery(story,request(story));
+ const result=await service.searchStoryRequest(story,p.id,confirm(story));assert.equal(result.state,'unavailable');assert.equal(result.errorCode,'SOURCE_HTTP_401');assert.equal(result.failedSourceUrl,project);assert.equal(result.sourceCalls,2);assert.equal(result.sourcePages.length,1);assert.equal(service.storyRequest(p.id).sourceCaptures[0].html,roundup);assert.equal(service.storyRequest(p.id).sourceAttempts[1].status,'failed');assert.equal(service.storyMedia(story).length,0);
+ await service.searchStoryRequest(story,p.id,confirm(story));assert.deepEqual(calls,[url,project]);assert.equal(JSON.stringify(story),before);
+});
+
+test('a named link cannot expand the reader to an unsupported host, or change a saved request relevance policy',async t=>{
+ let calls=0;const {service,research}=await setup(t,{readProjectPage:async()=>{calls++;return html+'<a href="https://unreviewed.example/private">Test Maker, Test Project</a>';}}),story=makeStory(),p=service.prepareDiscovery(story,request(story));
+ await service.searchStoryRequest(story,p.id,confirm(story));assert.equal(calls,1);
+ const next=service.prepareDiscovery(story,request(story)),stored=service.storyRequest(next.id);stored.plan.relevancePolicy='accept_every_reference';research.db.prepare('UPDATE photo_story_requests SET data_json=? WHERE request_id=?').run(JSON.stringify(stored),next.id);
+ await assert.rejects(service.searchStoryRequest(story,next.id,confirm(story)),{code:'INVALID_PHOTO_RECEIPT'});assert.equal(calls,1);
+});
+
+test('a later image-specific match can recover a previously withheld reference without rewriting its earlier receipt',async t=>{
+ const {service}=await setup(t),story=makeStory(),unconfirmed='<figure><img src="https://example.org/recovered.jpg"><figcaption>Uncaptioned image.</figcaption></figure>',matched=unconfirmed.replace('Uncaptioned image.','Test Maker, Test Project. Photographs by Test Maker.');
+ const first=service.prepareDiscovery(story,request(story,{sourceUrl:url,html:unconfirmed}));assert.equal((await service.searchStoryRequest(story,first.id,confirm(story))).newPhotoCount,0);const original=JSON.stringify(service.storyRequest(first.id).receipt);
+ const next=service.prepareDiscovery(story,request(story,{sourceUrl:url,html:matched})),result=await service.searchStoryRequest(story,next.id,confirm(story));assert.equal(result.newPhotoCount,1);assert.equal(result.duplicateCount,0);assert.equal(service.storyMedia(story).length,1);assert.equal(JSON.stringify(service.storyRequest(first.id).receipt),original);
+});
+
+test('historical version-two receipts and founder selections are not retroactively filtered',async t=>{
+ const {service,research}=await setup(t),story=makeStory(),first=service.prepareDiscovery(story,request(story,{sourceUrl:url,html}));await service.searchStoryRequest(story,first.id,confirm(story));
+ // Model the persisted pre-policy receipt format, retaining both references.
+ const old=service.storyRequest(first.id);delete old.plan.relevancePolicy;delete old.packet.payload.relevancePolicy;old.packet.digest=photoDigest(old.packet.payload);old.receipt.inputDigest=old.packet.digest;old.displayPhotoIds=old.receipt.photos.map(p=>p.id);delete old.excludedPhotoIds;
+ research.db.prepare('UPDATE photo_story_requests SET data_json=? WHERE request_id=?').run(JSON.stringify(old),first.id);
+ const oldMedia=service.storyMedia(story);assert.equal(oldMedia.length,2);story.localDraft.selectedAssetIds=[oldMedia[1].id];const before=JSON.stringify(service.storyRequest(first.id));
+ const next=service.prepareDiscovery(story,request(story,{sourceUrl:url,html}));assert.equal((await service.searchStoryRequest(story,next.id,confirm(story))).newPhotoCount,0);assert.deepEqual(service.storyMedia(story),oldMedia);assert.deepEqual(story.localDraft.selectedAssetIds,[oldMedia[1].id]);assert.equal(JSON.stringify(service.storyRequest(first.id)),before);
+});
+
+test('an older prepared one-page request cannot acquire the new second-page allowance',async t=>{
+ let calls=0;const {service,research}=await setup(t,{readProjectPage:async()=>{calls++;return html+'<a href="https://www.dazeddigital.com/art-photography/article/124/1/test-maker-test-project">Test Maker, Test Project</a>';}}),story=makeStory(),p=service.prepareDiscovery(story,request(story));
+ const old=service.storyRequest(p.id);delete old.plan.relevancePolicy;delete old.packet.payload.relevancePolicy;old.plan.sourceCalls=1;old.packet.payload.budget.sourceCalls=1;old.packet.digest=photoDigest(old.packet.payload);
+ research.db.prepare('UPDATE photo_story_requests SET data_json=? WHERE request_id=?').run(JSON.stringify(old),p.id);const result=await service.searchStoryRequest(story,p.id,confirm(story));assert.equal(calls,1);assert.equal(result.sourceCalls,1);assert.equal(result.newPhotoCount,2);assert.equal(result.plan.sourceCalls,1);
 });
 test('changed story quarantines fetched references and an interrupted request never resumes automatically',async t=>{
  const story=makeStory(),{research,service}=await setup(t,{readProjectPage:async()=>{story.localDraft.version++;return html;}}),p=service.prepareDiscovery(story,request(story));const result=await service.searchStoryRequest(story,p.id,confirm(story),{readStory:()=>story});assert.equal(result.state,'review_required');assert.equal(service.storyMedia(story).length,0);assert.equal(service.storyRequest(p.id).receipt.photos.length,2);

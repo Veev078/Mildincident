@@ -47,7 +47,7 @@ export function photoRelevance(asset,identity){
 }
 export function photoFileKeys(asset){
  const keys=[];if(asset.localPreview?.originalSha256)keys.push('sha256:'+asset.localPreview.originalSha256);
- for(const url of [asset.fileUrl,asset.sourcePreviewUrl||asset.previewUrl])try{const u=new URL(url);u.hash='';for(const k of [...u.searchParams.keys()])if(/^(?:utm_|w$|h$|width$|height$|quality$|fit$)/i.test(k))u.searchParams.delete(k);if(u.hostname==='images-prod.dazeddigital.com'&&u.pathname.includes('/azure/'))u.pathname='/azure/'+u.pathname.split('/azure/')[1];if(!keys.includes(u.href))keys.push(u.href);}catch{}
+ for(const url of [asset.fileUrl,asset.sourcePreviewUrl||asset.previewUrl])try{const u=new URL(url);u.hash='';for(const k of [...u.searchParams.keys()])if(/^(?:utm_|w$|h$|width$|height$|quality$|q$|fit$|crop$|format$|auto$|dpr$)/i.test(k))u.searchParams.delete(k);u.searchParams.sort();if(u.hostname==='images-prod.dazeddigital.com'&&u.pathname.includes('/azure/'))u.pathname='/azure/'+u.pathname.split('/azure/')[1];if(!keys.includes(u.href))keys.push(u.href);}catch{}
  return keys.length?keys:['asset:'+asset.id];
 }
 export const photoFileKey=asset=>photoFileKeys(asset)[0];
