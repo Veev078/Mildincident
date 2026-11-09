@@ -104,7 +104,7 @@ export class LocalPreviewStore {
     } finally { await handle.close(); }
   }
 
-  async save({ storyId, assetId, bytes, contentType, originalName, declaration }) {
+  async save({ storyId, assetId, bytes, contentType, originalName, declaration, onlyIfAbsent=false }) {
     requireThat(declaration === 'private_review_only', 'PREVIEW_DECLARATION_REQUIRED', 'Confirm that this upload is for private review and does not establish publication rights or provenance.');
     requireThat(typeof storyId === 'string' && storyId.length <= 150 && typeof assetId === 'string' && assetId.length > 0 && assetId.length <= 300, 'INVALID_PREVIEW_SCOPE', 'Invalid existing image reference.');
     requireThat(Buffer.isBuffer(bytes) && bytes.length > 0 && bytes.length <= MAX_PREVIEW_BYTES, 'INVALID_PREVIEW_FILE', 'Choose a nonempty JPG, PNG or WebP of at most 25 MiB.');
@@ -135,6 +135,7 @@ export class LocalPreviewStore {
     }
     await this.#writeBlob(originalHash, 'original', bytes);
     await this.#writeBlob(previewHash, 'jpg', preview);
+    requireThat(!onlyIfAbsent||!this.get(storyId,assetId),'EDIT_CONFLICT','A private preview was saved during retrieval. Automatic acquisition did not replace it.');
     this.db.prepare(`INSERT OR IGNORE INTO local_image_previews
       (story_id,asset_id,original_sha256,preview_sha256,original_name,width,height,original_width,original_height,original_format,uploaded_at)
       VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(storyId, assetId, originalHash, previewHash, name, info.width, info.height, meta.width, meta.height, meta.format, new Date().toISOString());
@@ -157,6 +158,13 @@ export class LocalPreviewStore {
     requireThat(this.get(storyId,assetId,hash),'PREVIEW_NOT_FOUND','A decoded existing private preview is required.');
     requireThat(safePhotoReference(sourceUrl)&&safePhotoReference(imageUrl)&&/^[0-9]{1,30}$/.test(executionId),'INVALID_PREVIEW_SOURCE','Recorded public URLs and a native inspection execution are required.');
     this.db.prepare('INSERT OR IGNORE INTO local_source_preview_evidence(story_id,asset_id,preview_sha256,source_url,image_url,execution_id,inspected_at) VALUES(?,?,?,?,?,?,?)').run(storyId,assetId,hash,sourceUrl,imageUrl,executionId,new Date().toISOString());
+    return this.get(storyId,assetId,hash);
+  }
+
+  recordPhotoSourceAcquisition(storyId,assetId,hash,{sourceUrl,imageUrl,requestId,inputDigest,pageSha256}){
+    requireThat(this.get(storyId,assetId,hash)&&safePhotoReference(sourceUrl)&&safePhotoReference(imageUrl)&&/^[a-f0-9-]{36}$/.test(requestId)&&[inputDigest,pageSha256].every(v=>/^[a-f0-9]{64}$/.test(v)),'INVALID_PREVIEW_SOURCE','An intact photo receipt and decoded scoped preview are required.');
+    const evidence={basis:'photo_request_source_copy',requestId,inputDigest,pageSha256,visualInspectionPerformed:false};
+    this.db.prepare('INSERT OR IGNORE INTO local_source_preview_evidence(story_id,asset_id,preview_sha256,source_url,image_url,execution_id,inspected_at,acquisition_json) VALUES(?,?,?,?,?,?,?,?)').run(storyId,assetId,hash,sourceUrl,imageUrl,'',new Date().toISOString(),JSON.stringify(evidence));
     return this.get(storyId,assetId,hash);
   }
 

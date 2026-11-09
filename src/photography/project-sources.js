@@ -6,9 +6,9 @@ import {requireThat} from '../errors.js';
 
 // Page readers, not an image proxy or arbitrary URL downloader. Only exact URLs
 // already present in this story's retained research may be fetched.
-export const PROJECT_PAGE_HOSTS=Object.freeze(['www.dazeddigital.com','thephotographersgallery.org.uk','www.thephotographersgallery.org.uk','www.booooooom.com','josharonson.us','www.josharonson.us','sophyrickett.com','www.sophyrickett.com','www.cobgallery.com','www.cheeriopublishing.com','www.climaxbooks.com']);
+export const PROJECT_PAGE_HOSTS=Object.freeze(['www.dazeddigital.com','www.life.com','life.com','thephotographersgallery.org.uk','www.thephotographersgallery.org.uk','www.booooooom.com','josharonson.us','www.josharonson.us','sophyrickett.com','www.sophyrickett.com','www.cobgallery.com','www.cheeriopublishing.com','www.climaxbooks.com']);
 const digest=value=>createHash('sha256').update(value).digest('hex');
-const knownPages=story=>[...(story.recordedProjectLinks||[]).map(l=>l.url),...(story.research||[]).map(r=>r.url)].filter(url=>safePhotoReference(url));
+const knownPages=story=>[...(story.recordedProjectLinks||[]).map(l=>l.url),...(story.research||[]).map(r=>r.url),...(story.media||[]).map(m=>m.sourceUrl)].filter(url=>safePhotoReference(url));
 export function permittedProjectPage(story,url){return Boolean(safePhotoReference(url)&&PROJECT_PAGE_HOSTS.includes(new URL(url).hostname)&&knownPages(story).includes(url));}
 
 export function automaticPhotoPlan(story,{direction='best',custom=''}={}){
@@ -21,7 +21,7 @@ export function automaticPhotoPlan(story,{direction='best',custom=''}={}){
  const originals=[...new Set(knownPages(story))],sourceUrl=pages[0]||originals[0]||null;
  const hosts=originals.map(url=>new URL(url).hostname),archive=hosts.some(h=>h==='www.loc.gov'||h==='loc.gov')?'loc':hosts.some(h=>h==='www.artic.edu'||h==='api.artic.edu')?'aic':hosts.some(h=>h==='commons.wikimedia.org')?'commons':null;
  const route=pages.length?'retained_project_page':archive?'archive_search':'source_assisted';
- return {...base,version:2,source:pages.length||!archive?'project':archive,sourceUrl,route,reason:pages.length?'Read the recorded source and, if present, follow one exact photographer-and-project link. Keep unrelated references out of project suggestions.':archive?'Search the catalogue already identified in this story’s source evidence.':'This original source has no supported direct reader. Import a saved page; a generic archive is unlikely to hold this exact project.',sourceCandidates:originals,sourceCalls:route==='source_assisted'?0:pages.length?2:1,relevancePolicy:'project_evidence_v1',automaticRetries:0,paidCalls:0,engine:'existing_photo_request_ledger',modelPlanningPerformed:false};
+ return {...base,version:2,source:pages.length||!archive?'project':archive,sourceUrl,route,reason:pages.length?'Check recorded project sources and exact project links. Capture supported image files for private review; keep unrelated references out of suggestions.':archive?'Search the catalogue already identified in this story’s source evidence.':'No supported original source is recorded. Existing photographs remain available; try another direction or add an original source under advanced tools.',sourceCandidates:originals,sourceCalls:route==='source_assisted'?0:pages.length?2:1,sourcePolicy:'recorded_fallback_v2',imageCalls:6,relevancePolicy:'project_evidence_v1',automaticRetries:0,paidCalls:0,engine:'existing_photo_request_ledger',modelPlanningPerformed:false};
 }
 
 export async function fetchProjectPage(story,url,{fetchImpl=fetch}={}){

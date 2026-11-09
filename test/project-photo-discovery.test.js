@@ -33,7 +33,7 @@ test('request integrity binds the actual direction and supplied source bytes bef
 });
 test('a contemporary original source without a supported reader leads to source-assisted import, not unrelated archive searches',async t=>{
  const {service}=await setup(t,{retrieve:()=>{throw Error('NO GENERIC ARCHIVE FALLBACK');},readProjectPage:()=>{throw Error('NO UNSUPPORTED SOURCE FETCH');}}),story=makeStory();story.subject='Duolingo’s 2025 mascot funeral campaign';story.research=[{url:'https://www.linkedin.com/posts/duolingo/recorded-original',claim:'An existing native source reference.'}];story.recordedProjectLinks=[];
- const plan=automaticPhotoPlan(story);assert.equal(plan.route,'source_assisted');assert.equal(plan.sourceCalls,0);const p=service.prepareDiscovery(story,request(story)),result=await service.searchStoryRequest(story,p.id,confirm(story));assert.equal(result.state,'unavailable');assert.equal(result.errorCode,'SOURCE_READER_UNAVAILABLE');assert.equal(result.sourceCalls,0);assert.match(result.message,/saved copy/);
+ const plan=automaticPhotoPlan(story);assert.equal(plan.route,'source_assisted');assert.equal(plan.sourceCalls,0);const p=service.prepareDiscovery(story,request(story)),result=await service.searchStoryRequest(story,p.id,confirm(story));assert.equal(result.state,'unavailable');assert.equal(result.errorCode,'SOURCE_READER_UNAVAILABLE');assert.equal(result.sourceCalls,0);assert.match(result.message,/Keep editing/);
 });
 test('source-first discovery works without a fabricated image anchor, duplicate clicks read once and restart preserves the receipt',async t=>{
  let calls=0;const {research,service}=await setup(t,{readProjectPage:async()=>{calls++;return html;}}),story=makeStory(),before=JSON.stringify(story),input=request(story),p=service.prepareDiscovery(story,input);
@@ -60,11 +60,11 @@ test('a recorded roundup follows one exact project link within the same claim an
  const restarted=new PhotographyService(research,{readProjectPage:()=>{throw Error('NO REPEAT');}});await restarted.searchStoryRequest(story,p.id,confirm(story));assert.equal(restarted.storyMedia(story).length,2);assert.equal(restarted.storyRequestsFor(story)[0].excludedCount,1);
 });
 
-test('a denied exact project stops without retry or fallback and preserves its first captured page',async t=>{
+test('a denied second source retains useful first-page evidence without retry',async t=>{
  const project='https://www.dazeddigital.com/art-photography/article/124/1/test-maker-test-project',calls=[];
  const roundup=html+`<a href="${project}">Test Maker, Test Project</a>`;
  const {service}=await setup(t,{readProjectPage:async(s,u)=>{calls.push(u);if(u===project)throw Error('SOURCE_HTTP_401');return roundup;}}),story=makeStory(),before=JSON.stringify(story),p=service.prepareDiscovery(story,request(story));
- const result=await service.searchStoryRequest(story,p.id,confirm(story));assert.equal(result.state,'unavailable');assert.equal(result.errorCode,'SOURCE_HTTP_401');assert.equal(result.failedSourceUrl,project);assert.equal(result.sourceCalls,2);assert.equal(result.sourcePages.length,1);assert.equal(service.storyRequest(p.id).sourceCaptures[0].html,roundup);assert.equal(service.storyRequest(p.id).sourceAttempts[1].status,'failed');assert.equal(service.storyMedia(story).length,0);
+ const result=await service.searchStoryRequest(story,p.id,confirm(story));assert.equal(result.state,'complete');assert.equal(result.sourceAttempts[1].errorCode,'SOURCE_HTTP_401');assert.equal(result.failedSourceUrl,project);assert.equal(result.sourceCalls,2);assert.equal(result.sourcePages.length,1);assert.equal(service.storyRequest(p.id).sourceCaptures[0].html,roundup);assert.equal(service.storyRequest(p.id).sourceAttempts[1].status,'failed');assert.equal(service.storyMedia(story).length,1);
  await service.searchStoryRequest(story,p.id,confirm(story));assert.deepEqual(calls,[url,project]);assert.equal(JSON.stringify(story),before);
 });
 
@@ -101,7 +101,7 @@ test('changed story quarantines fetched references and an interrupted request ne
  const closed=restarted.closeInterruptedDiscovery(story,next.id,{...confirm(story),confirm:'close_interrupted_search'});assert.equal(closed.state,'unavailable');assert.equal(restarted.storyRequestsFor(story).length,2);assert.equal(restarted.prepareDiscovery(story,request(story)).state,'prepared');
 });
 test('legacy captures recover exact project links from an imported roundup and the next search follows them without changing native evidence',async t=>{
- let reads=0;const {service}=await setup(t,{readProjectPage:async(s,u)=>{reads++;assert.equal(u,'https://www.dazeddigital.com/art-photography/article/124/1/test-maker-test-project');return html;}}),story=makeStory();story.recordedProjectLinks=[];const before=JSON.stringify(story),page=html+'<a href="/art-photography/article/124/1/test-maker-test-project">Test Maker, Test Project</a>',p=service.prepareDiscovery(story,request(story,{sourceUrl:url,html:page}));
- await service.searchStoryRequest(story,p.id,confirm(story));assert.equal(reads,0);assert.equal(service.storyProjectTrails(story).length,1);const next=service.prepareDiscovery(story,request(story));assert.match(next.plan.sourceUrl,/article\/124/);await service.searchStoryRequest(story,next.id,confirm(story));assert.equal(reads,1);assert.equal(JSON.stringify(story),before);
+ let reads=0;const {service}=await setup(t,{readProjectPage:async(s,u)=>{reads++;assert(permittedProjectPage(s,u));return html;}}),story=makeStory();story.recordedProjectLinks=[];const before=JSON.stringify(story),page=html+'<a href="/art-photography/article/124/1/test-maker-test-project">Test Maker, Test Project</a>',p=service.prepareDiscovery(story,request(story,{sourceUrl:url,html:page}));
+ await service.searchStoryRequest(story,p.id,confirm(story));assert.equal(reads,0);assert.equal(service.storyProjectTrails(story).length,1);const next=service.prepareDiscovery(story,request(story));assert.match(next.plan.sourceUrl,/article\/124/);await service.searchStoryRequest(story,next.id,confirm(story));assert.equal(reads,2);assert.equal(JSON.stringify(story),before);
  assert.deepEqual(service.storyProjectTrails({...story,revision:'changed'}),[]);
 });
