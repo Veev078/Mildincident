@@ -25,7 +25,7 @@ export function permittedSourceImage(sourceUrl,imageUrl){
 
 /** One transport attempt, bounded streaming and no redirects/authentication. */
 export async function readSourceImage(url,{fetchImpl=fetch}={}){
- const response=await fetchImpl(url,{method:'GET',redirect:'error',credentials:'omit',headers:{Accept:'image/jpeg,image/png,image/webp'},signal:AbortSignal.timeout(15000)});
+ const response=await fetchImpl(url,{method:'GET',redirect:'manual',credentials:'omit',headers:{Accept:'image/jpeg,image/png,image/webp'},signal:AbortSignal.timeout(15000)});
  try{
   requireThat(response.status===200,'SOURCE_HTTP_'+response.status,'The source image was unavailable.');
   const contentType=(response.headers.get('content-type')||'').split(';')[0].trim().toLowerCase(),declared=response.headers.get('content-length');

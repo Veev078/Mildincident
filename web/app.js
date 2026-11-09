@@ -3,6 +3,7 @@ import {researchAccess} from './discovery-flow.js';
 import {CAPTION_IMPROVEMENTS,captionRequestProposal,canConfirmCaption} from './caption-request-flow.js';
 import {launchSavedResearch} from './research-launch.js';
 import {editorialDiscoveryRequest} from './discovery-request.js';
+import {photoOutcome} from './photo-requests.js';
 import { esc, date, human, storyUrl, effective, mediaFor, proposalContent } from './components.js';
 import * as views from './views.js';
 import {navigation,resolveRoute,destination,libraryNavigation} from './navigation.js';
@@ -1003,7 +1004,7 @@ async function discoverStoryPhotos(id,button,sourcePage=null){
   if(!await flushAllDrafts())throw Error('Save pending edits before finding photographs.');
   const story=storyById(id),input={sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:button.dataset.requestKey,direction:state.photoDirections?.[id]||'best',custom:state.photoCustom?.[id]||'',...(sourcePage||{})};
   const result=await api('/api/stories/'+encodeURIComponent(id)+'/photo-discovery',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(input)});
-  await loadWorkspace({quiet:true});toast(result.photoRequest.message,{error:result.photoRequest.state!=='complete'});
+  await loadWorkspace({quiet:true});announce(photoOutcome(result.photoRequest));
  }catch(error){toast(error.message+' Check the recorded result before another request. No automatic repeat was made.',{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}
  finally{state.photoSearchBusy[id]=false;render();}
 }

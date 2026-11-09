@@ -126,6 +126,7 @@ export class LocalPreviewStore {
     const visualFingerprint=await fingerprint(preview);
     const originalHash = sha256(bytes);
     const previewHash = sha256(preview);
+    requireThat(!onlyIfAbsent||!this.get(storyId,assetId),'EDIT_CONFLICT','A private preview already exists. Automatic acquisition did not replace or reclassify it.');
     this.db.prepare('INSERT OR IGNORE INTO local_preview_fingerprints VALUES(?,?)').run(previewHash,JSON.stringify(visualFingerprint));
     const previous = this.db.prepare('SELECT * FROM local_image_previews WHERE story_id=? AND asset_id=? AND original_sha256=?').get(storyId, assetId, originalHash);
     if (previous) {

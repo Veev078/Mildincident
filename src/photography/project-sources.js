@@ -26,7 +26,7 @@ export function automaticPhotoPlan(story,{direction='best',custom=''}={}){
 
 export async function fetchProjectPage(story,url,{fetchImpl=fetch}={}){
  requireThat(permittedProjectPage(story,url),'PHOTO_SOURCE_NOT_BOUND','Only a supported project URL already recorded on this story can be read.');
- const response=await fetchImpl(url,{method:'GET',redirect:'error',credentials:'omit',headers:{Accept:'text/html','User-Agent':'MILDINCIDENT/1.0 (private editorial source review)'},signal:AbortSignal.timeout(12000)});
+ const response=await fetchImpl(url,{method:'GET',redirect:'manual',credentials:'omit',headers:{Accept:'text/html','User-Agent':'MILDINCIDENT/1.0 (private editorial source review)'},signal:AbortSignal.timeout(12000)});
  if(!response.ok)throw Error('SOURCE_HTTP_'+response.status);
  if(!/text\/html|application\/xhtml\+xml/i.test(response.headers.get('content-type')||''))throw Error('SOURCE_NOT_HTML');
  if(Number(response.headers.get('content-length')||0)>2000000)throw Error('SOURCE_TOO_LARGE');

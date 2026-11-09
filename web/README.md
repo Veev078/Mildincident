@@ -40,3 +40,7 @@ Creative briefs are preserved as complete objects in save queues, browser-rescue
 HTTPS image previews load directly in the browser with `referrerpolicy=no-referrer`, lazy loading and graceful unavailable-image states. All content is HTML-escaped; source links permit HTTPS only and use `noopener noreferrer`. No arbitrary server-side image downloader, external script, embedded secret or mock publishing success is introduced.
 
 Responsive layouts cover wide screens through small mobile. Contrast, keyboard focus, skip navigation, accessible input labels, reduced motion and touch-size controls are included. Actual browser/API integration checks are performed by the root sprint against the local server.
+
+## V15 source outcomes
+
+`photo-requests.js` presents one inline outcome and keeps original-page imports inside **Advanced source tools**, including after access failures. It distinguishes references from decoded files and never implies AI visual review or rights clearance. The BFF uses the existing PhotographyService ledger and LocalPreviewStore; the browser never supplies an image download URL. [V15 source/preview contracts and release gates](../docs/release/V15_PHOTOGRAPHIC_OPERATIONS.md) record the exact budgets, supported mappings, retained-story screenshots and remaining real-access/paid-vision limits.

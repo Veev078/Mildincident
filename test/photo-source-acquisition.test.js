@@ -19,7 +19,7 @@ const confirm=s=>({confirm:true,sourceRevision:s.revision,workingVersion:s.local
 async function setup(t,options={}){
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'mi-source-images-')),research=new LocalResearchStore(root+'/research.sqlite'),previews=new LocalPreviewStore(root+'/previews');
  const bytes=await sharp({create:{width:500,height:700,channels:3,background:'#456'}}).jpeg().toBuffer();
- const calls=[],service=new PhotographyService(research,{previews,readProjectPage:async()=>html(),fetchImage:async(u,o)=>{calls.push(u);assert.equal(o.redirect,'error');assert.equal(o.credentials,'omit');return new Response(bytes,{headers:{'content-type':'image/jpeg'}});},...options});
+ const calls=[],service=new PhotographyService(research,{previews,readProjectPage:async()=>html(),fetchImage:async(u,o)=>{calls.push(u);assert.equal(o.redirect,'manual');assert.equal(o.credentials,'omit');return new Response(bytes,{headers:{'content-type':'image/jpeg'}});},...options});
  t.after(async()=>{previews.close();research.close();await fs.rm(root,{recursive:true,force:true});});return{root,research,previews,service,calls};
 }
 
@@ -57,8 +57,16 @@ test('repeated source references can gain decoded evidence without replacing sel
 test('bad MIME, oversized streams, redirects and undecodable pixels never become a preview',async t=>{
  await assert.rejects(readSourceImage('https://static.life.com/file',{fetchImpl:async()=>new Response('not an image',{headers:{'content-type':'text/html'}})}),{code:'INVALID_PREVIEW_TYPE'});
  await assert.rejects(readSourceImage('https://static.life.com/file',{fetchImpl:async()=>new Response('x',{headers:{'content-type':'image/jpeg','content-length':String(9*1024*1024)}})}),{code:'SOURCE_IMAGE_TOO_LARGE'});
+ await assert.rejects(readSourceImage('https://static.life.com/file',{fetchImpl:async()=>new Response(Buffer.alloc(9*1024*1024),{headers:{'content-type':'image/jpeg'}})}),{code:'SOURCE_IMAGE_TOO_LARGE'});
  await assert.rejects(readSourceImage('https://static.life.com/file',{fetchImpl:async()=>new Response(null,{status:302,headers:{location:'https://evil.example'}})}),{code:'SOURCE_HTTP_302'});
  const {service,previews}=await setup(t,{fetchImage:async()=>new Response('not pixels',{headers:{'content-type':'image/jpeg'}})}),s=story(),p=service.prepareDiscovery(s,input(s)),result=await service.searchStoryRequest(s,p.id,confirm(s));assert.equal(result.decodedImageCount,0);assert.equal(previews.all().size,0);assert.equal(result.imageAttempts.length,1);
+});
+
+test('a founder preview saved during image retrieval is never replaced or relabelled as a source copy',async t=>{
+ const s=story();s.media=[{id:'chosen',previewUrl:'https://images.squarespace-cdn.com/content/fixture-0.jpg',sourceUrl:url}];
+ const {service,previews}=await setup(t);const bytes=await sharp({create:{width:500,height:700,channels:3,background:'#456'}}).jpeg().toBuffer();
+ service.fetchImage=async()=>{await previews.save({storyId:s.id,assetId:'chosen',bytes,contentType:'image/jpeg',originalName:'founder-owned.jpg',declaration:'private_review_only'});return new Response(bytes,{headers:{'content-type':'image/jpeg'}});};
+ const p=service.prepareDiscovery(s,input(s)),result=await service.searchStoryRequest(s,p.id,confirm(s));assert.equal(result.imageAttempts[0].errorCode,'EDIT_CONFLICT');assert.equal(previews.get(s.id,'chosen').originalName,'founder-owned.jpg');assert.equal(previews.get(s.id,'chosen').sourceInspection,null);
 });
 
 test('single-image WordPress captions and Squarespace data-image keep exact image context; shared captions do not',()=>{

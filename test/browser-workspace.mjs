@@ -262,7 +262,7 @@ try {
   assert.equal(JSON.stringify({title:snapshot.records.stories[0].title,format:snapshot.records.stories[0].format,target:snapshot.records.packages[0].target_slide_count}),sourceIdentity);
   checks.push('working title/hook/format survive reload and export while source identity and selected assets remain intact');
 
-  await page.getByText('Story details & version history',{exact:true}).click();
+  await page.getByText('Story details',{exact:true}).click();
   const downloadEvent = page.waitForEvent('download');
   await page.locator('.story-header-actions a').click();
   const download = await downloadEvent;
@@ -283,7 +283,7 @@ try {
   assert.ok(!drafts.proposal(originalView().stories[0]).stale);
   assert.ok(drafts.history(id).length >= 4);
   checks.push('stale source comparison and explicit local rebase preserve history');
-  await page.getByText('Story details & version history',{exact:true}).click();await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await page.getByText('Story details',{exact:true}).click();await page.getByRole('button', { name: 'Version history', exact: true }).click();
   assert.ok((await page.getByRole('dialog').textContent()).includes('Local version history.'));
   await page.getByRole('button', { name: 'Close local version history' }).click();
   checks.push('saved local version history is inspectable');
@@ -347,7 +347,7 @@ try {
   engineFixture.candidates.push({job_id:queued.job_id,candidate_id:fixtureCandidate.id,status:'ready_to_review',candidate_json:JSON.stringify(fixtureCandidate)});
   await page.getByRole('button',{name:'Check for results',exact:true}).first().click();await page.getByText('Research results checked.',{exact:true}).waitFor();
   await page.locator('[data-review-card] h3 a').first().click();
-  await page.getByText('Story details & version history',{exact:true}).click();await page.getByText('Research proposal',{exact:true}).waitFor();
+  await page.getByText('Story details',{exact:true}).click();await page.getByText('Research proposal',{exact:true}).waitFor();
   const devStoryId='CON-DEV-'+queued.job_id;
   await page.goto(`${origin}/#/story/${devStoryId}/research`);
   await page.getByText('Read the recorded source excerpt',{exact:true}).click();
