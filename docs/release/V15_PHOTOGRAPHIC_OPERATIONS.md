@@ -1,6 +1,10 @@
 # V15 — source acquisition and a simpler working path
 
-## Verified baseline and boundaries
+## Current release and founder acceptance
+
+The subsequent controlled release is live at `2d47c21b4f3b648d2193721321c473255cc1a2a2`, deployment `dep-dbp4iqbbc2fs7394fs30`. [Real hosted acceptance](V15_HOSTED_PHOTO_ACCEPTANCE.md) records Jack's strong result (7 new project references, 0 repeats, 20 excluded) and Sophy's limited result (0 new, 34 repeats, 6 excluded). Actual photographs are founder-visible; private decoded-file counts and exact successful source/CDN routes are not independently established. Preserve the UI. The implementation-stage observations below remain historical evidence and must not be read as a claim that V15 is still undeployed or that the hosted result was simulated.
+
+## Verified implementation baseline and boundaries
 
 Started from clean `5f9ebcacd39bbb5d108ee28cc7010395896c0b51` on `ui/photo-desk-flow-20261108`; that commit is the code recovery point. Existing draft PR #1 and the Photo Intelligence repairs remain intact. Render read-only inspection confirmed that exact commit live as manual deployment `dep-dbp3tketlv9c73eef8s0`, existing service `srv-dbih0du1egvs73er26kg`, original 10 GB disk `dsk-dbih0e61egvs73er27e0` mounted `/var/data`, automatic deployment off. No release occurs in this sprint.
 

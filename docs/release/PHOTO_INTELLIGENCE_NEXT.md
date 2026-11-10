@@ -1,4 +1,31 @@
-# Photographic intelligence — focused continuation after V14 acceptance
+# Photo Intelligence — next work after real V15 acceptance
+
+## Current evidence and priority
+
+V15 `2d47c21b4f3b648d2193721321c473255cc1a2a2` is live. [Real hosted founder acceptance](V15_HOSTED_PHOTO_ACCEPTANCE.md) supersedes the older local/replay limitations below:
+
+- **Jack Nicholson:** 7 new project references, 0 repeated, 20 unrelated/unconfirmed excluded. The founder sees highly relevant photographs forming a compelling collection and considers this a strong improvement.
+- **Sophy Rickett:** 0 new project references, 34 repeated, 6 unrelated/unconfirmed excluded. Existing relevant images display; there are no useful additions from this search.
+- The current UI works well. Preserve it; no broad redesign or repeated acceptance run is needed.
+- Browser-visible photographs are confirmed by the founder. Newly privately decoded files, their counts/hashes and exact successful source/CDN routes remain **unverified** until the existing hosted receipts are inspected. Reference counts and browser hotlinks are not durable-file proof. No AI visual review has been established.
+
+## Focused implementation order
+
+1. **Use the completed evidence first.** Inspect existing receipts/captures read-only, including successful and failed page/image attempts, provenance, excluded results, scan coverage and private-preview evidence. Do not trigger another search to reconstruct the accepted results.
+2. **Track source exhaustion in the existing ledger.** Distinguish complete unchanged source with no additions, bounded/truncated scan with no additions, denied access, unsupported host, unconfirmed identity and uncertain operation. Key history to story revision, exact identity/project, source URL/capture hash and direction. A repeated page is not an exhausted project. Deprioritize unchanged exhausted sources on the next founder-requested action; do not automatically refetch or resume uncertain requests. Allow a deliberate future refresh when source content or context changes.
+3. **Choose the next exact source.** Extend the recorded/captured source frontier toward the artist, photographer, gallery and original/book publishers, with the existing per-action budget and source/CDN binding. Preserve page evidence and attempt history; do not silently substitute generic archives. The Sophy artist/exhibition/book leads below are leads to validate, not proven new photographs. Separate frames/outtakes from covers, spreads, installations, different projects and alternate encodings of known images.
+4. **Make the successful path general.** Verify Jack-style original-editorial collections, specialized photographer projects like Sophy and a contemporary project. Preserve current captions, selected cover/order, image-specific credits, uncertainty and approvals. Judge usefulness and genuinely new relevant photographs, not extracted-reference totals.
+5. **Then add separately approved AI investigation/vision.** Reuse native guarded jobs and source/receipt/image hashes with a photo-specific permission. Actual image blocks must carry verified pixels; names or URLs embedded only in a text prompt do not constitute visual analysis. Review the byte handoff, exact native graph/checksum, bounded calls/searches, model input and costs before requesting live approval. Keep current caption/story policy and worker untouched. No paid call or installation is authorized by this plan.
+
+V15 has already implemented the safe acquisition foundation, known-denial fallback, LIFE/Squarespace parsing, private decoding path, exact-byte deduplication and optional advanced recovery. Those are not new infrastructure tasks to restart. This is the next backend/source-intelligence continuation, with small status changes only if necessary.
+
+## Historical context
+
+The remaining sections preserve the V14 diagnosis and then-planned checkpoints. Statements about what was local, missing or blocked describe that earlier checkpoint; consult the V15 implementation and hosted acceptance above for current truth.
+
+---
+
+# Historical V14 diagnosis and implementation plan
 
 ## Verified starting point
 

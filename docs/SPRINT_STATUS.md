@@ -1,10 +1,18 @@
-# V15 local checkpoints — source acquisition and founder flow
+# Current checkpoint — V15 live; real photographic acceptance recorded
+
+Live Studio is `2d47c21b4f3b648d2193721321c473255cc1a2a2`, Render deployment `dep-dbp4iqbbc2fs7394fs30`. [Hosted founder acceptance](release/V15_HOSTED_PHOTO_ACCEPTANCE.md): Jack Nicholson produced 7 new project references, 0 repeats and 20 exclusions; the founder reports highly relevant photographs and a compelling collection. Sophy Rickett produced 0 new, 34 repeated and 6 excluded references, with no useful additions. The UI works well and should be preserved. Browser-visible photographs are founder-confirmed; private decoding counts/hashes and exact successful source/CDN paths remain unverified. Do not count references as newly decoded originals or repeat acceptance just to reproduce these counts.
+
+[Next Photo Intelligence work](release/PHOTO_INTELLIGENCE_NEXT.md) focuses on read-only receipt evidence, source exhaustion, intelligent multi-source discovery and later separately authorized hash-bound image assessment. The existing worker, policy, UI and publishing safeguards remain unchanged. No paid calls, live mutations or new deployment in this acceptance-recording update.
+
+---
+
+# Earlier checkpoint — V15 local implementation
 
 Verified live baseline is `5f9ebca` (manual Render release); new V15 work remains local/draft review. [V15 findings, safe acquisition, rendered evidence and release/access gates](release/V15_PHOTOGRAPHIC_OPERATIONS.md). The existing photo ledger now binds exact captured pages to bounded private decoded-image acquisition, supports recorded-source fallback, preserves uncertain claims and founder previews, and keeps technical import secondary. Actual new useful photographs remain unproven: Cloud denies photographic hosts before connection, retained Sophy yields zero new project images, and positive pixel tests use labelled generated images. Recurring worker remains active at `d12b183b`; no paid execution, workflow/policy mutation or deployment in this sprint.
 
 ---
 
-# Current checkpoint — V14 live; photographic intelligence continuation
+# Earlier checkpoint — V14 live; photographic intelligence continuation
 
 V14 `108a7e88ce3f61844f4a3c45ec3530c604738448` is live. The founder completed hosted acceptance: interface/previews work, but nine new references and ten repeats were not relevant/compelling enough; no AI visual research occurred. Do not repeat acceptance or redeploy that commit. [Focused source/image diagnosis and implementation plan](release/PHOTO_INTELLIGENCE_NEXT.md) records the next work. Local development now filters unrelated references from **new** project-first requests, follows one exact project link within a two-page claim, retains private source captures/exclusions and deduplicates responsive encodings. Existing selections/history and live recurring AI are untouched. This is not yet intelligent image discovery: source acquisition/CDN binding, decoded-image visual review and a separately approved native photo-operation branch remain necessary. No deployment or paid operation is authorized by this continuation.
 
