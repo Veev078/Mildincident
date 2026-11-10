@@ -997,16 +997,23 @@ document.addEventListener('click',async event=>{
 });
 
 document.addEventListener('change',event=>{const select=event.target.closest('[data-photo-source]');if(!select)return;state.photoSources ||= {};state.photoSources[select.dataset.photoSource]=select.value;});
+function watchPhotoProgress(id){
+ let stopped=false,reading=false;
+ const tick=async()=>{if(stopped||reading||!state.photoSearchBusy?.[id])return;reading=true;
+  try{const story=await api('/api/stories/'+encodeURIComponent(id)),p=story.photoRequests?.[0],status=document.getElementById('photo-action-status-'+id);if(stopped||!status||!state.photoSearchBusy?.[id])return;const pages=p?.sourceAttempts?.filter(a=>a.status==='captured').length||0,files=p?.imageAttempts?.filter(a=>['decoded','cached_existing','exact_duplicate'].includes(a.status)).length||0;status.textContent=pages||files?`${pages} source page(s) read · ${files} image file(s) checked. Your selection stays in place.`:'Checking project sources. Your selection stays in place.';}catch{}finally{reading=false;}
+ };
+ const timer=setInterval(tick,1500);return()=>{stopped=true;clearInterval(timer);};
+}
 async function discoverStoryPhotos(id,button,sourcePage=null){
  state.photoSearchBusy ||= {};if(state.photoSearchBusy[id])return;state.photoSearchBusy[id]=true;button.disabled=true;
- button.dataset.requestKey ||= crypto.randomUUID();button.textContent=sourcePage?'Importing references…':'Finding photographs…';
+ button.dataset.requestKey ||= crypto.randomUUID();button.textContent=sourcePage?'Importing references…':'Finding photographs…';const stopProgress=watchPhotoProgress(id);
  try{
   if(!await flushAllDrafts())throw Error('Save pending edits before finding photographs.');
-  const story=storyById(id),input={sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:button.dataset.requestKey,direction:state.photoDirections?.[id]||'best',custom:state.photoCustom?.[id]||'',...(sourcePage||{})};
+  const story=storyById(id),input={sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:button.dataset.requestKey,direction:state.photoDirections?.[id]||'best',custom:state.photoCustom?.[id]||'',...(state.photoRefresh?.[id]&&!sourcePage?{refreshSources:true}:{}),...(sourcePage||{})};
   const result=await api('/api/stories/'+encodeURIComponent(id)+'/photo-discovery',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(input)});
   await loadWorkspace({quiet:true});announce(photoOutcome(result.photoRequest));
  }catch(error){toast(error.message+' Check the recorded result before another request. No automatic repeat was made.',{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}
- finally{state.photoSearchBusy[id]=false;render();}
+ finally{stopProgress();state.photoSearchBusy[id]=false;render();}
 }
 document.addEventListener('click',event=>{const button=event.target.closest('[data-photo-discover]');if(button&&!button.disabled)discoverStoryPhotos(button.dataset.photoDiscover,button);});
 document.addEventListener('click',async event=>{
@@ -1038,6 +1045,7 @@ document.addEventListener('click',async event=>{
 });
 
 document.addEventListener('change',event=>{const select=event.target.closest('[data-photo-direction]');if(!select)return;state.photoDirections ||= {};state.photoDirections[select.dataset.photoDirection]=select.value;render();});
+document.addEventListener('change',event=>{const input=event.target.closest('[data-photo-refresh]');if(!input)return;state.photoRefresh ||= {};state.photoRefresh[input.dataset.photoRefresh]=input.checked;});
 document.addEventListener('input',event=>{const input=event.target.closest('[data-photo-custom]');if(!input)return;state.photoCustom ||= {};state.photoCustom[input.dataset.photoCustom]=input.value;});
 document.addEventListener('click',async event=>{
  const button=event.target.closest('[data-photo-more]');if(!button||button.disabled)return;button.disabled=true;

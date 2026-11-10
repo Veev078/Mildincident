@@ -11,6 +11,26 @@ const digest=value=>createHash('sha256').update(value).digest('hex');
 const knownPages=story=>[...(story.recordedProjectLinks||[]).map(l=>l.url),...(story.research||[]).map(r=>r.url),...(story.media||[]).map(m=>m.sourceUrl)].filter(url=>safePhotoReference(url));
 export function permittedProjectPage(story,url){return Boolean(safePhotoReference(url)&&PROJECT_PAGE_HOSTS.includes(new URL(url).hostname)&&knownPages(story).includes(url));}
 
+/** Expand only exact maker/project links supported by the captured page context. */
+export function projectSourceTrails(html,url,identity,images=[]){
+ const found=recordedProjectTrails(html,url,identity),seen=new Set(found.map(l=>l.url)),lower=html.toLowerCase();
+ const norm=s=>String(s||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+ const has=(s,n)=>Boolean(n)&&(' '+norm(s)+' ').includes(' '+norm(n)+' '),text=s=>s.replace(/<[^>]*>/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();
+ const projectPresent=images.some(i=>i.sourceRelation==='subject_caption_match');
+ for(const match of html.slice(0,300000).matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)){
+  const label=text(match[2]).slice(0,200),href=match[1].match(/\bhref\s*=\s*["']([^"']+)["']/i)?.[1];if(!href)continue;
+  // A nearby heading may belong to the previous story in a roundup. Only the
+  // anchor's own paragraph can establish local maker/project context.
+  const before=html.slice(Math.max(0,match.index-4000),match.index),opening=[...before.matchAll(/<p\b[^>]*>/gi)].at(-1),close=before.toLowerCase().lastIndexOf('</p>'),end=lower.indexOf('</p>',match.index+match[0].length);
+  const paragraph=opening&&opening.index>close&&end>=0&&end-match.index<4000?before.slice(opening.index)+html.slice(match.index,end+4):'',context=text(paragraph);
+  const maker=projectPresent&&has(label,identity.photographer),local=has(context,identity.photographer)&&has(context,identity.series)&&/book|publisher|gallery|exhibition|project|artist|photographer|here/i.test(label);
+  if(!maker&&!local)continue;let target;try{target=safePhotoReference(new URL(href.replace(/&amp;/g,'&'),url).href);}catch{continue;}
+  if(!target||seen.has(target)||target===url||!PROJECT_PAGE_HOSTS.includes(new URL(target).hostname))continue;
+  seen.add(target);found.push({url:target,label,sourceUrl:url,basis:maker?'maker_named_link_from_project_page':'project_named_local_source_context',destinationFetched:false,identityVerified:false,rightsGranted:false});if(found.length>=8)break;
+ }
+ return found.slice(0,8);
+}
+
 export function automaticPhotoPlan(story,{direction='best',custom=''}={}){
  const base=planStoryPhotos(story,{direction,custom});
  const pages=[...new Set(knownPages(story))].filter(url=>permittedProjectPage(story,url));
@@ -21,7 +41,7 @@ export function automaticPhotoPlan(story,{direction='best',custom=''}={}){
  const originals=[...new Set(knownPages(story))],sourceUrl=pages[0]||originals[0]||null;
  const hosts=originals.map(url=>new URL(url).hostname),archive=hosts.some(h=>h==='www.loc.gov'||h==='loc.gov')?'loc':hosts.some(h=>h==='www.artic.edu'||h==='api.artic.edu')?'aic':hosts.some(h=>h==='commons.wikimedia.org')?'commons':null;
  const route=pages.length?'retained_project_page':archive?'archive_search':'source_assisted';
- return {...base,version:2,source:pages.length||!archive?'project':archive,sourceUrl,route,reason:pages.length?'Check recorded project sources and exact project links. Capture supported image files for private review; keep unrelated references out of suggestions.':archive?'Search the catalogue already identified in this story’s source evidence.':'No supported original source is recorded. Existing photographs remain available; try another direction or add an original source under advanced tools.',sourceCandidates:originals,sourceCalls:route==='source_assisted'?0:pages.length?2:1,sourcePolicy:'recorded_fallback_v2',imageCalls:6,relevancePolicy:'project_evidence_v1',automaticRetries:0,paidCalls:0,engine:'existing_photo_request_ledger',modelPlanningPerformed:false};
+ return {...base,version:2,source:pages.length||!archive?'project':archive,sourceUrl,route,reason:pages.length?'Check recorded project sources and exact project links. Capture supported image files for private review; keep unrelated references out of suggestions.':archive?'Search the catalogue already identified in this story’s source evidence.':'No supported original source is recorded. Existing photographs remain available; try another direction or add an original source under advanced tools.',sourceCandidates:pages.length?[...pages,...originals.filter(u=>!pages.includes(u))]:originals,sourceCalls:route==='source_assisted'?0:pages.length?2:1,sourcePolicy:'recorded_fallback_v2',imageCalls:6,relevancePolicy:'project_evidence_v1',automaticRetries:0,paidCalls:0,engine:'existing_photo_request_ledger',modelPlanningPerformed:false};
 }
 
 export async function fetchProjectPage(story,url,{fetchImpl=fetch}={}){
@@ -40,5 +60,5 @@ export function projectPageReferences(story,{url,html,direction='best',basis='fe
  const identity=storyPhotoIdentity(story),images=inspectPhotoSource(html,url,story),capturedAt=new Date().toISOString();
  const photos=images.map(m=>({id:'project:'+digest(url+'|'+m.url).slice(0,32),source:'project',query:identity.subject,title:m.caption||'Uncaptioned source-page reference',creator:m.creator||m.imageMetadata?.creatorReported||'',date:m.years.join(', '),description:m.caption,series:'',sourceUrl:url,previewUrl:m.url,fileUrl:'',rightsLabel:'Unknown — source reference only',rightsGranted:false,publicationApproved:false,sourceRelation:m.relation,creatorBasis:m.creatorBasis,sourceCredit:m.credit||m.imageMetadata?.creditReported||'',copyrightHolder:m.copyrightHolder||m.imageMetadata?.copyrightHolderReported||'',licenseUrl:m.imageMetadata?.licenseReportedUrl||'',sourceYears:m.years,sourceCaptionBasis:m.captionBasis,sourceResearchLinks:m.researchLinks,materialType:m.materialType,dateContext:m.dateContext,imageMetadata:m.imageMetadata,captureCoverage:m.captureCoverage,referenceVariants:m.referenceVariants,reportedWidth:m.reportedWidth,reportedHeight:m.reportedHeight,photoExplorationDirection:direction,sourceCaptureBasis:basis,pixelAnalysisPerformed:false,originalDownloadVerified:false}));
  const ranked=photos.sort((a,b)=>photoRelevance({...b,sourceCaption:b.description},identity).score-photoRelevance({...a,sourceCaption:a.description},identity).score);
- return {photos:ranked,sourceCapture:{url,sha256:digest(html),capturedAt,basis,html,identity,projectTrails:recordedProjectTrails(html,url,identity),coverage:images[0]?.captureCoverage||null,networkFetched:basis==='fetched_project_page',pixelInspectionPerformed:false,rightsGranted:false}};
+ return {photos:ranked,sourceCapture:{url,sha256:digest(html),capturedAt,basis,html,identity,projectTrails:projectSourceTrails(html,url,identity,ranked),coverage:images[0]?.captureCoverage||null,networkFetched:basis==='fetched_project_page',pixelInspectionPerformed:false,rightsGranted:false}};
 }

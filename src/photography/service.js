@@ -5,6 +5,8 @@ import {requireThat} from '../errors.js';
 import {safePhotoReference} from '../n8n/photo-url-guard.js';
 import {makePhotoPacket,validatePhotoReceipt,photoDigest,targetPhotoPacket} from './native-contract.js';
 import {captureTargetedPhotoResult} from '../n8n/studio-photo-adapter.js';
+import {prepareVisualAssessment,captureVisualExecution} from './visual-assessment.js';
+import {sourceProgression,advancePhotoPlan} from './source-progression.js';
 import {acquireReceiptImage,permittedSourceImage} from './source-images.js';
 import {automaticPhotoPlan,fetchProjectPage,projectPageReferences,permittedProjectPage} from './project-sources.js';
 export class PhotographyService extends PhotoResearch {
@@ -20,11 +22,34 @@ export class PhotographyService extends PhotoResearch {
   for(const row of this.db.prepare("SELECT request_id FROM photo_story_requests WHERE story_id=? AND state='complete' ORDER BY rowid DESC").all(story.id)){
    const p=this.storyRequest(row.request_id);
    if(p.packet.payload.target.sourceRevision!==story.revision)continue;
-   for(const capture of p.sourceCaptures||[p.sourceCapture]){
+   for(const capture of (p.sourceCaptures?.length?p.sourceCaptures:[p.sourceCapture])){
     if(!capture?.identity||capture.identity.photographer!==identity.photographer||capture.identity.series!==identity.series)continue;
     for(const link of capture.projectTrails||[])if(!seen.has(link.url)){seen.add(link.url);trails.push(link);if(trails.length===8)return trails;}
    }
   }return trails;
+ }
+ async prepareVisualReview(story,id,{assetIds,sourceRevision,workingVersion}){
+  requireThat(sourceRevision===story.revision&&workingVersion===(story.localDraft?.version||0)&&this.previews,'EDIT_CONFLICT','Use the current story and its private source files.');
+  const result=await prepareVisualAssessment({story,request:this.storyRequest(id),assetIds,previews:this.previews,workerId:'6CkqfYc4Pyd4k8vi'}),request=this.storyRequest(id);
+  const prior=request.visualReviews?.find(r=>r.state==='prepared'&&r.packet.manifestSha256===result.packet.manifestSha256);
+  if(prior)return {jobId:prior.packet.jobId,...prior.review,modelCalls:0,dispatchAvailable:false};
+  request.visualReviews||=[];requireThat(request.visualReviews.length<20,'PHOTO_REVIEW_LIMIT','Retain and review the existing prepared assessments before preparing more.');
+  request.visualReviews.push({packet:result.packet,review:result.review,state:'prepared',createdAt:new Date().toISOString()});
+  this.db.prepare('UPDATE photo_story_requests SET data_json=? WHERE request_id=?').run(JSON.stringify(request),id);return {jobId:result.packet.jobId,...result.review,modelCalls:0,dispatchAvailable:false};
+ }
+ acceptVisualReview(story,id,execution,{offline=false,approvedGraphSha256=null}={}){
+  const request=this.storyRequest(id),claimed=execution?.data?.resultData?.runData?.['Validate Photo Assessment']?.[0]?.data?.main?.[0]?.[0]?.json?.packet,saved=request?.visualReviews?.find(r=>r.packet.jobId===claimed?.jobId);
+  requireThat(request?.storyId===story.id&&saved,'INVALID_VISUAL_RESULT','Use this story’s prepared native photo job.');
+  const envelope=captureVisualExecution(execution,saved.packet,{offline,approvedGraphSha256}),result=envelope.result;
+  if(saved.executionId){requireThat(saved.executionId===String(execution.id)&&JSON.stringify(saved.result)===JSON.stringify(result),'EDIT_CONFLICT','A different result is already recorded.');return this.storyRequestView(request);}
+  const unchanged=story.revision===saved.packet.manifest.sourceRevision&&(story.localDraft?.version||0)===saved.packet.manifest.workingVersion&&saved.packet.images.every(i=>this.previews.get(story.id,i.assetId)?.sha256===i.sourcePreviewSha256);
+  Object.assign(saved,{state:unchanged?(offline?'offline_simulation':'complete'):'review_required',result,usage:envelope.usage||null,executionId:String(execution.id),simulation:offline,receivedAt:new Date().toISOString()});
+  this.db.prepare('UPDATE photo_story_requests SET data_json=? WHERE request_id=?').run(JSON.stringify(request),id);return this.storyRequestView(request);
+ }
+ sourceMemory(story,options={}){
+  this.storyTables();const requests=this.db.prepare("SELECT request_id FROM photo_story_requests WHERE story_id=? AND state IN ('complete','unavailable') ORDER BY rowid DESC LIMIT 100").all(story.id).map(r=>this.storyRequest(r.request_id));
+  const media=[...(story.media||[]),...this.storyMedia(story)];
+  return sourceProgression({...story,media},requests,{...options,hasPreview:a=>Boolean(a.localPreview||this.previews?.get(story.id,a.id))});
  }
  photoContextMatches(story,target){return story?.id===target.storyId&&story.revision===target.sourceRevision&&!story.localDraft?.stale&&(story.localDraft?.version||0)===target.workingVersion&&(target.scope==='story_source'&&target.assetId===null||story.media?.some(m=>m.id===target.assetId&&(m.localPreview?.sha256||null)===target.previewSha256));}
 
@@ -32,15 +57,19 @@ export class PhotographyService extends PhotoResearch {
   * from the separately reviewed archive-only native packet, which stays intact. */
  prepareDiscovery(story,input){
   this.storyTables();
-  requireThat(input&&Object.keys(input).every(k=>['idempotencyKey','sourceRevision','workingVersion','direction','custom','sourceUrl','html'].includes(k))&&/^[a-f0-9-]{36}$/.test(input.idempotencyKey)&&input.sourceRevision===story?.revision&&input.workingVersion===(story.localDraft?.version||0)&&!story.localDraft?.stale,'INVALID_PHOTO_TARGET','Save your edits and use the current story before finding photographs.');
-  const plan=automaticPhotoPlan({...story,recordedProjectLinks:[...(story.recordedProjectLinks||[]),...this.storyProjectTrails(story)]},{direction:input.direction||'best',custom:input.custom||''});
+  requireThat(input&&Object.keys(input).every(k=>['idempotencyKey','sourceRevision','workingVersion','direction','custom','sourceUrl','html','refreshSources'].includes(k))&&/^[a-f0-9-]{36}$/.test(input.idempotencyKey)&&input.sourceRevision===story?.revision&&input.workingVersion===(story.localDraft?.version||0)&&!story.localDraft?.stale,'INVALID_PHOTO_TARGET','Save your edits and use the current story before finding photographs.');
+  requireThat((input.custom===undefined||typeof input.custom==='string'&&input.custom.length<=300)&&(input.html===undefined||typeof input.html==='string')&&(input.refreshSources===undefined||typeof input.refreshSources==='boolean'),'INVALID_PHOTO_TARGET','Choose whether to recheck sources.');
+  const prior=this.storyRequest(input.idempotencyKey);
+  if(prior){requireThat(prior.storyId===story.id&&prior.packet.payload.target.sourceRevision===input.sourceRevision&&prior.packet.payload.target.workingVersion===input.workingVersion&&prior.plan.direction===(input.direction||'best')&&prior.plan.custom===((input.direction||'best')==='custom'?(input.custom||'').trim():'')&&Boolean(prior.plan.sourceProgression?.refreshSources)===Boolean(input.refreshSources)&&prior.packet.payload.htmlSha256===(input.html!==undefined?createHash('sha256').update(input.html).digest('hex'):null)&&(!input.sourceUrl||input.sourceUrl===prior.plan.sourceUrl),'EDIT_CONFLICT','This request is already bound to another source or story version.');return this.storyRequestView(prior);}
+  let plan=automaticPhotoPlan({...story,recordedProjectLinks:[...(story.recordedProjectLinks||[]),...this.storyProjectTrails(story)]},{direction:input.direction||'best',custom:input.custom||''});
+  const memory=this.sourceMemory(story,{direction:plan.direction,custom:plan.custom});
+  if(input.html===undefined)plan=advancePhotoPlan(plan,memory,{refreshSources:input.refreshSources===true});
   const imported=input.html!==undefined;
   if(imported){requireThat(safePhotoReference(input.sourceUrl)&&typeof input.html==='string'&&Buffer.byteLength(input.html)<=2000000&&input.html.length>=20,'INVALID_PHOTO_SOURCE','Choose an original public URL and its saved HTML page, up to 2 MB.');Object.assign(plan,{source:'project',sourceUrl:input.sourceUrl,route:'saved_page',reason:'Inspect the saved page you supplied. Its origin and captions remain unverified; no network request is made.',sourceCalls:0});}
   else requireThat(input.sourceUrl===undefined,'PHOTO_SOURCE_NOT_BOUND','Automatic discovery follows only source URLs already retained on this story.');
   const target={storyId:story.id,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,assetId:null,previewSha256:null,scope:'story_source'};
-  const payload={purpose:'private_story_photo_discovery',requestId:input.idempotencyKey,target,direction:{source:plan.source,query:plan.query,page:1,photographicDirection:plan.direction,custom:plan.custom},sourceUrl:plan.sourceUrl,route:plan.route,sourcePolicy:plan.sourcePolicy,sourceCandidates:plan.sourceCandidates,relevancePolicy:plan.relevancePolicy,htmlSha256:imported?createHash('sha256').update(input.html).digest('hex'):null,budget:{sourceCalls:plan.sourceCalls,imageCalls:imported?0:plan.imageCalls,automaticRetries:0,paidCalls:0,remoteWrites:0},rightsGranted:false};
-  const packet={schemaVersion:2,payload,digest:photoDigest(payload)},prior=this.storyRequest(input.idempotencyKey);
-  if(prior){requireThat(prior.packet.digest===packet.digest,'EDIT_CONFLICT','This request is already bound to another source or story version.');return this.storyRequestView(prior);}
+  const payload={purpose:'private_story_photo_discovery',requestId:input.idempotencyKey,target,direction:{source:plan.source,query:plan.query,page:1,photographicDirection:plan.direction,custom:plan.custom},sourceUrl:plan.sourceUrl,route:plan.route,sourcePolicy:plan.sourcePolicy,sourceCandidates:plan.sourceCandidates,...(plan.sourceProgression?{sourceProgression:plan.sourceProgression}:{}),relevancePolicy:plan.relevancePolicy,htmlSha256:imported?createHash('sha256').update(input.html).digest('hex'):null,budget:{sourceCalls:plan.sourceCalls,imageCalls:imported?0:plan.imageCalls,automaticRetries:0,paidCalls:0,remoteWrites:0},rightsGranted:false};
+  const packet={schemaVersion:2,payload,digest:photoDigest(payload)};
   requireThat(!this.db.prepare("SELECT request_id FROM photo_story_requests WHERE story_id=? AND state='fetching'").get(story.id),'EDIT_CONFLICT','A photograph request is already in progress or needs reconciliation. It will not be repeated.');
   this.create({query:plan.query,source:'saved',mode:'image',idempotencyKey:input.idempotencyKey});
   const data={packet,plan,createdAt:new Date().toISOString(),executionVerified:false,receipt:null,...(imported?{savedHtml:input.html}:{})};
@@ -52,7 +81,8 @@ export class PhotographyService extends PhotoResearch {
   requireThat(input.sourceRevision===story.revision&&input.workingVersion===(story.localDraft?.version||0)&&this.photoContextMatches(readStory(),p.packet.payload.target),'EDIT_CONFLICT','The story changed. Save it before a new photograph request.');
   const payload=p.packet.payload;
   requireThat(photoDigest(payload)===p.packet.digest&&payload.requestId===p.id&&payload.purpose==='private_story_photo_discovery'&&payload.direction.source===p.plan.source&&payload.direction.query===p.plan.query&&payload.direction.photographicDirection===p.plan.direction&&payload.direction.custom===p.plan.custom&&payload.sourceUrl===p.plan.sourceUrl&&payload.route===p.plan.route&&payload.relevancePolicy===p.plan.relevancePolicy&&payload.budget.sourceCalls===p.plan.sourceCalls&&payload.budget.paidCalls===0&&payload.budget.automaticRetries===0&&payload.budget.remoteWrites===0&&payload.rightsGranted===false,'INVALID_PHOTO_RECEIPT','The saved photo request changed. No source request was made.');
-  if(payload.sourcePolicy)requireThat(payload.sourcePolicy==='recorded_fallback_v2'&&payload.sourcePolicy===p.plan.sourcePolicy&&JSON.stringify(payload.sourceCandidates)===JSON.stringify(p.plan.sourceCandidates)&&payload.budget.imageCalls===(p.plan.route==='saved_page'?0:6),'INVALID_PHOTO_RECEIPT','The saved source and image budgets changed.');
+  if(payload.sourcePolicy)requireThat(['recorded_fallback_v2','source_progression_v1'].includes(payload.sourcePolicy)&&payload.sourcePolicy===p.plan.sourcePolicy&&JSON.stringify(payload.sourceCandidates)===JSON.stringify(p.plan.sourceCandidates)&&payload.budget.imageCalls===(p.plan.route==='saved_page'?0:6),'INVALID_PHOTO_RECEIPT','The saved source and image budgets changed.');
+  if(payload.sourcePolicy==='source_progression_v1')requireThat(JSON.stringify(payload.sourceProgression)===JSON.stringify(p.plan.sourceProgression),'INVALID_PHOTO_RECEIPT','The saved source progression changed.');
   if(p.plan.route==='saved_page')requireThat(typeof p.savedHtml==='string'&&createHash('sha256').update(p.savedHtml).digest('hex')===payload.htmlSha256,'INVALID_PHOTO_RECEIPT','The saved page differs from the reviewed request.');
   p.startedAt=new Date().toISOString();const cache=p.plan.source!=='project'&&this.db.prepare('SELECT cached_at FROM photo_page_cache WHERE source=? AND query=? AND page=1').get(p.plan.source,p.plan.query);p.sourceCalls=p.plan.source==='project'||cache&&Date.now()-Date.parse(cache.cached_at)<86400000?0:p.plan.sourceCalls;
   if(!this.db.prepare("UPDATE photo_story_requests SET state='fetching',data_json=? WHERE request_id=? AND state='prepared'").run(JSON.stringify(p),p.id).changes)return this.storyRequestView(this.storyRequest(p.id));
@@ -61,7 +91,9 @@ export class PhotographyService extends PhotoResearch {
    if(p.plan.route==='source_assisted')throw Error('SOURCE_READER_UNAVAILABLE');
    let found,sourceCapture=null;
    if(p.plan.source==='project'){
-    const captures=[],visited=new Set();
+    const captures=[],visited=new Set(payload.sourceProgression?.refreshSources?[]:(payload.sourceProgression?.states||[]).map(s=>s.url));let reused=[];
+    for(const ref of payload.sourceProgression?.reuse||[]){const previous=this.storyRequest(ref.requestId),capture=previous?.sourceCaptures?.find(c=>c.url===ref.url&&c.sha256===ref.sha256);requireThat(previous?.storyId===story.id&&previous.packet.payload.target.sourceRevision===story.revision&&capture?.networkFetched&&createHash('sha256').update(capture.html).digest('hex')===ref.sha256,'INVALID_PHOTO_RECEIPT','Retained source evidence changed.');captures.push(capture);reused.push(...projectPageReferences(story,{url:capture.url,html:capture.html,direction:p.plan.direction}).photos);visited.add(capture.url);}
+    p.sourceCaptures=[...captures];
     const read=async(context,url)=>{
      requireThat(permittedProjectPage(context,url),'PHOTO_SOURCE_NOT_BOUND','Only an exact recorded project link on a supported source can be followed.');
      requireThat(!visited.has(url)&&p.sourceCalls<payload.budget.sourceCalls&&this.photoContextMatches(readStory(),payload.target),'INVALID_PHOTO_TARGET','The source budget or story changed. No further page was read.');
@@ -73,8 +105,10 @@ export class PhotographyService extends PhotoResearch {
     const initialContext={...story,recordedProjectLinks:[...(story.recordedProjectLinks||[]),...this.storyProjectTrails(story)]};
     if(p.plan.route==='saved_page'){
      const result=projectPageReferences(story,{url:p.plan.sourceUrl,html:p.savedHtml,direction:p.plan.direction,basis:'founder_supplied_saved_page'});found=result.photos;sourceCapture=result.sourceCapture;
-    }else if(payload.sourcePolicy==='recorded_fallback_v2'){
-     let context=initialContext,next=p.plan.sourceUrl,lastError;found=[];
+    }else if(p.plan.route==='sources_checked'){found=[];
+    }else if(p.plan.route==='cached_project_evidence'){found=reused;sourceCapture=captures[0];
+    }else if(['recorded_fallback_v2','source_progression_v1'].includes(payload.sourcePolicy)){
+     let context=initialContext,next=p.plan.sourceUrl,lastError;found=[...reused];
      while(next&&p.sourceCalls<payload.budget.sourceCalls){
       try{
        const result=await read(context,next);sourceCapture=result.sourceCapture;found.push(...result.photos);
@@ -159,7 +193,7 @@ export class PhotographyService extends PhotoResearch {
   const filtered=p.plan?.relevancePolicy==='project_evidence_v1',newCount=p.displayPhotoIds?.length??p.receipt?.photos?.length??0,excludedCount=p.excludedPhotoIds?.length||0;
   const kind=p.plan?.direction==='context'?'context':'project',excluded=`${excludedCount} unrelated or unconfirmed reference${excludedCount===1?'':'s'} kept out of suggestions.`;
   const completionMessage=newCount?`${newCount} new ${kind} reference${newCount===1?'':'s'}. ${excluded} Visual review and permissions still need checking.`:`No new ${kind} references. ${excluded} No visual review has run.`;
-  return {id:p.id,state:p.state==='fetching'&&!this.running.has(p.id)?'uncertain':p.state,source:p.packet.payload.direction.source,query:p.packet.payload.direction.query,createdAt:p.createdAt,sourceRevision:p.packet.payload.target.sourceRevision,workingVersion:p.packet.payload.target.workingVersion,photoCount:p.receipt?.photos?.length||0,newPhotoCount:newCount,duplicateCount:p.duplicateCount||0,excludedCount,relevanceCounts:p.relevanceCounts||null,page:p.packet.payload.direction.page,hasMore:p.state==='complete'&&p.receipt?.hasMore===true,plan:p.plan||null,sourceCapture:p.sourceCapture?captureView(p.sourceCapture):null,sourcePages:(p.sourceCaptures||[]).map(captureView),executionVerified:p.executionVerified===true,executionId:p.receipt?.executionId||null,errorCode:p.errorCode||null,failedSourceUrl:p.failedSourceUrl||null,message:p.errorCode==='SOURCE_READER_UNAVAILABLE'?'No supported original source is recorded for this story. Keep editing with your saved photographs, or add a source through advanced tools. No AI call was made.':denied?'The source denied access (HTTP '+denied[1]+'). Your existing photographs are unchanged. Review the original link or try a different direction; advanced source assistance is optional.':p.state==='fetching'&&!this.running.has(p.id)?'The source request outcome needs checking after restart. It will not be resent.':p.state==='complete'&&filtered?completionMessage:p.state==='complete'&&p.sourceCapture?.projectTrails?.length&&!p.plan?.projectTrails?.length?'A more specific project page was recovered. Find more photos will follow it on your next request. Your caption and carousel are unchanged.':p.state==='complete'&&newCount===0?'No new references found. Repeated files stay in the receipt; try a different direction or bring an original page.':p.state==='prepared'&&p.packet.schemaVersion===2?`Read up to ${p.packet.payload.budget.sourceCalls} recorded source page(s). No AI call.`:messages[p.state]||'Outcome needs checking; do not resend this request.',sourceCalls:p.sourceCalls||0,sourceAttempts:(p.sourceAttempts||[]).map(a=>({url:a.url,status:a.status,errorCode:a.errorCode||null})),imageAttempts:p.imageAttempts||[],decodedImageCount:(p.imageAttempts||[]).filter(a=>a.status==='decoded').length,cachedExistingCount:(p.imageAttempts||[]).filter(a=>a.status==='cached_existing').length,pixelDuplicateCount:p.pixelDuplicateIds?.length||0,visualAnalysisPerformed:false,paidCalls:0,rightsGranted:false};
+  return {id:p.id,state:p.state==='fetching'&&!this.running.has(p.id)?'uncertain':p.state,source:p.packet.payload.direction.source,query:p.packet.payload.direction.query,createdAt:p.createdAt,sourceRevision:p.packet.payload.target.sourceRevision,workingVersion:p.packet.payload.target.workingVersion,photoCount:p.receipt?.photos?.length||0,newPhotoCount:newCount,duplicateCount:p.duplicateCount||0,excludedCount,relevanceCounts:p.relevanceCounts||null,page:p.packet.payload.direction.page,hasMore:p.state==='complete'&&p.receipt?.hasMore===true,plan:p.plan||null,sourceCapture:p.sourceCapture?captureView(p.sourceCapture):null,sourcePages:(p.sourceCaptures||[]).map(captureView),executionVerified:p.executionVerified===true,executionId:p.receipt?.executionId||null,errorCode:p.errorCode||null,failedSourceUrl:p.failedSourceUrl||null,message:p.errorCode==='SOURCE_READER_UNAVAILABLE'?'No supported original source is recorded for this story. Keep editing with your saved photographs, or add a source through advanced tools. No AI call was made.':denied?'The source denied access (HTTP '+denied[1]+'). Your existing photographs are unchanged. Review the original link or try a different direction; advanced source assistance is optional.':p.state==='fetching'&&!this.running.has(p.id)?'The source request outcome needs checking after restart. It will not be resent.':p.state==='complete'&&filtered?completionMessage:p.state==='complete'&&p.sourceCapture?.projectTrails?.length&&!p.plan?.projectTrails?.length?'A more specific project page was recovered. Find more photos will follow it on your next request. Your caption and carousel are unchanged.':p.state==='complete'&&newCount===0?'No new references found. Repeated files stay in the receipt; try a different direction or bring an original page.':p.state==='prepared'&&p.packet.schemaVersion===2?`Read up to ${p.packet.payload.budget.sourceCalls} recorded source page(s). No AI call.`:messages[p.state]||'Outcome needs checking; do not resend this request.',visualReviews:(p.visualReviews||[]).map(r=>({jobId:r.packet.jobId,manifestSha256:r.packet.manifestSha256,state:r.state,result:r.result||null,usage:r.usage||null,simulation:r.simulation===true,executionId:r.executionId||null})),sourceProgression:p.plan?.sourceProgression||null,sourceCalls:p.sourceCalls||0,sourceAttempts:(p.sourceAttempts||[]).map(a=>({url:a.url,status:a.status,errorCode:a.errorCode||null})),imageAttempts:p.imageAttempts||[],decodedImageCount:(p.imageAttempts||[]).filter(a=>a.status==='decoded').length,cachedExistingCount:(p.imageAttempts||[]).filter(a=>a.status==='cached_existing').length,pixelDuplicateCount:p.pixelDuplicateIds?.length||0,visualAnalysisPerformed:false,paidCalls:0,rightsGranted:false};
  }
  storyRequestsFor(story){this.storyTables();return this.db.prepare('SELECT request_id FROM photo_story_requests WHERE story_id=? ORDER BY rowid DESC').all(story.id).map(r=>this.storyRequestView(this.storyRequest(r.request_id)));}
  async searchStoryRequest(story,id,input,{readStory=()=>story}={}){

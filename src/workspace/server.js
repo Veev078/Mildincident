@@ -136,6 +136,11 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
         const result=await photography.searchStoryRequest(story,prepared.id,{sourceRevision:input.sourceRevision,workingVersion:input.workingVersion,confirm:true},{readStory:()=>view().stories.find(s=>s.id===id)});
         json(response,201,{photoRequest:result,paidCalls:0,productionApplied:false});return;
       }
+      const visualPreparation=url.pathname.match(/^\/api\/stories\/([^/]+)\/photo-research\/([a-f0-9-]{36})\/visual-review$/);
+      if(visualPreparation&&request.method==='POST'){
+        requireThat(photography,'RESEARCH_UNAVAILABLE','Photo review preparation is unavailable.');const input=await body(request),story=view().stories.find(s=>s.id===decodeURIComponent(visualPreparation[1]));requireThat(story&&input&&Object.keys(input).every(k=>['assetIds','sourceRevision','workingVersion'].includes(k)),'INVALID_PHOTO_VISION','Prepare one exact private image manifest only.');
+        json(response,201,{review:await photography.prepareVisualReview(story,visualPreparation[2],input),paidCalls:0,productionApplied:false});return;
+      }
       const continuationRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/photo-research$/);
       if(continuationRoute&&request.method==='POST'){requireThat(research,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request),workspace=view(),story=workspace.stories.find(s=>s.id===decodeURIComponent(continuationRoute[1]));const {photoSource,photoDirection,photoCustom,photoParent,...direction}=input;const saved=research.createPhotoContinuation(story,direction,workspace.stories),photoRequest=photography?.prepareStoryRequest(story,saved,{source:photoSource||'commons',direction:photoDirection||'series',custom:photoCustom||'',parentId:photoParent||null});json(response,201,{request:saved,photoRequest,scope:'private_research_only',networkRequests:0,paidCalls:0,productionApplied:false});return;}
       if(url.pathname==='/api/generation/disable'&&request.method==='POST'){requireThat(captionPilot,'CAPTION_POLICY_DISABLED','No pilot policy is configured.');requireThat(Object.keys(await body(request)).length===0,'INVALID_CAPTION_REQUEST','Disable future starts without other changes.');json(response,200,{pilot:captionPilot.disable(),productionApplied:false});return;}
