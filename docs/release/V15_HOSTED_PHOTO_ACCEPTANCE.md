@@ -27,13 +27,30 @@ Do not ask the founder to repeat either acceptance search merely to reproduce th
 | --- | --- | --- |
 | References | The exact new/repeated/excluded counts reported above. | Canonical-file and perceptual uniqueness of every new reference. |
 | Browser display and founder curation | Actual relevant photographs are visible in hosted Studio; Jack's collection is compelling to the founder. | Whether each displayed image came from a direct browser hotlink, an older private preview, or a newly acquired private source copy. |
-| Server acquisition and private storage | The deployed code supports receipt-bound acquisition, bounded decoding, private blobs and source/hash evidence. | Actual `decoded` / `cached_existing` / `exact_duplicate` image-attempt counts, stored-file checksums, dimensions and successful CDN paths for these two hosted requests; these were not supplied. Mark **unverified**, not zero. |
+| Server acquisition and private storage | The deployed code supports receipt-bound acquisition, bounded decoding, private blobs and source/hash evidence. | Superseded by the read-only receipt evidence below: six Jack `decoded` and six Sophy `cached_existing` acquisitions, with all twelve original/preview file pairs present and hash-matching. Full-resolution originals, visual uniqueness against all earlier thumbnails and rights remain unverified. |
 | AI visual assessment | No photo-vision operation was introduced or initiated for this acceptance. | No AI aesthetic, project-identity, composition or carousel assessment has been validated. |
 | Rights / approval | Existing human review boundaries remain in force. | Display, decoding and the founder's editorial enthusiasm do not establish reproduction permission or publication approval. |
 
-The exact successful original-page/CDN URLs and access failures must come from the existing hosted receipts before making per-host claims. LIFE and Squarespace were supported by the release, but support is not proof that those particular routes succeeded in these searches. The Cloud development allowlist restriction must not be reported as a Render origin-access failure.
+The successful LIFE and Dazed routes are now recorded below. The supplied receipts contain no failed page/image attempts; they provide no success or failure evidence for the artist, gallery, book-publisher or Squarespace routes. The Cloud development allowlist restriction must not be reported as a Render origin-access failure.
 
 The founder confirmed UI operation; an exhaustive record-by-record comparison of every caption, earlier draft and selection was not separately reported. Do not silently promote that broader preservation check to independently verified.
+
+## Read-only receipt follow-up — V16, 10 November 2026
+
+The founder supplied the full JSON from the prepared **read-only Render Shell** command. It inspected the completed requests and existing files without rerunning either search. This is hosted evidence supplied by the founder, not independent Codex filesystem/browser access.
+
+| Completed request | Source route | Private file evidence | Limits / interpretation |
+| --- | --- | --- | --- |
+| Jack `f737c4e8-04c6-49e7-ab5c-d881720e6b13` | [LIFE project page](https://www.life.com/people/jack-nicholson-early-photos/) → `static.life.com/wp-content/uploads/migrated/2012/04/` | Six JPEG acquisitions with status `decoded`. Original and derivative files exist; all twelve SHA256 checks match. Two 660×1000 images and four 1024×671–676 images; original downloads total 799,668 bytes. | Seven new references, **six acquired files**, not seven full-resolution originals. The seventh reference is outside the six-image acquisition budget. Earlier Brave-wrapped thumbnails do not provide comparable original hashes. |
+| Sophy `bc6efc1c-d6de-4cdf-8aa6-e00f4a09d202` | [Specific Dazed article](https://www.dazeddigital.com/art-photography/article/68611/1/pissing-women-sophy-rickett-art-activism-provocative-london-exhibition-book) and [September roundup](https://www.dazeddigital.com/art-photography/article/68819/1/most-loved-photo-stories-september-25-photographers-zines-series) → `images-prod.dazeddigital.com` | Six JPEG acquisitions with status `cached_existing`; all twelve original/derivative hashes match. One 640×426 image and five 640×427 images; original downloads total 367,846 bytes. | `cached_existing` means acquisition for an **existing reference**, not a new photograph or proof of previously cached bytes. Zero additional project references. |
+
+All three saved-page hash checks also match. LIFE considered 66/66 image tags and retained 27/27 references. The specific Dazed article retained 19/19. The roundup considered 50/50 tags but retained only **40 of 52 references**: the retained-reference limit was reached. That is a bounded scan, never proof that the whole source/project is exhausted. No receipt claims a complete shoot or AI pixel assessment.
+
+Jack's downloaded filenames end `150118-jack-nicholson-02.jpg`, `04-1024x676.jpg`, `05.jpg`, `07-1024x674.jpg`, `08-1024x671.jpg`, `09-1024x676.jpg`. Sophy's copies end `1422047.jpg`, `1422048.jpg`, `1422050.jpg`, `1422049.jpg`, `1421791.jpeg`, `1421792.jpeg`. These are observed web-sized source copies. No reproduction rights or independent aesthetic/identity verification follows from decoding.
+
+A separate older Sophy receipt `2c604ee2-7dc7-455d-a698-27974958eeb7` records nine new/ten repeated references and **no** page captures or image attempts. Preserve it as historical reference-only evidence; do not combine it with the current V15 result.
+
+The full supplied hash/dimension summary is retained privately under ignored `.local/v16/hosted-receipt-summary.json`. [V16 implementation and approval boundary](V16_PHOTO_INTELLIGENCE.md) build on these observations. No additional real photograph was obtained during V16 local development.
 
 ## Next focused work
 

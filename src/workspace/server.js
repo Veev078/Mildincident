@@ -67,11 +67,14 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
   if(photography&&!photography.previews)photography.previews=previews;
   if(captionPilot&&engine)engine.captionPilot=captionPilot;
   const themes=research?new StudioThemes(research):null,approvalRequests=research?new ApprovalRequests(research):null;
+  const isPhotoOperation=id=>Object.hasOwn(research?.engineJob(id)?.editorialContext||{},'photoAssessment');
   const view = () => {
     const workspace = source.snapshot?source.view(drafts.all()):buildWorkspace({records:Object.fromEntries(Object.keys(WORKSPACE_TABLES).map(k=>[k,[]])),buffer:{posts:[],complete:false,observedAt:null},observedAt:new Date().toISOString(),warnings:[]});
     if(!source.snapshot)workspace.source={...workspace.source,kind:'disconnected',observedAt:null,bufferObservedAt:null,stale:true,unavailable:true,warnings:['No authoritative production snapshot is available. Private photographic research remains usable; connect n8n/Buffer or restore your private backup to inspect existing stories.'],refreshError:{code:'SOURCE_UNAVAILABLE',message:'Production observations unavailable; no example stories were substituted.'}};
     workspace.hosted=Boolean(access);workspace.backupStatus=backups?.status()||null;workspace.editorialDirection=editorialDirectionV14();
-    workspace.researchRequests = research?.workspaceRequests() || [];
+    // Pixel packets and their single-use grants stay private; photo outcomes
+    // belong to the photo receipt, not the story-generation inbox.
+    workspace.researchRequests = (research?.workspaceRequests() || []).filter(r=>!Object.hasOwn(r.engineJob?.editorialContext||{},'photoAssessment'));
     workspace.researchPresets=themes?themes.catalog(editorialPresetCatalog(source.snapshot)):editorialPresetCatalog(source.snapshot);workspace.studioThemes=themes?.all()||[];
     workspace.aiUsage=captionPilot?.usageSummary?.()||null;
     for(const request of workspace.researchRequests)if(captionPilot)request.generationProposal=captionPilot.storyStatus?.(request.id);
@@ -194,6 +197,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       if (url.pathname === '/api/research/requests' && request.method === 'POST') {
         requireThat(research, 'RESEARCH_UNAVAILABLE', 'The private research request store is unavailable.');
         const input = await body(request); const workspace = view();
+        requireThat(!input.idempotencyKey||!isPhotoOperation(input.idempotencyKey),'PHOTO_SCOPE_MISMATCH','Photo assessments remain in their private photo receipt.');
         const resolved=resolvePresetRequest(input,workspace.researchPresets,input.idempotencyKey?research.get(input.idempotencyKey):null);
         json(response, 201, { request: research.create(resolved.input, workspace.stories, {reuseDefault:true,preset:resolved.preset,editorialDiscovery:request.headers['x-mildincident-discovery']==='founder-brief-v14'}), scope: 'local_only', productionApplied: false }); return;
       }
@@ -210,6 +214,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       const engineMatch=url.pathname.match(/^\/api\/research\/requests\/([a-f0-9-]{36})\/engine\/(queue|start|review|evidence)$/);
       if(engineMatch && request.method==='POST'){
         requireThat(engine,'ENGINE_NOT_CONFIGURED','Private development engine connection is unavailable.');
+        requireThat(!isPhotoOperation(engineMatch[1]),'PHOTO_SCOPE_MISMATCH','This route cannot start or disclose a private photo assessment.');
         const input=await body(request);let job;
         requireThat(!['queue','start'].includes(engineMatch[2])||engine.client?.connection?.executionScope!=='draft_only','CAPTION_SCOPE_MISMATCH','Use the exact story caption action for a drafting-only authorization.');
         if(['queue','start'].includes(engineMatch[2]))requireThat(!captionPilot?.raw(engineMatch[1]),'CAPTION_SCOPE_MISMATCH','Use the reviewed founder action for policy requests.');
@@ -223,6 +228,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       const requestMatch = url.pathname.match(/^\/api\/research\/requests\/([a-f0-9-]{36})\/events$/);
       if (requestMatch && request.method === 'POST') {
         requireThat(research, 'RESEARCH_UNAVAILABLE', 'The private research request store is unavailable.');
+        requireThat(!isPhotoOperation(requestMatch[1]),'PHOTO_SCOPE_MISMATCH','Photo assessments remain in their private photo receipt.');
         const input = await body(request); const workspace = view();
         json(response, 200, { request: research.event(requestMatch[1], input, workspace.stories), scope: 'local_only', productionApplied: false }); return;
       }

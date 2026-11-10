@@ -1,4 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import path from 'node:path';import os from 'node:os';import vm from 'node:vm';import {createHash,randomUUID} from 'node:crypto';import sharp from 'sharp';
+import {createWorkspaceServer} from '../src/workspace/server.js';
 import {EditorialEngineClient,requestFingerprint} from '../src/workspace/editorial-engine-client.js';import {EditorialEngineService} from '../src/workspace/editorial-engine-service.js';
 import {LocalPreviewStore} from '../src/workspace/previews.js';import {LocalResearchStore} from '../src/workspace/research-store.js';import {PhotographyService} from '../src/photography/service.js';import {photoSha256,photoJpegSize,prepareVisualAssessment,validateVisualJob,visualModelMessages,validateVisualResult} from '../src/photography/visual-assessment.js';import {preparePhotoVisualWorker} from '../src/n8n/photo-visual-worker.js';import {editorialGraphSha} from '../src/n8n/v14-editorial-patch.js';
 const workerId='6CkqfYc4Pyd4k8vi';
@@ -43,7 +44,7 @@ test('offline exact worker patch preserves every old node, routes malformed phot
 });
 
 test('photo operations use the existing queue, single-use durable claims and exact native delivery; a lost response is never resubmitted',async t=>{
- const {prepared,research}=await fixture(t),json=v=>new Response(JSON.stringify(v),{headers:{'content-type':'application/json'}});
+ const {prepared,research,previews,service}=await fixture(t),json=v=>new Response(JSON.stringify(v),{headers:{'content-type':'application/json'}});
  for(const lost of [false,true]){
   const packet=structuredClone(prepared.packet);packet.jobId=randomUUID();packet.approvalId=randomUUID();const b=bound(packet);
   const base={id:workerId,name:'MILDINCIDENT DEV — bounded editorial generation',versionId:'original',activeVersionId:'original',settings:{executionOrder:'v1',availableInMCP:true},connections:{'Development Job Claimed?':{main:[[{node:'Caption Improvement?',type:'main',index:0}]]}},nodes:[
@@ -69,6 +70,11 @@ test('photo operations use the existing queue, single-use durable claims and exa
   await assert.rejects(client.queue({...request,editorialContext:{captionImprovement:{}}}));const captionClient=new EditorialEngineClient({connection:{...connection,executionScope:'caption_policy',captionAction:{jobId:request.id,requestHash}},apiKey:'synthetic-test-api-key',fetchImpl:()=>assert.fail('Wrong-scope photo request must not read or write')});await assert.rejects(captionClient.queue({...request,editorialContext:context}),{code:'PHOTO_SCOPE_MISMATCH'});assert.equal(posts,0);
   const inspection=await client.inspect();assert.equal(inspection.maxResearchCalls,0);assert.equal(inspection.maxDraftCalls,0);assert.equal(inspection.maxPhotoCalls,1);
   await engine.queue(request.id,{editorialContext:context});await engine.queue(request.id,{editorialContext:context});assert.equal(posts,1);
+  const server=createWorkspaceServer({source:{snapshot:null},research,engine,photography:service,previews});await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port;
+  try{const publicWorkspace=await(await fetch(origin+'/api/workspace')).json();assert(!publicWorkspace.researchRequests.some(r=>r.id===request.id));assert(!JSON.stringify(publicWorkspace).includes(b.p.images[0].data));assert(!JSON.stringify(publicWorkspace).includes(b.p.authorization.id));
+   for(const route of ['/api/research/requests/'+request.id+'/engine/start','/api/research/requests/'+request.id+'/events','/api/research/requests']){const denied=await fetch(origin+route,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit',Origin:origin},body:JSON.stringify({kind:'brief',prompt:request.prompt,idempotencyKey:request.id})});assert.equal((await denied.json()).error.code,'PHOTO_SCOPE_MISMATCH');}assert.equal(dispatches,0);
+  }finally{await new Promise(r=>{server.close(r);server.closeAllConnections();});}
+
   await engine.start(request.id,research.engineJob(request.id).version);
   for(let n=0;n<30&&!['ready_to_review','dispatch_uncertain'].includes(research.engineJob(request.id).state);n++)await new Promise(r=>setTimeout(r,5));
   const saved=research.engineJob(request.id);assert.equal(saved.state,lost?'dispatch_uncertain':'ready_to_review');if(!lost){assert.equal(saved.photoResult.result.images.length,6);assert.deepEqual(saved.candidates,[]);}

@@ -1,15 +1,19 @@
 # Photo Intelligence — next work after real V15 acceptance
 
-## Current evidence and priority
+## V16 continuation — implemented locally, not deployed
+
+[V16 photo intelligence](V16_PHOTO_INTELLIGENCE.md) records the completed receipt inspection, source-memory/progression implementation, retained-roundup relevance repair and bounded six-image native foundation. Do not restart those tasks. Real hosted receipt evidence now confirms six acquired Jack files and six copies of existing Sophy references, with all original/preview hashes matching. No new real photographs or AI visual result were obtained in local development. The next gate is a separately approved code release and one hash-bound photo-only assessment; the existing live worker/policy remain unchanged.
+
+## V15 evidence and implementation brief
 
 V15 `2d47c21b4f3b648d2193721321c473255cc1a2a2` is live. [Real hosted founder acceptance](V15_HOSTED_PHOTO_ACCEPTANCE.md) supersedes the older local/replay limitations below:
 
 - **Jack Nicholson:** 7 new project references, 0 repeated, 20 unrelated/unconfirmed excluded. The founder sees highly relevant photographs forming a compelling collection and considers this a strong improvement.
 - **Sophy Rickett:** 0 new project references, 34 repeated, 6 unrelated/unconfirmed excluded. Existing relevant images display; there are no useful additions from this search.
 - The current UI works well. Preserve it; no broad redesign or repeated acceptance run is needed.
-- Browser-visible photographs are confirmed by the founder. Newly privately decoded files, their counts/hashes and exact successful source/CDN routes remain **unverified** until the existing hosted receipts are inspected. Reference counts and browser hotlinks are not durable-file proof. No AI visual review has been established.
+- Browser-visible photographs are confirmed by the founder. The read-only receipt follow-up now verifies private files and the LIFE/Dazed source/CDN routes. Other artist/gallery/book routes remain untested by that hosted evidence. No AI visual review has been established.
 
-## Focused implementation order
+## Original V16 implementation brief (progress recorded above)
 
 1. **Use the completed evidence first.** Inspect existing receipts/captures read-only, including successful and failed page/image attempts, provenance, excluded results, scan coverage and private-preview evidence. Do not trigger another search to reconstruct the accepted results.
 2. **Track source exhaustion in the existing ledger.** Distinguish complete unchanged source with no additions, bounded/truncated scan with no additions, denied access, unsupported host, unconfirmed identity and uncertain operation. Key history to story revision, exact identity/project, source URL/capture hash and direction. A repeated page is not an exhausted project. Deprioritize unchanged exhausted sources on the next founder-requested action; do not automatically refetch or resume uncertain requests. Allow a deliberate future refresh when source content or context changes.

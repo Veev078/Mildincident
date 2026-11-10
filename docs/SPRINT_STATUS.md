@@ -1,6 +1,18 @@
-# Current checkpoint — V15 live; real photographic acceptance recorded
+# Current checkpoint — V16 local photo intelligence; V15 remains live
 
-Live Studio is `2d47c21b4f3b648d2193721321c473255cc1a2a2`, Render deployment `dep-dbp4iqbbc2fs7394fs30`. [Hosted founder acceptance](release/V15_HOSTED_PHOTO_ACCEPTANCE.md): Jack Nicholson produced 7 new project references, 0 repeats and 20 exclusions; the founder reports highly relevant photographs and a compelling collection. Sophy Rickett produced 0 new, 34 repeated and 6 excluded references, with no useful additions. The UI works well and should be preserved. Browser-visible photographs are founder-confirmed; private decoding counts/hashes and exact successful source/CDN paths remain unverified. Do not count references as newly decoded originals or repeat acceptance just to reproduce these counts.
+[V16 implementation, actual evidence and separate native approval package](release/V16_PHOTO_INTELLIGENCE.md). The founder supplied the completed hosted receipts read-only: six Jack decoded JPEGs and six source copies for existing Sophy references; all 24 original/preview file hashes and three page hashes match. Sophy still has zero useful additions; its roundup retained 40/52 references. No searches were repeated and no new real photograph was obtained during V16.
+
+Implementation checkpoint `93250483d546b8518c9925555067f8c76cdbb623` adds scoped source memory/progression, exact artist/publisher trails, cached-page acquisition of remaining files, and small understandable status changes. The accepted UI remains intact. Retained Sophy markup exposed a cross-project “here” link which is now excluded. Six hash-bound decoded-image inputs and a separate photo-only native branch are verified offline through the existing client, queue, durable claims and delivery contract. Results stay advisory; actual model vision remains gated.
+
+Validation: 502 unit/regression tests, 40 browser groups, 11 isolated HTTPS hosted checks, nine workstation screens at six widths, retained Jack/Sophy/Marcie desktop/mobile before/after journeys and the real message formatter with six generated image inputs. These simulations do not establish new photographic quality. Screenshots are actual rendered local UI, visibly labelled as generated/replayed evidence.
+
+The live recurring worker was rechecked read-only: active saved/version `d12b183b-a511-4f58-9726-5a565db61f6d`, unchanged graph `0e1777e5…`. Proposed photo graph `c0110405…` is not installed; no photo policy/permit exists. Live Studio remains V15 `2d47c21`; no deployment, live mutation, credential change, paid call or publishing. Separate release and one-photo-assessment authorization are required. PR #1 remains draft and unmerged.
+
+---
+
+# Earlier checkpoint — V15 live; real photographic acceptance recorded
+
+Live Studio is `2d47c21b4f3b648d2193721321c473255cc1a2a2`, Render deployment `dep-dbp4iqbbc2fs7394fs30`. [Hosted founder acceptance](release/V15_HOSTED_PHOTO_ACCEPTANCE.md): Jack Nicholson produced 7 new project references, 0 repeats and 20 exclusions; the founder reports highly relevant photographs and a compelling collection. Sophy Rickett produced 0 new, 34 repeated and 6 excluded references, with no useful additions. The UI works well and should be preserved. Browser-visible photographs are founder-confirmed; private decoding/path evidence was pending at this checkpoint and is now recorded in the V16 follow-up above. Do not count references as newly decoded originals or repeat acceptance just to reproduce these counts.
 
 [Next Photo Intelligence work](release/PHOTO_INTELLIGENCE_NEXT.md) focuses on read-only receipt evidence, source exhaustion, intelligent multi-source discovery and later separately authorized hash-bound image assessment. The existing worker, policy, UI and publishing safeguards remain unchanged. No paid calls, live mutations or new deployment in this acceptance-recording update.
 
