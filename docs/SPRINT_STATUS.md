@@ -1,4 +1,14 @@
-# Current checkpoint — V16 local photo intelligence; V15 remains live
+# Current checkpoint — V16 native compatibility repaired locally
+
+[Actual vision attempt 2363](release/V16_LIVE_VISION_ACCEPTANCE.md) failed before any model node. Its grant was revoked and the original caption/story worker and policy pin restored; the founder's guarded reconciliation confirmed ordinary starts available. Read-only inspection still verifies active saved/version `673685e5-71af-4b24-a50d-ae06d5799841`, graph `0e1777e5…`. Hosted Studio remains V16 `92e404a`; no new deployment occurred.
+
+[Local compatibility repair and real-byte proof](release/V16_NATIVE_COMPATIBILITY_REPAIR.md): replace blocked prototype access, keep native message collection rows structural, route malformed photo context away from research, and retain separate exact saved/execution graph fingerprints plus the native execution version. The proof reproduces the full 59-empty-message Cloud photo parameters, then runs six retained real Jack JPEGs through actual n8n normalization/evaluation and native OpenAI request construction with transport blocked. Hashes/order/dimensions match, output remains 1,200 tokens, and zero model calls, grants or live mutations occur. All 502 regressions and syntax checks pass. This proves compatibility at the request boundary, not AI photographic quality or live delivery.
+
+[V17 plan](release/V17_PHOTO_INTELLIGENCE_PLAN.md) prioritizes useful project-source progression, actual visual judgments and deliberate carousel selection. Source/extraction/provenance/curation work can proceed independently of live vision. No V17 product implementation, paid acceptance or live worker repair is authorized by this checkpoint. PR #1 remains draft/unmerged.
+
+---
+
+# Earlier checkpoint — V16 local photo intelligence; V15 remains live
 
 [V16 implementation, actual evidence and separate native approval package](release/V16_PHOTO_INTELLIGENCE.md). The founder supplied the completed hosted receipts read-only: six Jack decoded JPEGs and six source copies for existing Sophy references; all 24 original/preview file hashes and three page hashes match. Sophy still has zero useful additions; its roundup retained 40/52 references. No searches were repeated and no new real photograph was obtained during V16.
 

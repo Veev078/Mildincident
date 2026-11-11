@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import path from 'node:path';import os from 'node:os';import vm from 'node:vm';import {createHash,randomUUID} from 'node:crypto';import sharp from 'sharp';
 import {createWorkspaceServer} from '../src/workspace/server.js';
 import {EditorialEngineClient,requestFingerprint} from '../src/workspace/editorial-engine-client.js';import {EditorialEngineService} from '../src/workspace/editorial-engine-service.js';
-import {LocalPreviewStore} from '../src/workspace/previews.js';import {LocalResearchStore} from '../src/workspace/research-store.js';import {PhotographyService} from '../src/photography/service.js';import {photoSha256,photoJpegSize,prepareVisualAssessment,validateVisualJob,visualModelMessages,validateVisualResult} from '../src/photography/visual-assessment.js';import {preparePhotoVisualWorker} from '../src/n8n/photo-visual-worker.js';import {editorialGraphSha} from '../src/n8n/v14-editorial-patch.js';
+import {LocalPreviewStore} from '../src/workspace/previews.js';import {LocalResearchStore} from '../src/workspace/research-store.js';import {PhotographyService} from '../src/photography/service.js';import {photoSha256,photoJpegSize,prepareVisualAssessment,validateVisualJob,visualModelMessages,validateVisualResult,captureVisualExecution} from '../src/photography/visual-assessment.js';import {preparePhotoVisualWorker} from '../src/n8n/photo-visual-worker.js';import {editorialGraphSha} from '../src/n8n/v14-editorial-patch.js';
 const workerId='6CkqfYc4Pyd4k8vi';
 async function fixture(t){
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'mi-photo-vision-')),research=new LocalResearchStore(root+'/research.sqlite'),previews=new LocalPreviewStore(root+'/previews');t.after(async()=>{research.close();previews.close();await fs.rm(root,{recursive:true,force:true});});
@@ -41,6 +41,24 @@ test('offline exact worker patch preserves every old node, routes malformed phot
  const formatted=run('Finalize Photo Assessment',{id:'resp_fixture',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(output(b.p))}]}],usage:{input_tokens:1800,output_tokens:300,total_tokens:2100}})[0].json;assert.equal(JSON.parse(formatted.result_json).result.images.length,6);
  for(const n of patch.workflow.nodes)if(n.parameters?.jsCode)new vm.Script('(function(){'+n.parameters.jsCode+'})');
  const gate=by('Photo Visual Assessment?').parameters.conditions.conditions[0].leftValue;for(const v of [null,false,{},[]])assert.equal(vm.runInNewContext(gate.slice(3,-2),{$:()=>({first:()=>({json:{editorial_context_json:JSON.stringify({photoAssessment:v})}})})}),true);
+ for(const context of ['{}','{"captionImprovement":{}}','null'])assert.equal(vm.runInNewContext(gate.slice(3,-2),{$:()=>({first:()=>({json:{editorial_context_json:context}})})}),false);
+ assert.equal(vm.runInNewContext(gate.slice(3,-2),{$:()=>({first:()=>({json:{editorial_context_json:'{'}})})}),true,'Malformed context must fail photo validation, not fall through to research.');
+ assert.equal(patch.workflow.connections['Photo Visual Assessment?'].main[2][0].node,'Prepare Development Failure');
+ const values=by('Assess Photo Pixels').parameters.responses.values;
+ assert(Array.isArray(values));assert.equal(values.length,7);assert.equal(values.filter(m=>m.type==='image').length,6);
+ for(const [n,message]of values.entries()){
+  const field=n?'imageUrl':'content',rendered=vm.runInNewContext(message[field].slice(3,-2),{$:()=>({first:()=>({json:rows['Validate Photo Assessment']})})});
+  assert.equal(rendered,visualModelMessages(b.p)[n][field]);
+ }
+ for(const count of [1,3]){
+  const p=structuredClone(b.p);p.images=p.images.slice(0,count);p.manifest.images=p.manifest.images.slice(0,count);p.manifestSha256=photoSha256(JSON.stringify(p.manifest));const one=bound(p);
+  const smaller=preparePhotoVisualWorker(base,{expectedVersion:'version',expectedSha256:editorialGraphSha(base),approvedJobId:p.jobId,approvalId:p.approvalId,imageCount:count});
+  const context={$:name=>({first:()=>({json:name==='Verify Development Claim'?one.row:one.dispatch})}),Buffer};
+  const validate=smaller.workflow.nodes.find(n=>n.name==='Validate Photo Assessment');
+  assert.equal(vm.runInNewContext('(function(){'+validate.parameters.jsCode+'})()',context)[0].json.messages.length,count+1);
+  assert.throws(()=>vm.runInNewContext('(function(){'+by('Validate Photo Assessment').parameters.jsCode+'})()',context),/PHOTO_IMAGE_COUNT_DRIFT/);
+ }
+ for(const count of [0,7,1.5])assert.throws(()=>preparePhotoVisualWorker(base,{expectedVersion:'version',expectedSha256:editorialGraphSha(base),approvedJobId:b.p.jobId,approvalId:b.p.approvalId,imageCount:count}),{code:'INVALID_PHOTO_VISION'});
 });
 
 test('photo operations use the existing queue, single-use durable claims and exact native delivery; a lost response is never resubmitted',async t=>{
@@ -55,8 +73,16 @@ test('photo operations use the existing queue, single-use durable claims and exa
   const patch=preparePhotoVisualWorker(base,{expectedVersion:'original',expectedSha256:editorialGraphSha(base),approvedJobId:b.p.jobId,approvalId:b.p.approvalId}),workflow={...patch.workflow,id:workerId,versionId:'prepared',activeVersionId:'prepared',active:true,activeVersion:{nodes:patch.workflow.nodes,connections:patch.workflow.connections}};
   const request=research.create({kind:'brief',prompt:b.row.prompt,sourceUrl:'',idempotencyKey:b.p.jobId},[]),context={photoAssessment:b.p},requestHash=requestFingerprint({...request,editorialContext:context}),jobs=[];let posts=0,dispatches=0;
   const envelope={purpose:'private_photo_visual_assessment_result',jobId:b.p.jobId,manifestSha256:b.p.manifestSha256,result:output(b.p),usage:{input_tokens:1800,output_tokens:300,total_tokens:2100},responseId:'simulated-provider-response',executionId:'9999',rightsGranted:false,publicationApproved:false};
-  const execution={id:'9999',workflowId:workerId,status:'success',workflowData:workflow,data:{resultData:{runData:{'Validate Photo Assessment':[{data:{main:[[{json:{packet:b.p}}]]}}],'Finalize Photo Assessment':[{data:{main:[[{json:{result_json:JSON.stringify(envelope)}}]]}}]}}}};
-  const connection={mode:'standard',generationEnabled:true,executionScope:'photo_vision',jobsTableId:'devjobs',candidatesTableId:'devresults',editorialWorkerId:workerId,headerName:'X-Mildincident-Development-Key',token:'synthetic-private-token-with-thirty-two-characters',approvedWorkerVersion:'prepared',approvedGraphSha256:patch.review.graphSha256,authorization:b.p.authorization,photoAction:{jobId:request.id,requestHash,manifestSha256:b.p.manifestSha256,approvalId:b.p.approvalId}};
+  const expanded=structuredClone(workflow);expanded.nodes.find(n=>n.name==='Assess Photo Pixels').parameters.builtInTools={};
+  const execution={id:'9999',workflowId:workerId,workflowVersionId:'prepared',status:'success',workflowData:expanded,data:{resultData:{runData:{'Validate Photo Assessment':[{data:{main:[[{json:{packet:b.p}}]]}}],'Finalize Photo Assessment':[{data:{main:[[{json:{result_json:JSON.stringify(envelope)}}]]}}]}}}};
+  const executionBinding={approvedGraphSha256:patch.review.graphSha256,approvedExecutionGraphSha256:editorialGraphSha(expanded),approvedWorkerVersion:'prepared'};
+  assert.equal(captureVisualExecution(execution,b.p,executionBinding).jobId,request.id);
+  assert.throws(()=>captureVisualExecution(execution,b.p,{approvedGraphSha256:patch.review.graphSha256}),{code:'INVALID_VISUAL_RESULT'});
+  assert.throws(()=>captureVisualExecution({...execution,workflowVersionId:'unreviewed'},b.p,executionBinding),{code:'INVALID_VISUAL_RESULT'});
+  assert.throws(()=>captureVisualExecution(execution,b.p,{...executionBinding,approvedExecutionGraphSha256:'0'.repeat(64)}),{code:'INVALID_VISUAL_RESULT'});
+  const altered=structuredClone(execution);altered.workflowData.nodes[0].parameters.options.maxTokens=9999;
+  assert.throws(()=>captureVisualExecution(altered,b.p,executionBinding),{code:'INVALID_VISUAL_RESULT'});
+  const connection={mode:'standard',generationEnabled:true,executionScope:'photo_vision',jobsTableId:'devjobs',candidatesTableId:'devresults',editorialWorkerId:workerId,headerName:'X-Mildincident-Development-Key',token:'synthetic-private-token-with-thirty-two-characters',...executionBinding,authorization:b.p.authorization,photoAction:{jobId:request.id,requestHash,manifestSha256:b.p.manifestSha256,approvalId:b.p.approvalId}};
   const client=new EditorialEngineClient({connection,apiKey:'synthetic-test-api-key',fetchImpl:async(url,options)=>{
    const u=new URL(url);if(u.pathname==='/api/v1/workflows/'+workerId)return json(workflow);
    if(u.pathname==='/api/v1/data-tables/devjobs')return json({name:'mildincident_dev_editorial_jobs',columns:[{name:'editorial_context_json'}]});
@@ -67,8 +93,9 @@ test('photo operations use the existing queue, single-use durable claims and exa
    if(u.pathname==='/webhook/mildincident-dev-editorial-job-v1'){dispatches++;if(lost)throw Error('SIMULATED_AMBIGUOUS_RESPONSE');Object.assign(jobs[0],{status:'ready_to_review',result_count:0,result_json:JSON.stringify(envelope),execution_id:'9999'});return json({accepted:true,scope:'development_only',purpose:'private_photo_visual_assessment',status:'ready_to_review',jobId:request.id,executionId:'9999',productionApplied:false});}
    assert.fail('Unexpected simulated endpoint '+u.pathname);
   }}),engine=new EditorialEngineService({research,client});
-  await assert.rejects(client.queue({...request,editorialContext:{captionImprovement:{}}}));const captionClient=new EditorialEngineClient({connection:{...connection,executionScope:'caption_policy',captionAction:{jobId:request.id,requestHash}},apiKey:'synthetic-test-api-key',fetchImpl:()=>assert.fail('Wrong-scope photo request must not read or write')});await assert.rejects(captionClient.queue({...request,editorialContext:context}),{code:'PHOTO_SCOPE_MISMATCH'});assert.equal(posts,0);
+  await assert.rejects(client.queue({...request,editorialContext:{captionImprovement:{}}}));const captionClient=new EditorialEngineClient({connection:{...connection,executionScope:'caption_policy',approvedExecutionGraphSha256:undefined,captionAction:{jobId:request.id,requestHash}},apiKey:'synthetic-test-api-key',fetchImpl:()=>assert.fail('Wrong-scope photo request must not read or write')});await assert.rejects(captionClient.queue({...request,editorialContext:context}),{code:'PHOTO_SCOPE_MISMATCH'});assert.equal(posts,0);
   const inspection=await client.inspect();assert.equal(inspection.maxResearchCalls,0);assert.equal(inspection.maxDraftCalls,0);assert.equal(inspection.maxPhotoCalls,1);
+  workflow.settings.executionTimeout=999;await assert.rejects(client.inspect(),{code:'UNSAFE_ENGINE_WORKFLOW'});delete workflow.settings.executionTimeout;
   await engine.queue(request.id,{editorialContext:context});await engine.queue(request.id,{editorialContext:context});assert.equal(posts,1);
   const server=createWorkspaceServer({source:{snapshot:null},research,engine,photography:service,previews});await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port;
   try{const publicWorkspace=await(await fetch(origin+'/api/workspace')).json();assert(!publicWorkspace.researchRequests.some(r=>r.id===request.id));assert(!JSON.stringify(publicWorkspace).includes(b.p.images[0].data));assert(!JSON.stringify(publicWorkspace).includes(b.p.authorization.id));
@@ -77,7 +104,7 @@ test('photo operations use the existing queue, single-use durable claims and exa
 
   await engine.start(request.id,research.engineJob(request.id).version);
   for(let n=0;n<30&&!['ready_to_review','dispatch_uncertain'].includes(research.engineJob(request.id).state);n++)await new Promise(r=>setTimeout(r,5));
-  const saved=research.engineJob(request.id);assert.equal(saved.state,lost?'dispatch_uncertain':'ready_to_review');if(!lost){assert.equal(saved.photoResult.result.images.length,6);assert.deepEqual(saved.candidates,[]);}
+  const saved=research.engineJob(request.id);assert.equal(saved.state,lost?'dispatch_uncertain':'ready_to_review');assert.equal(saved.photoExecutionGraphSha256,executionBinding.approvedExecutionGraphSha256);assert.equal(saved.photoWorkerVersion,'prepared');if(!lost){assert.equal(saved.photoResult.result.images.length,6);assert.deepEqual(saved.candidates,[]);}
   const restarted=new EditorialEngineService({research,client});await assert.rejects(restarted.start(request.id,saved.version));assert.equal(dispatches,1);assert.equal(posts,1);assert.equal(research.authorizationRemaining(connection.authorization),0);
  }
 });

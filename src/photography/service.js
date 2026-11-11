@@ -37,10 +37,10 @@ export class PhotographyService extends PhotoResearch {
   request.visualReviews.push({packet:result.packet,review:result.review,state:'prepared',createdAt:new Date().toISOString()});
   this.db.prepare('UPDATE photo_story_requests SET data_json=? WHERE request_id=?').run(JSON.stringify(request),id);return {jobId:result.packet.jobId,...result.review,modelCalls:0,dispatchAvailable:false};
  }
- acceptVisualReview(story,id,execution,{offline=false,approvedGraphSha256=null}={}){
+ acceptVisualReview(story,id,execution,{offline=false,approvedGraphSha256=null,approvedExecutionGraphSha256=null,approvedWorkerVersion=null}={}){
   const request=this.storyRequest(id),claimed=execution?.data?.resultData?.runData?.['Validate Photo Assessment']?.[0]?.data?.main?.[0]?.[0]?.json?.packet,saved=request?.visualReviews?.find(r=>r.packet.jobId===claimed?.jobId);
   requireThat(request?.storyId===story.id&&saved,'INVALID_VISUAL_RESULT','Use this story’s prepared native photo job.');
-  const envelope=captureVisualExecution(execution,saved.packet,{offline,approvedGraphSha256}),result=envelope.result;
+  const envelope=captureVisualExecution(execution,saved.packet,{offline,approvedGraphSha256,approvedExecutionGraphSha256,approvedWorkerVersion}),result=envelope.result;
   if(saved.executionId){requireThat(saved.executionId===String(execution.id)&&JSON.stringify(saved.result)===JSON.stringify(result),'EDIT_CONFLICT','A different result is already recorded.');return this.storyRequestView(request);}
   const unchanged=story.revision===saved.packet.manifest.sourceRevision&&(story.localDraft?.version||0)===saved.packet.manifest.workingVersion&&saved.packet.images.every(i=>this.previews.get(story.id,i.assetId)?.sha256===i.sourcePreviewSha256);
   Object.assign(saved,{state:unchanged?(offline?'offline_simulation':'complete'):'review_required',result,usage:envelope.usage||null,executionId:String(execution.id),simulation:offline,receivedAt:new Date().toISOString()});

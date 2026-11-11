@@ -27,6 +27,7 @@
     "test:hosted": "node test/browser-hosted.mjs",
     "test:ux": "node test/browser-editorial-ux.mjs",
     "test:workstation": "node test/browser-workstation.mjs",
+    "test:photo-native": "node scripts/verify-photo-native-compatibility.mjs",
     "workspace:design-review": "node test/browser-workstation.mjs --serve",
     "test:refinement": "node test/browser-refinement.mjs",
     "media:cache-recorded": "node --use-env-proxy --use-system-ca scripts/cache-recorded-image.mjs"

@@ -70,9 +70,14 @@ export function validateVisualResult(result,packet){
 }
 
 /** Read-only delivery proof; neither a model response nor a claimed ID alone is sufficient. */
-export function captureVisualExecution(execution,packet,{offline=false,approvedGraphSha256=null}={}){
+export function captureVisualExecution(execution,packet,{offline=false,approvedGraphSha256=null,approvedExecutionGraphSha256=null,approvedWorkerVersion=null}={}){
  requireThat(execution?.workflowId===packet.workerId&&execution.status==='success'&&/^\d+$/.test(String(execution.id)),'INVALID_VISUAL_RESULT','Use one successful execution from the reviewed worker.');
- requireThat(offline||/^[a-f0-9]{64}$/.test(approvedGraphSha256||'')&&execution.workflowData&&editorialGraphSha(execution.workflowData)===approvedGraphSha256,'INVALID_VISUAL_RESULT','Live delivery requires the separately approved exact graph.');
+ // Dispatch still verifies the full saved graph. n8n adds node defaults to its
+ // execution snapshot; accepting that different representation requires its own
+ // reviewed full checksum AND the exact native execution version. Never strip
+ // defaults, ignore differences, or accept a version in place of a checksum.
+ const expanded=approvedExecutionGraphSha256!==null;
+ requireThat(offline||/^[a-f0-9]{64}$/.test(approvedGraphSha256||'')&&(!expanded||/^[a-f0-9]{64}$/.test(approvedExecutionGraphSha256||'')&&typeof approvedWorkerVersion==='string'&&approvedWorkerVersion.length>0&&execution.workflowVersionId===approvedWorkerVersion)&&execution.workflowData&&editorialGraphSha(execution.workflowData)===(expanded?approvedExecutionGraphSha256:approvedGraphSha256),'INVALID_VISUAL_RESULT','Live delivery requires the separately approved saved graph and exact execution graph/version.');
  const one=name=>{const entries=(execution.data?.resultData?.runData?.[name]||[]).flatMap(r=>r.data?.main?.[0]||[]);requireThat(entries.length===1,'INVALID_VISUAL_RESULT','An unambiguous photo result is required.');return entries[0].json;};
  const validated=one('Validate Photo Assessment').packet,envelope=JSON.parse(one('Finalize Photo Assessment').result_json);
  requireThat(envelope.purpose==='private_photo_visual_assessment_result'&&envelope.rightsGranted===false&&envelope.publicationApproved===false&&validated.jobId===packet.jobId&&envelope.jobId===packet.jobId&&validated.manifestSha256===packet.manifestSha256&&envelope.manifestSha256===packet.manifestSha256&&envelope.executionId===String(execution.id)&&JSON.stringify(validated.manifest)===JSON.stringify(packet.manifest)&&JSON.stringify(validated.images)===JSON.stringify(packet.images),'INVALID_VISUAL_RESULT','Delivery must bind the prepared job, source manifest and actual input bytes.');
