@@ -1,4 +1,14 @@
-# Current checkpoint — V16 native compatibility repaired locally
+# Current checkpoint — V17 Sprint A implemented locally
+
+[Sprint A implementation and real evidence boundaries](release/V17_SPRINT_A.md): source progression now re-derives legitimate legacy project leads, continues hash-bound 40-reference windows, prioritizes saved material/pending files and preserves incomplete work across restarts/days. Image-specific documentation stays outside direct project-photo suggestions; maker credit alone cannot establish an unrelated project. Receipts and inspector distinguish new decoded project files, copies of existing references, pending references and supporting material. Captions, ordered selections, evidence, permissions and earlier receipts are preserved.
+
+Retained Sophy HTML completes 40→52 without a page read (two repeats, ten excluded, no useful additions). The labelled simulated artist/book route saves two generated files and excludes a cover. Jack's existing pending-seventh mechanism remains functional and is counted as a copy, not a new photograph; the actual seventh hosted URL is unavailable locally. Marcie has no retained alternative lead and returns an honest zero. **No new hosted photograph, paid call or live mutation occurred.**
+
+Final verification: 519 unit/regression tests, syntax checks, 40 existing browser groups and the retained three-story desktop/mobile journey pass. Six before/eight after actual rendered screenshots carry a visible simulation banner; refresh/storage-reopen checks preserve edits/order. No UI redesign or deployment. The V16 repair at `6645579` is preserved; live worker, policy, credentials and grants were not modified. Next: separately authorize a controlled code release, then genuine source acceptance and the separately approved bounded AI vision test.
+
+---
+
+# Earlier checkpoint — V16 native compatibility repaired locally
 
 [Actual vision attempt 2363](release/V16_LIVE_VISION_ACCEPTANCE.md) failed before any model node. Its grant was revoked and the original caption/story worker and policy pin restored; the founder's guarded reconciliation confirmed ordinary starts available. Read-only inspection still verifies active saved/version `673685e5-71af-4b24-a50d-ae06d5799841`, graph `0e1777e5…`. Hosted Studio remains V16 `92e404a`; no new deployment occurred.
 

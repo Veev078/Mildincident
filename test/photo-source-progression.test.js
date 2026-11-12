@@ -30,3 +30,17 @@ test('bounded scans and corrupt evidence remain distinct; only explicit refresh 
  const refresh=service.prepareDiscovery(s,{...input(s),refreshSources:true});await service.searchStoryRequest(s,refresh.id,confirm(s));assert.equal(calls,2);
  const p=service.storyRequest(refresh.id);p.sourceCaptures[0].html+='corrupted';research.db.prepare('UPDATE photo_story_requests SET data_json=? WHERE request_id=?').run(JSON.stringify(p),refresh.id);assert.equal(service.sourceMemory(s).states[0].state,'evidence_needs_review');assert.equal(service.sourceMemory(s).reuse.length,0);
 });
+
+test('remaining references after forty acquire exact page-bound files before pending copies, without rereading or changing earlier receipts',async t=>{
+ let pages=0,images=0;const {service,previews,research}=await setup(t,{readProjectPage:async()=>{pages++;return html(a,52);},fetchImage:async u=>{images++;const n=Number(u.match(/frame-(\d+)/)[1]);return new Response(await sharp({create:{width:300,height:400,channels:3,background:{r:n*3,g:200-n,b:n*2}}}).jpeg().toBuffer(),{headers:{'content-type':'image/jpeg'}});}}),s=story();
+ const current=()=>({...s,media:service.storyMedia(s)}),prepare=()=>service.prepareDiscovery(current(),input(s)),run=id=>service.searchStoryRequest(current(),id,confirm(s),{readStory:current});
+ const first=prepare();await run(first.id);assert.equal(images,6);assert.equal(pages,1);
+ const original=research.db.prepare('SELECT data_json FROM photo_story_requests WHERE request_id=?').get(first.id).data_json;
+ const next=prepare();assert.equal(next.plan.sourceProgression.reuse[0].cursor.offset,40);const completed=await run(next.id);
+ assert.equal(pages,1);assert.equal(images,12);assert.equal(completed.sourcePages[0].coverage.extractionOffset,40);assert.equal(completed.sourcePages[0].coverage.retainedThrough,52);
+ assert.equal(completed.newPhotoCount,12);assert.equal(completed.acquisitionSummary.newDecodedPhotographs,6);assert.equal(completed.acquisitionSummary.newReferencesWithoutFiles,6);
+ const acquired=service.storyMedia(s).filter(p=>p.photoRequestId===next.id&&previews.get(s.id,p.id));assert.equal(acquired.length,6);
+ for(const photo of acquired){const proof=previews.get(s.id,photo.id).sourceInspection;assert.equal(proof.pageSha256,completed.sourcePages[0].sha256);assert.equal(proof.requestId,next.id);assert(photo.sourceReferenceIndex>=40);}
+ const pending=prepare();assert.equal(pending.plan.sourceCalls,0);await run(pending.id);assert.equal(pages,1);assert.equal(images,18);
+ assert.equal(research.db.prepare('SELECT data_json FROM photo_story_requests WHERE request_id=?').get(first.id).data_json,original);assert.equal(s.caption,'Preserved copy.');assert.deepEqual(s.localDraft.selectedAssetIds,[]);
+});

@@ -53,3 +53,32 @@ test('an unavailable selected cover is reported without relabeling another photo
  assert.match(html,/2 photographs/);assert.match(html,/Inspect selected photograph 2: Second frame/);assert.match(html,/<span>02<\/span>/);assert.match(html,/A selected reference is unavailable/);assert(!html.includes('<span>Cover</span>'));
  assert.deepEqual(story.selectedAssetIds,['missing-cover','one']);
 });
+
+test('photo outcomes distinguish newly saved photographs, private copies and unacquired references',()=>{
+ const complete={id:'search-one',state:'complete',sourceRevision:'r1',workingVersion:0,source:'project',plan:{route:'cached_project_evidence'},sourceProgression:{states:[],reuse:[{url:'https://www.life.com/project'}]},newPhotoCount:3,acquisitionSummary:{newDecodedPhotographs:1,decodedExistingReferences:2,newReferencesWithoutFiles:2,referenceDuplicates:4,exactFileDuplicates:1,contextReferences:2}};
+ const html=requestPanel({photoRequests:[complete],selectedAssetIds:['kept']});
+ assert.match(html,/1 new photograph saved/);assert.match(html,/1 new project photograph privately saved/);
+ assert.match(html,/2 existing references now have a private image copy/);assert.match(html,/2 new references still need an image file/);
+ assert.match(html,/1 identical image file not added again/);assert.match(html,/2 supporting references kept separate from project photographs/);
+ assert.match(html,/Your selection is unchanged/);
+ const onlyCopies=requestPanel({photoRequests:[{...complete,acquisitionSummary:{...complete.acquisitionSummary,newDecodedPhotographs:0,newReferencesWithoutFiles:0}}]});
+ assert.match(onlyCopies,/Private copies saved for existing references/);assert.match(onlyCopies,/No new project photographs were saved/);
+ assert(!onlyCopies.includes('New images ready to inspect'));
+ const references=requestPanel({photoRequests:[{...complete,acquisitionSummary:{...complete.acquisitionSummary,newDecodedPhotographs:0,decodedExistingReferences:0}}]});
+ assert.match(references,/New references found — image files still needed/);
+});
+
+test('photo receipts explain partial scans and completion without declaring the whole project exhausted',()=>{
+ const url='https://www.dazeddigital.com/project',base={id:'search-one',state:'complete',sourceRevision:'r1',workingVersion:0,source:'project',plan:{route:'cached_project_evidence'},acquisitionSummary:{newDecodedPhotographs:0,newReferencesWithoutFiles:0},sourceProgression:{states:[{url,completeScan:false,remainingReferences:12}],reuse:[{url}]}};
+ const partial=requestPanel({photoRequests:[{...base,sourcePages:[{url,coverage:{offset:0,nextOffset:40,hasMore:true,referenceCount:52,retainedCount:40}}]}]});
+ assert.match(partial,/Checked 40 of 52 references on this page; 12 remain/);
+ const finished=requestPanel({photoRequests:[{...base,sourcePages:[{url,coverage:{offset:40,nextOffset:52,hasMore:false,referenceCount:52,retainedCount:12}}]}]});
+ assert.match(finished,/Finished the saved page’s remaining references \(41–52 of 52\)/);
+ assert(!finished.includes('A saved page still has references to check'));
+ const checked=requestPanel({photoRequests:[{...base,plan:{route:'sources_checked'},sourceProgression:{states:[{url,completeScan:true,remainingReferences:0}]}}]});
+ assert.match(checked,/No page was repeated. Other project sources may still exist/);assert(!checked.includes('project exhausted'));
+ const cursor=requestPanel({photoRequests:[{...base,sourcePages:[{url,coverage:{extractionOffset:40,retainedThrough:52,remainingReferenceCount:0,extractionComplete:true,referenceCount:52,retainedCount:12}}]}]});
+ assert.match(cursor,/Finished the saved page’s remaining references \(41–52 of 52\)/);
+ const deferred=requestPanel({photoRequests:[{...base,sourceProgression:{states:[],suppressedImageUrls:['https://images.example.org/frame.jpg']},imageAttempts:[{imageUrl:'https://images.example.org/frame.jpg',status:'deferred_previous_attempt',networkAttempted:false}]}]});
+ assert.match(deferred,/1 earlier image attempt was not repeated/);assert.match(deferred,/earlier attempt kept; not requested again/);assert(!deferred.includes('· deferred_previous_attempt'));
+});

@@ -42,7 +42,7 @@ export async function readSourceImage(url,{fetchImpl=fetch}={}){
 export async function acquireReceiptImage({story,request,photo,store,existingAssetId=null,fetchImpl=fetch,assertCurrent=()=>{}}){
  const capture=request.sourceCaptures?.find(c=>c.url===photo.sourceUrl);
  requireThat(request.packet.payload.target.storyId===story.id&&photoDigest(request.packet.payload)===request.packet.digest&&request.receipt?.inputDigest===request.packet.digest&&capture?.networkFetched===true&&capture.basis==='fetched_project_page'&&createHash('sha256').update(capture.html).digest('hex')===capture.sha256,'INVALID_PREVIEW_SOURCE','Use an intact, network-captured page from this request.');
- const embedded=projectPageReferences(story,{url:capture.url,html:capture.html}).photos.find(p=>p.id===photo.id&&p.previewUrl===photo.previewUrl);
+ const embedded=projectPageReferences(story,{url:capture.url,html:capture.html,direction:request.plan?.direction||'best',cursor:capture.extractionInputCursor||null}).photos.find(p=>p.id===photo.id&&p.previewUrl===photo.previewUrl);
  const existing=existingAssetId&&story.media?.find(a=>a.id===existingAssetId&&photoFileKeys(a).some(k=>photoFileKeys(photo).includes(k)));
  requireThat(embedded&&(existing||request.displayPhotoIds.includes(photo.id))&&permittedSourceImage(capture.url,photo.previewUrl),'PHOTO_IMAGE_NOT_BOUND','The image must be embedded in this captured project page and use its supported image host.');
  const assetId=existing?existing.id:'photo:'+photoDigest({requestId:request.id,photoId:photo.id}).slice(0,32);

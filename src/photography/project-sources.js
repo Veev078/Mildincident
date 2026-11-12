@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {safePhotoReference} from '../n8n/photo-url-guard.js';
-import {inspectPhotoSource} from '../editorial-evidence.js';
+import {inspectPhotoSourceWindow} from '../editorial-evidence.js';
 import {storyPhotoIdentity,planStoryPhotos,photoRelevance,recordedProjectTrails} from './story-intelligence.js';
 import {requireThat} from '../errors.js';
 
@@ -8,25 +8,30 @@ import {requireThat} from '../errors.js';
 // already present in this story's retained research may be fetched.
 export const PROJECT_PAGE_HOSTS=Object.freeze(['www.dazeddigital.com','www.life.com','life.com','thephotographersgallery.org.uk','www.thephotographersgallery.org.uk','www.booooooom.com','josharonson.us','www.josharonson.us','sophyrickett.com','www.sophyrickett.com','www.cobgallery.com','www.cheeriopublishing.com','www.climaxbooks.com']);
 const digest=value=>createHash('sha256').update(value).digest('hex');
+export const PROJECT_IMAGE_PARSER_VERSION='project-images-v2';
+const sourceKind=(url,label='')=>/sophyrickett\.com|josharonson\.us/i.test(new URL(url).hostname)?'artist':/gallery|photographersgallery/i.test(new URL(url).hostname+' '+label)?'gallery':/publisher|publishing|climaxbooks|book/i.test(new URL(url).hostname+' '+label)?'book_publisher':/dazeddigital|booooooom|life\.com/i.test(new URL(url).hostname)?'original_publisher':'project';
 const knownPages=story=>[...(story.recordedProjectLinks||[]).map(l=>l.url),...(story.research||[]).map(r=>r.url),...(story.media||[]).map(m=>m.sourceUrl)].filter(url=>safePhotoReference(url));
 export function permittedProjectPage(story,url){return Boolean(safePhotoReference(url)&&PROJECT_PAGE_HOSTS.includes(new URL(url).hostname)&&knownPages(story).includes(url));}
 
 /** Expand only exact maker/project links supported by the captured page context. */
 export function projectSourceTrails(html,url,identity,images=[]){
- const found=recordedProjectTrails(html,url,identity),seen=new Set(found.map(l=>l.url)),lower=html.toLowerCase();
+ const markup=html.slice(0,300000).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi,' ').replace(/<!--[\s\S]*?-->/g,' ');
+ const found=recordedProjectTrails(markup,url,identity).filter(l=>PROJECT_PAGE_HOSTS.includes(new URL(l.url).hostname)).map(l=>({...l,sourceKind:sourceKind(l.url,l.label)})),seen=new Set(found.map(l=>l.url)),lower=markup.toLowerCase();
  const norm=s=>String(s||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
  const has=(s,n)=>Boolean(n)&&(' '+norm(s)+' ').includes(' '+norm(n)+' '),text=s=>s.replace(/<[^>]*>/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();
- const projectPresent=images.some(i=>i.sourceRelation==='subject_caption_match');
- for(const match of html.slice(0,300000).matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)){
+ const heading=[...markup.matchAll(/<(h1|title)\b[^>]*>([\s\S]*?)<\/\1>/gi)].slice(0,4).map(m=>text(m[2])).join(' ');
+ const pageNamesProject=has(heading,identity.photographer)&&(!identity.series||has(heading,identity.series));
+ const projectPresent=images.some(i=>i.sourceRelation==='subject_caption_match')||pageNamesProject;
+ for(const match of markup.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)){
   const label=text(match[2]).slice(0,200),href=match[1].match(/\bhref\s*=\s*["']([^"']+)["']/i)?.[1];if(!href)continue;
   // A nearby heading may belong to the previous story in a roundup. Only the
   // anchor's own paragraph can establish local maker/project context.
-  const before=html.slice(Math.max(0,match.index-4000),match.index),opening=[...before.matchAll(/<p\b[^>]*>/gi)].at(-1),close=before.toLowerCase().lastIndexOf('</p>'),end=lower.indexOf('</p>',match.index+match[0].length);
-  const paragraph=opening&&opening.index>close&&end>=0&&end-match.index<4000?before.slice(opening.index)+html.slice(match.index,end+4):'',context=text(paragraph);
-  const maker=projectPresent&&has(label,identity.photographer),local=has(context,identity.photographer)&&has(context,identity.series)&&/book|publisher|gallery|exhibition|project|artist|photographer|here/i.test(label);
+  const before=markup.slice(Math.max(0,match.index-4000),match.index),opening=[...before.matchAll(/<p\b[^>]*>/gi)].at(-1),close=before.toLowerCase().lastIndexOf('</p>'),end=lower.indexOf('</p>',match.index+match[0].length);
+  const paragraph=opening&&opening.index>close&&end>=0&&end-match.index<4000?before.slice(opening.index)+markup.slice(match.index,end+4):'',context=text(paragraph);
+  const maker=projectPresent&&has(label,identity.photographer),local=has(context,identity.photographer)&&has(context,identity.series)&&/book|publisher|gallery|exhibition|project|artist|photographer|here|website|official|visit|read|more/i.test(label);
   if(!maker&&!local)continue;let target;try{target=safePhotoReference(new URL(href.replace(/&amp;/g,'&'),url).href);}catch{continue;}
   if(!target||seen.has(target)||target===url||!PROJECT_PAGE_HOSTS.includes(new URL(target).hostname))continue;
-  seen.add(target);found.push({url:target,label,sourceUrl:url,basis:maker?'maker_named_link_from_project_page':'project_named_local_source_context',destinationFetched:false,identityVerified:false,rightsGranted:false});if(found.length>=8)break;
+  seen.add(target);found.push({url:target,label,sourceUrl:url,sourceKind:sourceKind(target,label),basis:maker?'maker_named_link_from_project_page':'project_named_local_source_context',destinationFetched:false,identityVerified:false,rightsGranted:false});if(found.length>=8)break;
  }
  return found.slice(0,8);
 }
@@ -55,10 +60,14 @@ export async function fetchProjectPage(story,url,{fetchImpl=fetch}={}){
 }
 
 /** Inspect supplied markup as inert data. No scripts, assets, links or images are fetched. */
-export function projectPageReferences(story,{url,html,direction='best',basis='fetched_project_page'}){
+export function projectPageReferences(story,{url,html,direction='best',basis='fetched_project_page',cursor=null}){
  requireThat(safePhotoReference(url)&&typeof html==='string'&&html.length>=20&&Buffer.byteLength(html)<=2000000,'INVALID_PHOTO_SOURCE','Supply a public original-page URL and a saved HTML page, up to 2 MB.');
- const identity=storyPhotoIdentity(story),images=inspectPhotoSource(html,url,story),capturedAt=new Date().toISOString();
- const photos=images.map(m=>({id:'project:'+digest(url+'|'+m.url).slice(0,32),source:'project',query:identity.subject,title:m.caption||'Uncaptioned source-page reference',creator:m.creator||m.imageMetadata?.creatorReported||'',date:m.years.join(', '),description:m.caption,series:'',sourceUrl:url,previewUrl:m.url,fileUrl:'',rightsLabel:'Unknown — source reference only',rightsGranted:false,publicationApproved:false,sourceRelation:m.relation,creatorBasis:m.creatorBasis,sourceCredit:m.credit||m.imageMetadata?.creditReported||'',copyrightHolder:m.copyrightHolder||m.imageMetadata?.copyrightHolderReported||'',licenseUrl:m.imageMetadata?.licenseReportedUrl||'',sourceYears:m.years,sourceCaptionBasis:m.captionBasis,sourceResearchLinks:m.researchLinks,materialType:m.materialType,dateContext:m.dateContext,imageMetadata:m.imageMetadata,captureCoverage:m.captureCoverage,referenceVariants:m.referenceVariants,reportedWidth:m.reportedWidth,reportedHeight:m.reportedHeight,photoExplorationDirection:direction,sourceCaptureBasis:basis,pixelAnalysisPerformed:false,originalDownloadVerified:false}));
+ const identity=storyPhotoIdentity(story),captureSha256=digest(html),contextSha256=digest(JSON.stringify({storyId:story.id,sourceRevision:story.revision||null,subject:identity.subject,photographer:identity.photographer,series:identity.series,direction})),capturedAt=new Date().toISOString();
+ requireThat(cursor===null||cursor&&typeof cursor==='object'&&!Array.isArray(cursor)&&Object.keys(cursor).length===6&&Object.keys(cursor).every(k=>['version','parserVersion','captureSha256','sourceUrl','contextSha256','offset'].includes(k))&&cursor.version===1&&cursor.parserVersion===PROJECT_IMAGE_PARSER_VERSION&&cursor.captureSha256===captureSha256&&cursor.sourceUrl===url&&cursor.contextSha256===contextSha256&&Number.isSafeInteger(cursor.offset)&&cursor.offset>0&&cursor.offset<=10000&&cursor.offset%40===0,'INVALID_PHOTO_CURSOR','Continue only the exact captured page and unchanged photo direction.');
+ const {images,coverage}=inspectPhotoSourceWindow(html,url,story,{offset:cursor?.offset||0});
+ requireThat(!cursor||cursor.offset<coverage.referenceCount,'INVALID_PHOTO_CURSOR','The captured page has no remaining reference window at this position.');
+ const photos=images.map(m=>({id:'project:'+digest(url+'|'+m.url).slice(0,32),source:'project',query:identity.subject,title:m.caption||'Uncaptioned source-page reference',creator:m.creator||m.imageMetadata?.creatorReported||'',date:m.years.join(', '),description:m.caption,series:'',sourceUrl:url,previewUrl:m.url,fileUrl:'',rightsLabel:'Unknown — source reference only',rightsGranted:false,publicationApproved:false,sourceRelation:m.relation,creatorBasis:m.creatorBasis,sourceCredit:m.credit||m.imageMetadata?.creditReported||'',copyrightHolder:m.copyrightHolder||m.imageMetadata?.copyrightHolderReported||'',licenseUrl:m.imageMetadata?.licenseReportedUrl||'',sourceYears:m.years,sourceCaptionBasis:m.captionBasis,sourceResearchLinks:m.researchLinks,materialType:m.materialType,materialBasis:m.materialBasis,dateContext:m.dateContext,imageMetadata:m.imageMetadata,captureCoverage:m.captureCoverage,referenceVariants:m.referenceVariants,reportedWidth:m.reportedWidth,reportedHeight:m.reportedHeight,photoExplorationDirection:direction,sourceCaptureBasis:basis,sourceCaptureSha256:captureSha256,sourceParserVersion:PROJECT_IMAGE_PARSER_VERSION,sourceReferenceIndex:m.referenceIndex,pixelAnalysisPerformed:false,originalDownloadVerified:false}));
  const ranked=photos.sort((a,b)=>photoRelevance({...b,sourceCaption:b.description},identity).score-photoRelevance({...a,sourceCaption:a.description},identity).score);
- return {photos:ranked,sourceCapture:{url,sha256:digest(html),capturedAt,basis,html,identity,projectTrails:projectSourceTrails(html,url,identity,ranked),coverage:images[0]?.captureCoverage||null,networkFetched:basis==='fetched_project_page',pixelInspectionPerformed:false,rightsGranted:false}};
+ const extractionCursor=coverage.nextOffset===null?null:{version:1,parserVersion:PROJECT_IMAGE_PARSER_VERSION,captureSha256,sourceUrl:url,contextSha256,offset:coverage.nextOffset};
+ return {photos:ranked,sourceCapture:{url,sha256:captureSha256,capturedAt,basis,html,identity,parserVersion:PROJECT_IMAGE_PARSER_VERSION,projectTrails:projectSourceTrails(html,url,identity,ranked).map(link=>({...link,captureSha256,parserVersion:PROJECT_IMAGE_PARSER_VERSION})),coverage,extractionInputCursor:cursor,extractionCursor,networkFetched:basis==='fetched_project_page',pixelInspectionPerformed:false,rightsGranted:false}};
 }

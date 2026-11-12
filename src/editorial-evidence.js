@@ -22,8 +22,9 @@ export function photoEvidenceTools(publicReference) {
   const fileKey=url=>{const clean=url.split('#')[0];const question=clean.indexOf('?');const base=(question<0?clean:clean.slice(0,question)).replace(/\/_gallery_\d+\//g,'/_gallery_variant/');
     const query=question<0?[]:clean.slice(question+1).split('&').filter(part=>{let key;try{key=decodeURIComponent(part.split('=')[0]).toLowerCase();}catch{return true;}return !['w','width','h','height','fit','crop','quality','q','format','auto','dpr'].includes(key);}).sort();return base+(query.length?'?'+query.join('&'):'');};
   const hash=value=>{let h=2166136261;for(let i=0;i<value.length;i++){h^=value.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h.toString(36);};
-  function inspect(html,page,story={}) {
+  function inspect(html,page,story={},options={}) {
     if(typeof html!=='string'||html.length>2500000||!publicReference(page))return [];
+    const offset=options.offset??0;if(!Number.isSafeInteger(offset)||offset<0||offset>10000)return [];
     const candidates=new Map();const body=html.slice(0,300000).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi,' ').replace(/<!--[\s\S]*?-->/g,' ');
     const captionText=value=>decode(String(value||'').replace(/<[^>]+>/g,' ')).replace(/\s+/g,' ').trim().slice(0,2000);
     const figures=[...body.matchAll(/<figure\b[^>]*>[\s\S]*?<\/figure>/gi)].slice(0,260).map(m=>({start:m.index,end:m.index+m[0].length,html:m[0],images:[...m[0].matchAll(/<img\b/gi)].length,caption:captionText((m[0].match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/i)||[])[1]||'')}));
@@ -84,20 +85,30 @@ export function photoEvidenceTools(publicReference) {
       const creatorBasis=creator?'explicit_source_photo_credit':credit?'copyright_holder_only':courtesy?'courtesy_only':'not_recorded';
       const seriesReference=m.researchLinks.find(l=>l.kind==='series')||null;
       const years=[...new Set(m.caption.match(/\b(?:18|19|20)\d{2}\b/g)||[])].map(Number);
-      return {...m,id:`${story.id||'source'}-${m.isCover?'og':'img'}-${hash(page+'|'+m.url)}`,creator,creatorBasis,creatorVerified:false,copyrightHolder:credit,seriesReference,credit:credit?'© '+credit:courtesy,sourceUrl:page,years,storyYears,dateContext:years.length&&storyYears.length&&!years.some(y=>storyYears.includes(y))?'different_year_context':'not_established',
-        materialType:/croquis|sketch|drawing|costume design/i.test(m.caption)?'design_documentation':'photograph_reference',relation:m.isCover?'page_cover':related?'subject_caption_match':'context_only',matchedTerms:matched,distinctiveTerms:anchors,matchingBasis:completeSubjectTerms?'complete_subject_terms_in_source_caption':'source_caption_metadata_only',pixelAnalysisPerformed:false,rightsGranted:false};
+      // Material claims must come from this individual image's caption. An
+      // article mentioning a book/exhibition cannot classify every frame as a
+      // cover or installation, nor does a matching project title make one a
+      // photograph from the project itself.
+      const materialType=m.isCover?'page_cover':/\b(?:book|publication|catalogue|catalog|zine)\s+(?:(?:front|back)\s+)?(?:cover|jacket)\b|\b(?:cover|jacket)\s+(?:of|for|from)\s+(?:the\s+)?(?:book|publication|catalogue|catalog|zine)\b/i.test(m.caption)?'publication_cover':/\b(?:book|publication|catalogue|catalog|zine)\s+(?:double[- ]page\s+)?spread\b|\b(?:double[- ]page|two[- ]page)\s+(?:book\s+)?spread\b|\b(?:pages?|spreads?)\s+from\s+(?:the\s+)?(?:book|publication|catalogue|catalog|zine)\b/i.test(m.caption)?'publication_spread':/\b(?:installation|exhibition|gallery)\s+(?:view|documentation)\b|\bview\s+of\s+(?:the\s+)?(?:installation|exhibition)\b/i.test(m.caption)?'installation':/croquis|sketch|drawing|costume design/i.test(m.caption)?'design_documentation':'photograph_reference';
+      const documentation=['publication_cover','publication_spread','installation'].includes(materialType);
+      return {...m,referenceIndex:index,id:`${story.id||'source'}-${m.isCover?'og':'img'}-${hash(page+'|'+m.url)}`,creator,creatorBasis,creatorVerified:false,copyrightHolder:credit,seriesReference,credit:credit?'© '+credit:courtesy,sourceUrl:page,years,storyYears,dateContext:years.length&&storyYears.length&&!years.some(y=>storyYears.includes(y))?'different_year_context':'not_established',
+        materialType,materialBasis:'individual_image_caption_not_pixel_inspection',relation:m.isCover?'page_cover':documentation?'context_documentation':related?'subject_caption_match':'context_only',matchedTerms:matched,distinctiveTerms:anchors,matchingBasis:completeSubjectTerms?'complete_subject_terms_in_source_caption':'source_caption_metadata_only',pixelAnalysisPerformed:false,rightsGranted:false};
     });
     // Bound payloads without silently dropping a related frame late in the source page. This is metadata priority, not taste ranking.
     const priority=m=>m.relation==='subject_caption_match'?0:m.isCover?2:1;
-    const retained=new Set([...inspected].sort((a,b)=>priority(a)-priority(b)).slice(0,40));
-    const captureCoverage={scannedCharacters:Math.min(html.length,300000),pageTruncated:html.length>300000,imageTagsFound:imageTags.length,imageTagsConsidered:Math.min(imageTags.length,260),referenceCount:images.length,retainedCount:retained.size,referenceLimit:40,completeShootVerified:false,pixelAnalysisPerformed:false};
+    const retained=new Set([...inspected].sort((a,b)=>priority(a)-priority(b)).slice(offset,offset+40));
+    const retainedThrough=Math.min(offset+retained.size,images.length),nextOffset=retainedThrough<images.length?retainedThrough:null;
+    const captureCoverage={parserVersion:'project-images-v2',scannedCharacters:Math.min(html.length,300000),pageTruncated:html.length>300000,imageTagsFound:imageTags.length,imageTagsConsidered:Math.min(imageTags.length,260),referenceCount:images.length,retainedCount:retained.size,referenceLimit:40,extractionOffset:offset,retainedThrough,nextOffset,remainingReferenceCount:Math.max(0,images.length-retainedThrough),referenceWindowComplete:nextOffset===null,extractionComplete:nextOffset===null&&html.length<=300000&&imageTags.length<=260,completeShootVerified:false,pixelAnalysisPerformed:false};
+    if(options.coverage&&typeof options.coverage==='object')Object.assign(options.coverage,captureCoverage);
     return inspected.filter(m=>retained.has(m)).map(m=>({...m,captureCoverage}));
   }
-  return {inspect,decode};
+  function inspectWindow(html,page,story={},options={}){const coverage={};return {images:inspect(html,page,story,{...options,coverage}),coverage};}
+  return {inspect,inspectWindow,decode};
 }
 
 const tools=photoEvidenceTools(safePhotoReference);
-export const inspectPhotoSource=(html,url,story)=>tools.inspect(html,url,story);
+export const inspectPhotoSource=(html,url,story,options)=>tools.inspect(html,url,story,options);
+export const inspectPhotoSourceWindow=(html,url,story,options)=>tools.inspectWindow(html,url,story,options);
 export function readableSourceText(value) {
   return tools.decode(String(value||'').slice(0,2500000).replace(/<(script|style|noscript|svg)\b[^>]*>[\s\S]*?<\/\1>/gi,' ').replace(/<!--[\s\S]*?-->/g,' ').replace(/<[^>]+>/g,' ')).replace(/\s+/g,' ').trim();
 }

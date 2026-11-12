@@ -1,6 +1,6 @@
 # V17 — useful photographs, from discovery to carousel
 
-Status: proposal for founder review. No V17 implementation, deployment or paid operation is authorized by this document. Preserve the accepted V15/V16 interface and working recurring caption/story pipeline.
+Status: **Checkpoint A locally implemented under the founder's separate authorization**; see [Sprint A outcomes and evidence](V17_SPRINT_A.md). Checkpoints B/C remain proposals. No deployment, native/policy change or paid operation is authorized by this document. Preserve the accepted interface and working recurring caption/story pipeline.
 
 ## Sprint order and independent progress
 
@@ -109,4 +109,4 @@ Before a native maintenance window, capture the current active/saved worker and 
 
 Cost estimates use the final bounded prompt/images and actual V16 usage when available. The earlier $0.03–$0.08 vision estimate is not a guaranteed bill. Hidden provider retries, image tokenization, reasoning and account pricing remain residual risks. Sending private image bytes to the model requires explicit disclosure and confirmation; browser responses never expose credentials or private packets.
 
-**Next coding action after scope approval:** derive project trails and remaining-image cursors from hash-verified legacy captures, then demonstrate Sophy's next legitimate source and Jack's pending-reference progression using retained evidence. Preserve old receipts and the accepted UI. No new paid call is needed for that local checkpoint.
+**Checkpoint A delivered:** derived project trails and remaining-image cursors now use hash-verified legacy captures. Sophy's retained 40/52 scan completes without rereading; Jack's existing pending-copy path is preserved and accurately reported; Marcie returns an honest zero. Fresh transport and positive acquisition fixtures remain labelled simulations. The next source acceptance needs a separately approved hosted release; AI visual judgments still require their own approval and real model result.
