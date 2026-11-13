@@ -11,7 +11,7 @@ import {productionDecisions} from './production-decisions.js';
 import {validatePacketImport} from '../production-packet-contract.js';
 import {prepareProductionPacket} from './production-bridge.js';
 import {assessStudioReadiness,imageEvidenceState} from '../editorial-readiness.js';
-import {buildSourceSequencePlan} from '../editorial-sequence.js';
+import {buildSourceSequencePlan,sourceSequenceDraft} from '../editorial-sequence.js';
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -63,14 +63,18 @@ async function imageBody(request) {
   return Buffer.concat(chunks);
 }
 
-export function createWorkspaceServer({ source, drafts, previews, research, engine, captionPilot=null, photography=research?new PhotographyService(research):null, founderReviews=research?new FounderReviewStore(research):null, feeds=research?new PublicationFeeds(research):null, access=null,backups=null,delivery=null,serverFactory=http.createServer, webRoot = WEB_ROOT }) {
+export function createWorkspaceServer({ source, drafts, previews, research, engine, captionPilot=null, photography=research?new PhotographyService(research,{previews}):null, founderReviews=research?new FounderReviewStore(research):null, feeds=research?new PublicationFeeds(research):null, access=null,backups=null,delivery=null,serverFactory=http.createServer, webRoot = WEB_ROOT }) {
+  if(photography&&!photography.previews)photography.previews=previews;
   if(captionPilot&&engine)engine.captionPilot=captionPilot;
   const themes=research?new StudioThemes(research):null,approvalRequests=research?new ApprovalRequests(research):null;
+  const isPhotoOperation=id=>Object.hasOwn(research?.engineJob(id)?.editorialContext||{},'photoAssessment');
   const view = () => {
     const workspace = source.snapshot?source.view(drafts.all()):buildWorkspace({records:Object.fromEntries(Object.keys(WORKSPACE_TABLES).map(k=>[k,[]])),buffer:{posts:[],complete:false,observedAt:null},observedAt:new Date().toISOString(),warnings:[]});
     if(!source.snapshot)workspace.source={...workspace.source,kind:'disconnected',observedAt:null,bufferObservedAt:null,stale:true,unavailable:true,warnings:['No authoritative production snapshot is available. Private photographic research remains usable; connect n8n/Buffer or restore your private backup to inspect existing stories.'],refreshError:{code:'SOURCE_UNAVAILABLE',message:'Production observations unavailable; no example stories were substituted.'}};
     workspace.hosted=Boolean(access);workspace.backupStatus=backups?.status()||null;workspace.editorialDirection=editorialDirectionV14();
-    workspace.researchRequests = research?.workspaceRequests() || [];
+    // Pixel packets and their single-use grants stay private; photo outcomes
+    // belong to the photo receipt, not the story-generation inbox.
+    workspace.researchRequests = (research?.workspaceRequests() || []).filter(r=>!Object.hasOwn(r.engineJob?.editorialContext||{},'photoAssessment'));
     workspace.researchPresets=themes?themes.catalog(editorialPresetCatalog(source.snapshot)):editorialPresetCatalog(source.snapshot);workspace.studioThemes=themes?.all()||[];
     workspace.aiUsage=captionPilot?.usageSummary?.()||null;
     for(const request of workspace.researchRequests)if(captionPilot)request.generationProposal=captionPilot.storyStatus?.(request.id);
@@ -92,7 +96,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     }
     for(const story of workspace.stories){if(story.draftRecovery?.sourceJobId){const original='CON-DEV-'+story.draftRecovery.sourceJobId;if(workspace.stories.some(s=>s.id===original))story.recoveryOfStoryId=original;}const result=story.captionGeneration?.result;if(result){const version=workspace.stories.find(s=>s.id===result.storyId);if(version)version.recoveryOfStoryId=story.id;}}
     attachLocalPreviews(workspace,previews);
-    for (const story of workspace.stories) { story.photography=photoDesk(story);story.organization=drafts.organization(story.id);story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.sourceSequencePlan = buildSourceSequencePlan(story); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity};story.approvalRequest=approvalRequests?.status(story)||null; }
+    for (const story of workspace.stories) { story.photography=photoDesk(story);story.organization=drafts.organization(story.id);story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.sourceSequencePlan = buildSourceSequencePlan(story,{visualReview:photography?.selectionReview?.(story)||null}); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity};story.approvalRequest=approvalRequests?.status(story)||null; }
     workspace.photoHunts=photography?.all()||[];
     workspace.founderReviews=founderReviews?.all()||{};
     workspace.sourceInputs={publications:feeds?.status()||[],leads:feeds?.list()||[]};
@@ -134,6 +138,11 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
         const prepared=photography.prepareDiscovery(story,input);
         const result=await photography.searchStoryRequest(story,prepared.id,{sourceRevision:input.sourceRevision,workingVersion:input.workingVersion,confirm:true},{readStory:()=>view().stories.find(s=>s.id===id)});
         json(response,201,{photoRequest:result,paidCalls:0,productionApplied:false});return;
+      }
+      const visualPreparation=url.pathname.match(/^\/api\/stories\/([^/]+)\/photo-research\/([a-f0-9-]{36})\/visual-review$/);
+      if(visualPreparation&&request.method==='POST'){
+        requireThat(photography,'RESEARCH_UNAVAILABLE','Photo review preparation is unavailable.');const input=await body(request),story=view().stories.find(s=>s.id===decodeURIComponent(visualPreparation[1]));requireThat(story&&input&&Object.keys(input).every(k=>['assetIds','sourceRevision','workingVersion'].includes(k)),'INVALID_PHOTO_VISION','Prepare one exact private image manifest only.');
+        json(response,201,{review:await photography.prepareVisualReview(story,visualPreparation[2],input),paidCalls:0,productionApplied:false});return;
       }
       const continuationRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/photo-research$/);
       if(continuationRoute&&request.method==='POST'){requireThat(research,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request),workspace=view(),story=workspace.stories.find(s=>s.id===decodeURIComponent(continuationRoute[1]));const {photoSource,photoDirection,photoCustom,photoParent,...direction}=input;const saved=research.createPhotoContinuation(story,direction,workspace.stories),photoRequest=photography?.prepareStoryRequest(story,saved,{source:photoSource||'commons',direction:photoDirection||'series',custom:photoCustom||'',parentId:photoParent||null});json(response,201,{request:saved,photoRequest,scope:'private_research_only',networkRequests:0,paidCalls:0,productionApplied:false});return;}
@@ -188,6 +197,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       if (url.pathname === '/api/research/requests' && request.method === 'POST') {
         requireThat(research, 'RESEARCH_UNAVAILABLE', 'The private research request store is unavailable.');
         const input = await body(request); const workspace = view();
+        requireThat(!input.idempotencyKey||!isPhotoOperation(input.idempotencyKey),'PHOTO_SCOPE_MISMATCH','Photo assessments remain in their private photo receipt.');
         const resolved=resolvePresetRequest(input,workspace.researchPresets,input.idempotencyKey?research.get(input.idempotencyKey):null);
         json(response, 201, { request: research.create(resolved.input, workspace.stories, {reuseDefault:true,preset:resolved.preset,editorialDiscovery:request.headers['x-mildincident-discovery']==='founder-brief-v14'}), scope: 'local_only', productionApplied: false }); return;
       }
@@ -195,7 +205,19 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
         requireThat(engine,'ENGINE_NOT_CONFIGURED','Private development engine connection is unavailable.');
         if(delivery){const state=await delivery.tick();requireThat(state.state==='connected','ENGINE_NETWORK_UNCERTAIN','Research delivery is temporarily unavailable; cached work is preserved.');}else await engine.refresh();json(response,200,{engine:engine.status(),productionApplied:false});return;
       }
+      const sequenceApply=url.pathname.match(/^\/api\/stories\/([^/]+)\/sequence-proposals\/apply$/);
+      if(sequenceApply&&request.method==='POST'){
+        const input=await body(request),id=decodeURIComponent(sequenceApply[1]);let story=view().stories.find(s=>s.id===id);requireThat(story,'STORY_NOT_FOUND','Open an existing story.');
+        if(input.optionId==='curated-sequence'){const option=story.sourceSequencePlan.options.find(o=>o.id===input.optionId);requireThat(option&&previews,'EDIT_CONFLICT','The private-image proposal is no longer available.');for(const slide of option.slides){const asset=story.media.find(a=>a.id===slide.assetId);requireThat(asset?.localPreview,'PREVIEW_NOT_FOUND','A proposed private image is unavailable.');await previews.readPreview(story.id,asset.id,asset.localPreview.sha256);}story=view().stories.find(s=>s.id===id);}
+        const patch=sourceSequenceDraft(story,story.sourceSequencePlan,input),draft=drafts.save(story,patch);json(response,200,{draft,selectionApplied:true,productionApplied:false});return;
+      }
       const storyAction=url.pathname.match(/^\/api\/research\/requests\/([a-f0-9-]{36})\/generation\/(prepare|confirm)$/);
+      const storyProgress=url.pathname.match(/^\/api\/research\/requests\/([a-f0-9-]{36})\/generation\/status$/);
+      if(storyProgress&&request.method==='GET'){
+        const p=captionPilot?.raw(storyProgress[1]);requireThat(p?.operation==='story'&&!isPhotoOperation(p.id),'RESEARCH_REQUEST_NOT_FOUND','Open an existing story-generation request.');
+        let observation=null;if(p.confirmedAt&&engine){try{if(delivery)observation=await delivery.tick({maxAgeMs:10000});else await engine.refresh();}catch{observation={state:'unavailable'};}}
+        json(response,200,{proposal:captionPilot.storyStatus(p.id),delivery:observation?{state:observation.state}:null,readOnly:true,productionApplied:false});return;
+      }
       if(storyAction&&request.method==='POST'){
         requireThat(captionPilot,'CAPTION_POLICY_DISABLED','Founder-confirmed generation is unavailable.');const input=await body(request);
         const proposal=storyAction[2]==='prepare'?await captionPilot.prepareStory(storyAction[1],input):await captionPilot.confirmStory(storyAction[1],input);
@@ -204,6 +226,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       const engineMatch=url.pathname.match(/^\/api\/research\/requests\/([a-f0-9-]{36})\/engine\/(queue|start|review|evidence)$/);
       if(engineMatch && request.method==='POST'){
         requireThat(engine,'ENGINE_NOT_CONFIGURED','Private development engine connection is unavailable.');
+        requireThat(!isPhotoOperation(engineMatch[1]),'PHOTO_SCOPE_MISMATCH','This route cannot start or disclose a private photo assessment.');
         const input=await body(request);let job;
         requireThat(!['queue','start'].includes(engineMatch[2])||engine.client?.connection?.executionScope!=='draft_only','CAPTION_SCOPE_MISMATCH','Use the exact story caption action for a drafting-only authorization.');
         if(['queue','start'].includes(engineMatch[2]))requireThat(!captionPilot?.raw(engineMatch[1]),'CAPTION_SCOPE_MISMATCH','Use the reviewed founder action for policy requests.');
@@ -217,6 +240,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       const requestMatch = url.pathname.match(/^\/api\/research\/requests\/([a-f0-9-]{36})\/events$/);
       if (requestMatch && request.method === 'POST') {
         requireThat(research, 'RESEARCH_UNAVAILABLE', 'The private research request store is unavailable.');
+        requireThat(!isPhotoOperation(requestMatch[1]),'PHOTO_SCOPE_MISMATCH','Photo assessments remain in their private photo receipt.');
         const input = await body(request); const workspace = view();
         json(response, 200, { request: research.event(requestMatch[1], input, workspace.stories), scope: 'local_only', productionApplied: false }); return;
       }

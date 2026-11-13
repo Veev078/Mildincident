@@ -24,7 +24,7 @@ test('story overview leads with actual references and preserves private notes, w
  assert.ok(html.includes('class="writing-hero"'));assert.ok(html.includes('caption-workbench'));
  assert.ok(html.includes('aria-label="Local caption draft"'));assert.ok(html.includes('aria-label="Your direction"'));
  assert.match(html,/An unfinished angle/);assert.match(html,/Working caption stays preserved/);
- assert.match(html,/Story details &amp; version history|Story details & version history/);
+ assert.match(html,/<summary>Story details<\/summary>/);
  assert.match(html,/data-action="draft-history"/);assert.match(html,/data-proposal-for=/);
  assert.match(html,/No preview available|https:\/\/example.org\/thumb/);
  assert.ok(!html.includes('Image verified'));

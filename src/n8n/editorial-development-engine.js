@@ -8,6 +8,8 @@ import {photoEvidenceTools,captionReviewSignals} from '../editorial-evidence.js'
 import {buildLeaseNodes} from './editorial-job-lease.js';
 import {editorialHookOptions,draftEvidenceSignals} from '../editorial-hooks.js';
 import {sourceSelectionConcern} from './editorial-source-selection.js';
+import {fitResearchContext,researchContextParts} from './research-context-budget.js';
+import {developmentFailureCode,developmentFailureResponse} from './editorial-failure.js';
 export const EDITORIAL_JOB_BUDGET=Object.freeze({maxResearchCalls:1,maxDraftCalls:1,maxResearchToolCalls:2,maxCandidates:1,maxInputCharactersPerCall:30000,maxResearchOutputTokens:3500,maxDraftOutputTokens:1800,priceVerified:false});
 export const PHOTO_REFERENCE_BUDGET=Object.freeze({capture:40,draftContext:7,maxSourcePages:5});
 export const EDITORIAL_JOB_PATH='mildincident-dev-editorial-job-v1';
@@ -34,7 +36,7 @@ return [{json:{...row,claimed:true}}];`));
   const prompt=find('Build Research Prompt');
   // Replace the inherited exemplar, rather than appending contradictory field instructions.
   prompt.parameters.jsCode=prompt.parameters.jsCode.replace(/const shape='[^\n]*';/, 'const shape='+JSON.stringify(JSON.stringify(editorialResearchShape()))+';');
-  prompt.parameters.jsCode=`const safePhotoReference=${safePhotoReference.toString()};
+  prompt.parameters.jsCode=`const fitResearchContext=${fitResearchContext.toString()};const researchContextParts=${researchContextParts.toString()};const safePhotoReference=${safePhotoReference.toString()};
 const requests=(function(){${prompt.parameters.jsCode}\n})();
 const history=$('Read Development Candidate History').all().map(i=>{try{return JSON.parse(i.json.candidate_json||'{}');}catch{return null;}}).filter(Boolean);
 const job=$('Verify Development Claim').first().json;
@@ -48,7 +50,7 @@ try{planned=plan(requests,history,job);}catch(error){
  planned=plan(requests,history,job,fallback,capturedPreset);
 }
 const principles=(${editorialPrinciples.toString()})();for(const item of planned){item.json.instructions=(item.json.instructions||'')+'\\nEDITORIAL PRINCIPLES '+principles.version+': '+principles.discovery;}
-for(const item of planned)if(item.json.userPrompt.length+String(item.json.instructions||'').length>30000)throw new Error('RESEARCH_INPUT_BUDGET_EXCEEDED');return planned;`;
+for(const item of planned){item.json=fitResearchContext(item.json);if(item.json.userPrompt.length+String(item.json.instructions||'').length>30000)throw new Error('RESEARCH_INPUT_BUDGET_EXCEEDED');}return planned;`;
   for(const name of ['Research Candidates','Draft Editorial Concept']){const n=find(name);n.retryOnFail=false;n.onError='continueRegularOutput';n.parameters.simplify=false;n.parameters.options={...n.parameters.options,maxTokens:name==='Research Candidates'?3500:1800};if(name==='Research Candidates'){n.parameters.options.maxToolCalls=2;n.parameters.options.maxToolsIterations=2;}else{delete n.parameters.builtInTools;delete n.parameters.options.maxToolCalls;delete n.parameters.options.maxToolsIterations;}}
   const draftNode=find('Draft Editorial Concept');
   requireThat(typeof draftNode.parameters.responses?.values?.[0]?.content==='string','NODE_DRIFT','Expected the active drafting message template.');
@@ -116,9 +118,9 @@ return [{json:{job_id:job.job_id,candidate_id:candidateId,status,candidate_json:
   const visual=['Prepare First-Party Page Scan','Fetch First-Party Page Metadata','Extract Original-Page Image Previews','Prepare Visual Draft Context','Editorial Evidence Ready?'];for(let i=0;i<visual.length-1;i++)link(visual[i],visual[i+1]);link('Editorial Evidence Ready?','Guard Draft Input Budget');link('Editorial Evidence Ready?','Prepare Rejected Development Candidate',1);
   const final=['Build Pipeline Rows','Finalize Development Candidate','Persist Development Candidate','Finish Development Job','Return Development Job'];for(let i=0;i<final.length-1;i++)link(final[i],final[i+1]);link('Prepare Rejected Development Candidate','Finalize Development Candidate');
   // Ordinary node failures close the claimed job. Process kills/timeouts are reconciled read-only in Studio.
-  nodes.push(codeNode('Prepare Development Failure',`const row=$('Claim Queued Development Job').first().json;const dispatch=$('Validate Development Dispatch').first().json;if(row.job_id!==dispatch.job_id||row.lease_token!==dispatch.dispatch_id||row.status!=='generating')throw new Error('UNOWNED_DEVELOPMENT_FAILURE');return [{json:{job_id:row.job_id,lease_token:row.lease_token,error:'DEVELOPMENT_EXECUTION_FAILED',execution_id:String($execution.id)}}];`));
-  nodes.push({id:'fail-development-job',name:'Fail Development Job',type:'n8n-nodes-base.dataTable',typeVersion:1,position:[0,0],alwaysOutputData:true,parameters:{resource:'row',operation:'update',dataTableId:{__rl:true,mode:'id',value:jobsTableId},matchType:'allConditions',filters:{conditions:[{keyName:'job_id',condition:'eq',keyValue:'={{ $json.job_id }}'},{keyName:'lease_token',condition:'eq',keyValue:'={{ $json.lease_token }}'},{keyName:'status',condition:'eq',keyValue:'generating'}]},columns:{mappingMode:'defineBelow',value:{status:'failed',error:'DEVELOPMENT_EXECUTION_FAILED'}},options:{}}});
-  nodes.push({id:'return-development-failure',name:'Return Development Failure',type:'n8n-nodes-base.respondToWebhook',typeVersion:1.4,position:[0,0],parameters:{respondWith:'json',responseBody:'={{ { accepted: true, scope: "development_only", productionApplied: false, jobId: $("Validate Development Dispatch").first().json.job_id, status: "failed", executionId: String($execution.id) } }}',options:{}}});
+  nodes.push(codeNode('Prepare Development Failure',developmentFailureCode));
+  nodes.push({id:'fail-development-job',name:'Fail Development Job',type:'n8n-nodes-base.dataTable',typeVersion:1,position:[0,0],alwaysOutputData:true,parameters:{resource:'row',operation:'update',dataTableId:{__rl:true,mode:'id',value:jobsTableId},matchType:'allConditions',filters:{conditions:[{keyName:'job_id',condition:'eq',keyValue:'={{ $json.job_id }}'},{keyName:'lease_token',condition:'eq',keyValue:'={{ $json.lease_token }}'},{keyName:'status',condition:'eq',keyValue:'generating'}]},columns:{mappingMode:'defineBelow',value:{status:'failed',error:'={{ $json.error }}'}},options:{}}});
+  nodes.push({id:'return-development-failure',name:'Return Development Failure',type:'n8n-nodes-base.respondToWebhook',typeVersion:1.4,position:[0,0],parameters:{respondWith:'json',responseBody:developmentFailureResponse,options:{}}});
   link('Prepare Development Failure','Fail Development Job');link('Fail Development Job','Return Development Failure');
   for(const node of nodes){if(['Prepare Development Failure','Validate Development Dispatch'].includes(node.name))continue;if(node.type==='n8n-nodes-base.code'||node.type==='n8n-nodes-base.dataTable'&&node.name!=='Claim Queued Development Job'&&node.name!=='Fail Development Job'){node.onError='continueErrorOutput';link(node.name,'Prepare Development Failure',1);}}
   nodes.forEach((n,index)=>{n.position=[(index%6)*250,Math.floor(index/6)*180];});

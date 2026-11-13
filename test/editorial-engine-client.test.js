@@ -156,3 +156,16 @@ test('complete native history reads are not capped at five pages and repeated cu
  const f=fake();let page=0;f.client.verifyTables=async()=>{};f.client.api=async()=>({data:[{id:++page}],nextCursor:page<7?'cursor-'+page:null});assert.equal((await f.client.rows('devjobs')).length,7);assert.equal(f.state.posts,0);
  f.client.api=async()=>({data:[{id:1}],nextCursor:'stuck'});await assert.rejects(f.client.rows('devjobs'),{code:'ENGINE_SCAN_INCOMPLETE'});assert.equal(f.state.posts,0);
 });
+
+test('a correlated failed webhook receipt is terminal even when workflow status is success and reads lag',async t=>{
+ const f=await setup(t);f.state.workerActive=true;f.client.connection.generationEnabled=true;f.client.connection.approvedWorkerVersion='approved-v1';
+ const request=f.research.create({kind:'brief',prompt:'Inspect a realistic bounded cultural research direction'},[]);await f.service.queue(request.id);
+ f.state.dispatchReceipt={accepted:true,scope:'development_only',productionApplied:false,jobId:request.id,executionId:'2365',status:'failed',failureCode:'RESEARCH_INPUT_BUDGET_EXCEEDED',privateHeader:'MUST_NOT_SURVIVE'};
+ await f.service.start(request.id,f.research.engineJob(request.id).version);await new Promise(r=>setImmediate(r));
+ let job=f.research.engineJob(request.id);assert.equal(job.state,'failed');assert.equal(job.resultPending,false);assert.equal(job.executionId,'2365');assert.equal(job.lastError,'RESEARCH_INPUT_BUDGET_EXCEEDED');assert(!JSON.stringify(job).includes('MUST_NOT_SURVIVE'));
+ f.state.jobs[0].status='failed';f.state.jobs[0].error='DEVELOPMENT_EXECUTION_FAILED';f.state.jobs[0].execution_id='2365';
+ let detailReads=0;f.client.executionDetails=async()=>{detailReads++;return ({id:'2365',status:'success',data:{resultData:{runData:{'Verify Development Claim':[{data:{main:[[{json:{job_id:request.id,request_hash:job.requestHash}}]]}}],'Build Research Prompt':[{data:{main:[[],[{json:{error:'RESEARCH_INPUT_BUDGET_EXCEEDED [line 367]',privateData:'NEVER_IMPORT'}}]]}}],'Prepare Development Failure':[{data:{main:[[{json:{error:'DEVELOPMENT_EXECUTION_FAILED'}}]]}}]}}}});};
+ await f.service.refresh();job=f.research.engineJob(request.id);assert.deepEqual(job.failure,{code:'RESEARCH_INPUT_BUDGET_EXCEEDED',stage:'research_preparation',executionId:'2365',stoppedBeforeModels:true});assert.equal(job.candidates.length,0);assert(!JSON.stringify(job).includes('NEVER_IMPORT'));await f.service.refresh();assert.equal(detailReads,1);
+ const reopened=new LocalResearchStore(path.join(f.root,'research.sqlite'));try{assert.equal(reopened.engineJob(request.id).state,'failed');assert(reopened.engineJob(request.id).failure.stoppedBeforeModels);}finally{reopened.close();}
+ await assert.rejects(f.service.start(request.id,job.version));assert.equal(f.state.dispatches,1);
+});

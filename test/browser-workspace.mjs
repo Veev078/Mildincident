@@ -143,8 +143,8 @@ try {
   checks.push('large carousel rehearsal supports keyboard navigation and full-image framing without editing saved sequence');
 
   await page.goto(`${origin}/#/story/${id}/images`);
-  await page.locator('[data-action="compare-asset"]').nth(0).click();
-  await page.locator('[data-action="compare-asset"]').nth(1).click();
+  await page.locator('.selected-sequence-panel [data-action="compare-asset"][data-asset="asset-1"]').click();
+  await page.locator('.selected-sequence-panel [data-action="compare-asset"][data-asset="asset-2"]').click();
   await page.getByRole('button', { name: 'Compare images →', exact: true }).click();
   assert.ok((await page.getByRole('dialog').textContent()).includes('Compare the evidence.'));
   await page.getByRole('button', { name: 'Close image comparison' }).click();
@@ -180,13 +180,13 @@ try {
   await page.getByRole('button',{name:'Close image details'}).click();
   checks.push('image taste feedback persists with explicit rejection warning while source rights and selected slides remain unchanged');
   await page.getByLabel('Editorial view',{exact:true}).selectOption('reject');
-  assert.equal(await page.locator('.photo-current .asset-card').count(),2);
-  assert.equal(await page.locator('.photo-collection:not(.photo-current) .asset-card').count(),0);
+  assert.equal(await page.locator('.selected-sequence-list>li').count(),2);
+  assert.equal(await page.locator('.photo-collection .asset-card').count(),0);
   await page.getByLabel('Editorial view',{exact:true}).selectOption('shortlist');
-  assert.equal(await page.locator('.photo-current .asset-card').count(),2);
-  assert.equal(await page.locator('.photo-collection:not(.photo-current) .asset-card').count(),0);
+  assert.equal(await page.locator('.selected-sequence-list>li').count(),2);
+  assert.equal(await page.locator('.photo-collection .asset-card').count(),0);
   await page.getByLabel('Editorial view',{exact:true}).selectOption('all');
-  assert.equal(await page.locator('.asset-card').count(),3);
+  assert.equal(await page.locator('.asset-card').count()+await page.locator('.selected-sequence-list>li').count(),3);
   checks.push('editorial image filters surface saved decisions without changing source rights or selection');
 
 
@@ -262,7 +262,7 @@ try {
   assert.equal(JSON.stringify({title:snapshot.records.stories[0].title,format:snapshot.records.stories[0].format,target:snapshot.records.packages[0].target_slide_count}),sourceIdentity);
   checks.push('working title/hook/format survive reload and export while source identity and selected assets remain intact');
 
-  await page.getByText('Story details & version history',{exact:true}).click();
+  await page.getByText('Story details',{exact:true}).click();
   const downloadEvent = page.waitForEvent('download');
   await page.locator('.story-header-actions a').click();
   const download = await downloadEvent;
@@ -283,7 +283,7 @@ try {
   assert.ok(!drafts.proposal(originalView().stories[0]).stale);
   assert.ok(drafts.history(id).length >= 4);
   checks.push('stale source comparison and explicit local rebase preserve history');
-  await page.getByText('Story details & version history',{exact:true}).click();await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await page.getByText('Story details',{exact:true}).click();await page.getByRole('button', { name: 'Version history', exact: true }).click();
   assert.ok((await page.getByRole('dialog').textContent()).includes('Local version history.'));
   await page.getByRole('button', { name: 'Close local version history' }).click();
   checks.push('saved local version history is inspectable');
@@ -347,7 +347,7 @@ try {
   engineFixture.candidates.push({job_id:queued.job_id,candidate_id:fixtureCandidate.id,status:'ready_to_review',candidate_json:JSON.stringify(fixtureCandidate)});
   await page.getByRole('button',{name:'Check for results',exact:true}).first().click();await page.getByText('Research results checked.',{exact:true}).waitFor();
   await page.locator('[data-review-card] h3 a').first().click();
-  await page.getByText('Story details & version history',{exact:true}).click();await page.getByText('Research proposal',{exact:true}).waitFor();
+  await page.getByText('Story details',{exact:true}).click();await page.getByText('Research proposal',{exact:true}).waitFor();
   const devStoryId='CON-DEV-'+queued.job_id;
   await page.goto(`${origin}/#/story/${devStoryId}/research`);
   await page.getByText('Read the recorded source excerpt',{exact:true}).click();
@@ -356,7 +356,7 @@ try {
   await page.goto(`${origin}/#/story/${devStoryId}/images`);
   await page.locator('[data-story-task="images"]').waitFor();
   for(const collection of await page.locator('details.photo-collection').all())if(!await collection.evaluate(d=>d.open))await collection.locator('summary').click();
-  await page.locator('[data-action="inspect"]').first().click();
+  await page.locator('[data-action="inspect"][data-asset="dev-photo-1"]').first().click();
   await page.getByText('Full source record',{exact:true}).click();
   await page.getByRole('dialog').getByText('Copyright holder recorded; the photographer is not established by that credit.',{exact:true}).waitFor();
   await page.getByRole('dialog').getByRole('link',{name:'Series / project: Synthetic series trail'}).waitFor();
@@ -367,7 +367,7 @@ try {
   await page.goto(`${origin}/#/story/${devStoryId}/images`);
   await page.locator('[data-story-task="images"]').waitFor();
   for(const collection of await page.locator('details.photo-collection').all())if(!await collection.evaluate(d=>d.open))await collection.locator('summary').click();
-  await page.locator('[data-action="inspect"]').first().click();
+  await page.locator('[data-action="inspect"][data-asset="dev-photo-1"]').first().click();
   const requestsBeforePhotoResearch=research.all().length,jobsBeforePhotoResearch=engineFixture.jobs.length;
   await page.getByText('Explore this photograph further',{exact:true}).click();
   await page.getByRole('button',{name:'Investigate this photograph',exact:true}).click();
@@ -408,7 +408,7 @@ try {
   await page.goto(`${origin}/#/story/${devStoryId}/images`);
   await page.locator('[data-story-task="images"]').waitFor();
   for(const collection of await page.locator('details.photo-collection').all())if(!await collection.evaluate(d=>d.open))await collection.locator('summary').click();
-  await page.locator('[data-action="inspect"]').first().click();
+  await page.locator('[data-action="inspect"][data-asset="dev-photo-1"]').first().click();
   // Original source context remains available alongside later captured image captions.
   await page.getByText('Full source record',{exact:true}).click();
   await page.getByRole('dialog').getByText('Caption recorded at the source',{exact:true}).waitFor();

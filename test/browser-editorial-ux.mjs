@@ -11,6 +11,7 @@ import {WorkspaceSource} from '../src/workspace/data-source.js';
 import {LocalDraftStore} from '../src/workspace/store.js';
 import {LocalResearchStore} from '../src/workspace/research-store.js';
 import {workspaceSnapshot} from './helpers/workspace-fixture.js';
+import {PublicationFeeds} from '../src/discovery/publication-feeds.js';
 
 const root=await fs.mkdtemp(path.join(os.tmpdir(),'mi-editorial-ux-'));
 const artifacts=path.resolve(process.argv.find(a=>a.startsWith('--artifacts='))?.slice(12)||'.local/ux-transformation');
@@ -18,6 +19,7 @@ const baseline=process.argv.find(a=>a.startsWith('--baseline='))?.slice(11)||'f5
 assert.match(baseline,/^[a-f0-9]{7,40}$/);
 await fs.mkdir(artifacts,{recursive:true,mode:0o700});
 const servers=[],stores=[],checks=[],errors=[];
+async function waitUntil(predicate){const deadline=Date.now()+12000;while(Date.now()<deadline){if(predicate())return;await new Promise(r=>setTimeout(r,50));}assert.fail('The isolated ledger did not reach its expected state.');}
 let browser;
 let captureBasis='existing_private_cached_snapshot';
 async function boot(snapshot,webRoot){
@@ -25,7 +27,8 @@ async function boot(snapshot,webRoot){
  const source=new WorkspaceSource({root:directory,loadLive:async()=>snapshot});source.snapshot=snapshot;
  const drafts=new LocalDraftStore(path.join(directory,'drafts.sqlite')),research=new LocalResearchStore(path.join(directory,'research.sqlite'));
  stores.push(drafts,research);
- const server=createWorkspaceServer({source,drafts,research,...(webRoot?{webRoot}:{})});
+ const feeds=new PublicationFeeds(research,{sources:[],fetchImpl:()=>{throw Error('No external feed request in UI regression');}});
+ const server=createWorkspaceServer({source,drafts,research,feeds,...(webRoot?{webRoot}:{})});
  servers.push(server);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  return {origin:'http://127.0.0.1:'+server.address().port,source,drafts,research};
 }
@@ -83,23 +86,20 @@ try{
   await page.locator('[data-review-card="'+id+'"] .review-receipt').filter({hasText:'Saved'}).waitFor();
   checks.push('one-click founder selection persists and is available in the saved review queue');
   const creative=page.getByLabel('Creative direction',{exact:true});
-  if(!await creative.isVisible())await page.getByRole('button',{name:'Custom direction',exact:true}).click();
+  if(!await creative.isVisible())await page.getByRole('button',{name:'Custom Direction',exact:true}).click();
   await creative.fill('Synthetic private direction; do not dispatch a model.');
-  await page.getByRole('button',{name:'Surprise Me',exact:true}).click();await page.getByRole('button',{name:'Save general discovery brief',exact:true}).click();
-  await page.getByRole('button',{name:'Custom direction',exact:true}).click();assert.equal(await creative.inputValue(),'Synthetic private direction; do not dispatch a model.');
+  await page.getByRole('button',{name:'Surprise Me',exact:true}).click();await page.getByRole('button',{name:'Save direction',exact:true}).click();await waitUntil(()=>app.research.all().length===1);
+  await page.getByRole('button',{name:'Custom Direction',exact:true}).click();assert.equal(await creative.inputValue(),'Synthetic private direction; do not dispatch a model.');
   assert.equal(app.research.all().length,1);
-  await page.getByRole('button',{name:'Save research direction',exact:true}).click();
-  await page.waitForFunction(()=>document.querySelectorAll('[data-request-id]').length===2);
+  await page.getByRole('button',{name:'Save direction',exact:true}).click();
+  await waitUntil(()=>app.research.all().length===2);
   assert.equal(app.research.all().length,2);assert.ok(!calls.some(c=>/queue|dispatch|activate/.test(c.path)));
   checks.push('saving directions preserves unsent input and never queues or dispatches paid research');
   const lead={id:'synthetic-source-lead',sourceKey:'synthetic',sourceName:'Synthetic publication fixture',title:'Synthetic photographic project — not real research',url:'https://example.org/project',summary:'A clearly labeled metadata-only source lead',previewUrl:'',aiGenerated:false,rightsGranted:false};
   app.research.db.prepare('INSERT INTO publication_leads VALUES(?,?,?)').run(lead.id,lead.sourceKey,JSON.stringify(lead));
-  await page.reload();await page.getByText('Publication leads',{exact:true}).click();
-  const requestCount=calls.length;await page.getByRole('button',{name:'Develop a research direction',exact:true}).click();
-  assert.ok((await page.getByLabel('Creative direction',{exact:true}).inputValue()).includes(lead.title));assert.equal(await page.getByLabel('Source link (optional)',{exact:true}).inputValue(),lead.url);assert.equal(calls.length,requestCount);assert.equal(app.research.all().length,2);
-  await page.getByRole('button',{name:'Save research direction',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('[data-request-id]').length===3);
-  assert.equal(app.research.all()[0].sourceUrl,lead.url);assert.ok(!calls.some(c=>/queue|dispatch|activate/.test(c.path)));
-  checks.push('a publication source lead becomes an editable, persisted source-bound direction without automatic research');
+  await page.reload();await page.locator('h1').waitFor();
+  const catalog=await (await fetch(app.origin+'/api/workspace')).json();assert.equal(catalog.sourceInputs.leads[0].url,lead.url);assert.equal(await page.getByText('Publication leads',{exact:true}).count(),0);assert.equal(app.research.all().length,2);assert.ok(!calls.some(c=>/queue|dispatch|activate/.test(c.path)));
+  checks.push('retained publication leads remain in the read-only source catalog without reviving the retired Discover controls or starting research');
 
   for(const [width,height]of [[1366,768],[1440,900],[390,844]]){
    await page.setViewportSize({width,height});

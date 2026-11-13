@@ -28,3 +28,11 @@ test('founder angle controls are optional, source-linked, escaped and revision-s
  assert.match(hookOptionsView({...story,localDraft:{stale:true}},{editable:true}),/data-index="1" disabled/);assert.ok(!hookOptionsView({...story,hookOptions:[{...options[0],text:'An angle with <script>injected text</script>'}]}).includes('<script>'));
  assert.ok(photographicEvidenceSummary({sourceRelation:'page_cover',creatorBasis:'copyright_holder_only'}).includes('photographer is not established'));assert.ok(photographicEvidenceSummary({sourceRelation:'context_only'}).includes('does not establish a match'));assert.ok(photographicEvidenceSummary({sourceRelation:'subject_caption_match',creatorBasis:'explicit_source_photo_credit',creator:'Noor Lens'}).includes('Image identity needs visual review'));
 });
+
+test('photographic evidence separates browser references, private uploads and decoded source copies',()=>{
+ const asset={photoRequestId:'request-one',sourceUrl:'https://example.org/project',previewUrl:'https://example.org/frame.jpg',sourceRelation:'subject_caption_match'};
+ const reference=photographicEvidenceSummary(asset);assert(reference.includes('A browser preview or file link alone does not establish a saved source copy'));assert(reference.includes('Studio has not downloaded'));
+ const upload=photographicEvidenceSummary({...asset,localPreview:{sha256:'a'.repeat(64),width:640,height:480,sourceInspection:null}});assert(upload.includes('A private upload is saved separately'));assert(!upload.includes('decoded a copy from this source'));
+ const copy=photographicEvidenceSummary({...asset,photoRequestId:null,localPreview:{sha256:'a'.repeat(64),width:640,height:480,sourceInspection:{basis:'photo_request_source_copy'}}});
+ assert(copy.includes('Source record and files'));assert(copy.includes('privately saved and decoded a copy from this source'));assert(copy.includes('Image identity and publication permission still need review'));assert(!copy.includes('Studio has not downloaded'));
+});

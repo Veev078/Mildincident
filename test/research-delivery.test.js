@@ -15,3 +15,7 @@ test('delivery coalesces overlap for read-only or launch-enabled clients; it nev
 test('a restart respects a persisted unavailable-read backoff instead of immediately repeating the failed API read',async t=>{
  const {delivery,research,engine}=await setup(t);let reads=0;engine.refresh=async()=>{reads++;};research.saveDeliveryState({state:'unavailable',nextAttempt:new Date(Date.now()+60000).toISOString(),failures:1});delivery.start();await new Promise(r=>setImmediate(r));assert.equal(reads,0);await delivery.stop();
 });
+test('foreground status checks reuse recent observations and respect outage backoff without repeating a dispatch',async t=>{
+ const {delivery,state,engine}=await setup(t);let now=Date.now();delivery.now=()=>now;await delivery.tick({maxAgeMs:10000});const initial=state.reads;await delivery.tick({maxAgeMs:10000});assert.equal(state.reads,initial);
+ now+=11000;state.fail=true;await delivery.tick({maxAgeMs:10000});assert.equal(delivery.status().state,'unavailable');const failed=state.reads;await delivery.tick({maxAgeMs:10000});assert.equal(state.reads,failed);state.fail=false;now=Date.parse(delivery.status().nextAttempt)+1;await delivery.tick({maxAgeMs:10000});assert.equal(delivery.status().state,'connected');assert.equal(engine.client.readOnly,true);
+});
