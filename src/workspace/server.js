@@ -11,7 +11,7 @@ import {productionDecisions} from './production-decisions.js';
 import {validatePacketImport} from '../production-packet-contract.js';
 import {prepareProductionPacket} from './production-bridge.js';
 import {assessStudioReadiness,imageEvidenceState} from '../editorial-readiness.js';
-import {buildSourceSequencePlan} from '../editorial-sequence.js';
+import {buildSourceSequencePlan,sourceSequenceDraft} from '../editorial-sequence.js';
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -96,7 +96,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     }
     for(const story of workspace.stories){if(story.draftRecovery?.sourceJobId){const original='CON-DEV-'+story.draftRecovery.sourceJobId;if(workspace.stories.some(s=>s.id===original))story.recoveryOfStoryId=original;}const result=story.captionGeneration?.result;if(result){const version=workspace.stories.find(s=>s.id===result.storyId);if(version)version.recoveryOfStoryId=story.id;}}
     attachLocalPreviews(workspace,previews);
-    for (const story of workspace.stories) { story.photography=photoDesk(story);story.organization=drafts.organization(story.id);story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.sourceSequencePlan = buildSourceSequencePlan(story); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity};story.approvalRequest=approvalRequests?.status(story)||null; }
+    for (const story of workspace.stories) { story.photography=photoDesk(story);story.organization=drafts.organization(story.id);story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.sourceSequencePlan = buildSourceSequencePlan(story,{visualReview:photography?.selectionReview?.(story)||null}); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity};story.approvalRequest=approvalRequests?.status(story)||null; }
     workspace.photoHunts=photography?.all()||[];
     workspace.founderReviews=founderReviews?.all()||{};
     workspace.sourceInputs={publications:feeds?.status()||[],leads:feeds?.list()||[]};
@@ -205,7 +205,19 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
         requireThat(engine,'ENGINE_NOT_CONFIGURED','Private development engine connection is unavailable.');
         if(delivery){const state=await delivery.tick();requireThat(state.state==='connected','ENGINE_NETWORK_UNCERTAIN','Research delivery is temporarily unavailable; cached work is preserved.');}else await engine.refresh();json(response,200,{engine:engine.status(),productionApplied:false});return;
       }
+      const sequenceApply=url.pathname.match(/^\/api\/stories\/([^/]+)\/sequence-proposals\/apply$/);
+      if(sequenceApply&&request.method==='POST'){
+        const input=await body(request),id=decodeURIComponent(sequenceApply[1]);let story=view().stories.find(s=>s.id===id);requireThat(story,'STORY_NOT_FOUND','Open an existing story.');
+        if(input.optionId==='curated-sequence'){const option=story.sourceSequencePlan.options.find(o=>o.id===input.optionId);requireThat(option&&previews,'EDIT_CONFLICT','The private-image proposal is no longer available.');for(const slide of option.slides){const asset=story.media.find(a=>a.id===slide.assetId);requireThat(asset?.localPreview,'PREVIEW_NOT_FOUND','A proposed private image is unavailable.');await previews.readPreview(story.id,asset.id,asset.localPreview.sha256);}story=view().stories.find(s=>s.id===id);}
+        const patch=sourceSequenceDraft(story,story.sourceSequencePlan,input),draft=drafts.save(story,patch);json(response,200,{draft,selectionApplied:true,productionApplied:false});return;
+      }
       const storyAction=url.pathname.match(/^\/api\/research\/requests\/([a-f0-9-]{36})\/generation\/(prepare|confirm)$/);
+      const storyProgress=url.pathname.match(/^\/api\/research\/requests\/([a-f0-9-]{36})\/generation\/status$/);
+      if(storyProgress&&request.method==='GET'){
+        const p=captionPilot?.raw(storyProgress[1]);requireThat(p?.operation==='story'&&!isPhotoOperation(p.id),'RESEARCH_REQUEST_NOT_FOUND','Open an existing story-generation request.');
+        let observation=null;if(p.confirmedAt&&engine){try{if(delivery)observation=await delivery.tick({maxAgeMs:10000});else await engine.refresh();}catch{observation={state:'unavailable'};}}
+        json(response,200,{proposal:captionPilot.storyStatus(p.id),delivery:observation?{state:observation.state}:null,readOnly:true,productionApplied:false});return;
+      }
       if(storyAction&&request.method==='POST'){
         requireThat(captionPilot,'CAPTION_POLICY_DISABLED','Founder-confirmed generation is unavailable.');const input=await body(request);
         const proposal=storyAction[2]==='prepare'?await captionPilot.prepareStory(storyAction[1],input):await captionPilot.confirmStory(storyAction[1],input);

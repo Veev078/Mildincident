@@ -1,4 +1,16 @@
-# Current checkpoint — hosted failures repaired locally
+# Current checkpoint — V17 Sprint B implemented locally
+
+[Sprint B evidence and next release](release/V17_SPRINT_B.md): Hase project matching is independent of photographer attribution/rights, observed Windowseat → Gelitin image routes are prioritized, and useful captured evidence survives a later uncertain source. The existing reader also supports the actual Dog Pound Days publisher/CDN gallery. No fresh hosted photographic acquisition is claimed.
+
+The retained execution 2367 now reconciles into a visible, editable preliminary draft with sources, claims, gaps and recorded usage, without a new model call. Its progress and usage update without replacing unsaved writing; a failed Studio read cannot erase the completed outcome. Opening/sequence suggestions use source context, founder preferences, decoded dimensions and similarity, remain distinct from AI judgment, and apply through the existing versioned draft store with exact-plan/private-file checks.
+
+542 regressions, syntax checks, the existing desktop/mobile workstation journey and the four-case retained-evidence journey pass. Six real retained Jack model-size JPEGs support explicit sequence application and persistence; Sophy's remaining 12/52 references yield no new project photographs. Actual rendered before/after screenshots are labelled local replays. No paid calls, grants, live workflow/policy/credential mutations, publishing or deployment occurred. PR #1 stays draft/unmerged.
+
+Live Studio baseline is founder-confirmed `3a61f0d`; the completed four-node research-budget repair remains active on saved/active worker `adc2ed9e-2863-428e-b9fd-165eb7b7a2a7`, graph `b971c6f5…`, rechecked read-only. Next: separately approve this code release and inspect genuine hosted Hase file outcomes plus the existing 2367 draft. A fresh bounded AI visual acceptance remains separately gated.
+
+---
+
+# Earlier checkpoint — hosted failures repaired locally
 
 [Focused repair and next release](release/V17_LIVE_FAILURE_REPAIR.md): execution 2365 stopped before either model because its rendered research input was 36,608 characters. Shared context budgeting preserves essential instructions and founder direction within the unchanged 30,000 limit; captured brief and Surprise Me replays render at 29,999 / 29,985. Failure receipts now remain terminal and report their actual safe cause, even when the webhook reports success. The exact four-node native proposal requires separate installation approval; the live recurring worker remains unchanged and active on `673685e5-71af-4b24-a50d-ae06d5799841` / `0e1777e5…`.
 

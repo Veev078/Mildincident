@@ -1,4 +1,4 @@
-import {storyProposal} from './ai-operations.js';
+import {updateStoryGenerationReview,reconcileStoryProgress,updateAiUsagePanel,storyProposal} from './ai-operations.js';
 import {researchAccess} from './discovery-flow.js';
 import {CAPTION_IMPROVEMENTS,captionRequestProposal,canConfirmCaption} from './caption-request-flow.js';
 import {launchSavedResearch} from './research-launch.js';
@@ -130,7 +130,7 @@ function focusStoryTask(){
  else {document.querySelector('#main-content')?.focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});}
 }
 
-async function loadWorkspace({ quiet = false } = {}) {
+async function loadWorkspace({ quiet = false, renderView = true } = {}) {
   if (!quiet) { state.loading = true; render(); }
   try {
     const workspace = await api('/api/workspace');
@@ -156,7 +156,7 @@ async function loadWorkspace({ quiet = false } = {}) {
         if(version)state.captionChoices[story.id]=version.id;
       }
     }
-    state.loading = false; state.error = null; render();
+    state.loading = false; state.error = null; if(renderView)render();
     return workspace;
   } catch (error) {
     state.loading = false;
@@ -429,7 +429,7 @@ async function downloadProposal(story) {
   toast('Local proposal downloaded. No n8n data was changed.');
 }
 
-document.addEventListener('click', event => {
+document.addEventListener('click', async event => {
   if (event.target.closest('.skip-link')) { event.preventDefault(); document.querySelector('#main-content')?.focus(); return; }
   const proposalLink = event.target.closest('a[href]');
   if (proposalLink) {
@@ -449,13 +449,14 @@ document.addEventListener('click', event => {
       const src = img.getAttribute('src'); img.removeAttribute('src'); img.setAttribute('src', src); break;
     }
     case 'apply-source-sequence': {
-      const option=story?.sourceSequencePlan?.options[Number(button.dataset.index)];
-      if(!option||story.localDraft?.stale)break;
-      const brief=creativeBriefFor(story);
-      const roles=new Map(brief.sequenceRoles.map(role=>[role.assetId,role]));
-      for(const slide of option.slides)if(!roles.has(slide.assetId))roles.set(slide.assetId,{assetId:slide.assetId,role:slide.role,note:slide.note});
-      brief.sequenceRoles=[...roles.values()];
-      editDraft(story.id,{format:option.format,targetSlideCount:option.targetSlideCount,selectedAssetIds:option.slides.map(slide=>slide.assetId),creativeBrief:brief},{rerender:true,immediate:true});
+      if(!story||story.localDraft?.stale)break;
+      const digest=button.dataset.planDigest,optionId=button.dataset.optionId;button.disabled=true;
+      try{
+       if(!await flushAllDrafts())throw Error('Save pending writing before applying a sequence.');
+       const current=storyById(story.id);if(current.sourceSequencePlan?.digest!==digest)throw Error('The proposal changed after your edits. Review the current sequence.');
+       await api('/api/stories/'+encodeURIComponent(story.id)+'/sequence-proposals/apply',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({planDigest:digest,optionId,sourceRevision:current.revision,workingVersion:current.localDraft?.version||0})});
+       await loadWorkspace({quiet:true});announce('Sequence applied to your working copy. Earlier order and writing remain in history.');
+      }catch(error){toast(error.message+' No automatic retry was made.',{error:true});await loadWorkspace({quiet:true}).catch(()=>{});button.disabled=false;}
       break;
     }
     case 'rehearse-story': showRehearsal(story); break;
@@ -851,6 +852,18 @@ document.addEventListener('click',async event=>{
 // Background UI reads never flush or replace pending editorial edits/forms.
 let backgroundRead=false;
 async function receiveResearchUpdates(){
+ const active=storyProposal(state);
+ if(!backgroundRead&&!document.hidden&&active&&(['dispatching','queued','running','uncertain'].includes(active.state)||state.storyResultPending===active.id)){
+  backgroundRead=true;try{
+   const result=await api('/api/research/requests/'+encodeURIComponent(active.id)+'/generation/status');
+   result.proposal=reconcileStoryProgress(active,result.proposal);
+   state.storyGenerationProposal=result.proposal;const request=state.workspace.researchRequests?.find(r=>r.id===active.id);if(request)request.generationProposal=result.proposal;
+   const terminal=['completed','failed'].includes(result.proposal.state);
+   if(terminal){state.storyResultPending=active.id;result.proposal.deliveryPending=true;updateStoryGenerationReview(document,result.proposal);try{await loadWorkspace({quiet:true,renderView:false});updateAiUsagePanel(document,state);state.storyResultPending=null;result.proposal.deliveryPending=false;}catch{/* Keep the recorded outcome and retry only its read-only Studio handoff. */}}
+   updateStoryGenerationReview(document,{...result.proposal,deliveryPending:state.storyResultPending===active.id,readUnavailable:result.delivery?.state==='unavailable'||state.storyResultPending===active.id});
+  }catch{updateStoryGenerationReview(document,{...active,deliveryPending:state.storyResultPending===active.id,readUnavailable:true});}finally{backgroundRead=false;}
+  return;
+ }
  if(state.discoverySubmitting||backgroundRead||document.hidden||!state.workspace?.engine?.delivery||pending.size||saving.size||document.querySelector('#asset-dialog')?.open||!['home','discovery','story'].includes(route().view)||document.activeElement?.matches('input,textarea,select')||document.querySelector('details[open]:not(.research-activity-row):not(.caption-request)')||[...document.querySelectorAll('form input:not([type=hidden]),form textarea')].some(el=>el.type==='checkbox'?el.checked!==el.defaultChecked:el.value!==el.defaultValue))return;
  backgroundRead=true;try{await loadWorkspace({quiet:true});}catch{}finally{backgroundRead=false;}
 }
@@ -993,7 +1006,7 @@ document.addEventListener('click',async event=>{
   if(result.proposal)state.storyGenerationProposal=result.proposal;
   await loadWorkspace({quiet:true});toast(disable?'Future AI starts disabled. Accepted work may still finish.':'Story request confirmed once. Check its recorded progress.');
  }catch(error){toast(error.message+(confirm?' Check results; no automatic resubmission was made.':''),{error:true});}
- finally{state.storyConfirmBusy=false;render();}
+ finally{state.storyConfirmBusy=false;render();receiveResearchUpdates();}
 });
 
 document.addEventListener('change',event=>{const select=event.target.closest('[data-photo-source]');if(!select)return;state.photoSources ||= {};state.photoSources[select.dataset.photoSource]=select.value;});

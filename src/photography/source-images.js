@@ -19,7 +19,8 @@ const CDN_HOSTS={
  // Relationships observed on the retained Hase article/artwork, not guessed URLs.
  'www.artsy.net':['d7hftxdivxxvm.cloudfront.net','d32dm0rphc51dk.cloudfront.net'],
  'www.windowseat.ph':['www.gelitin.net','c1.staticflickr.com'],
- 'windowseat.ph':['www.gelitin.net','c1.staticflickr.com']
+ 'windowseat.ph':['www.gelitin.net','c1.staticflickr.com'],
+ 'www.itsnicethat.com':['m.itsnicethat.com']
 };
 export function permittedSourceImage(sourceUrl,imageUrl){
  if(!safePhotoReference(sourceUrl)||!safePhotoReference(imageUrl))return false;

@@ -7,10 +7,10 @@ import {projectImageContext} from './project-image-context.js';
 
 // Page readers, not an image proxy or arbitrary URL downloader. Only exact URLs
 // already present in this story's retained research may be fetched.
-export const PROJECT_PAGE_HOSTS=Object.freeze(['www.dazeddigital.com','www.life.com','life.com','thephotographersgallery.org.uk','www.thephotographersgallery.org.uk','www.booooooom.com','josharonson.us','www.josharonson.us','sophyrickett.com','www.sophyrickett.com','www.cobgallery.com','www.cheeriopublishing.com','www.climaxbooks.com','www.theguardian.com','www.artsy.net','www.windowseat.ph','windowseat.ph','www.gelitin.net','gelitin.net']);
+export const PROJECT_PAGE_HOSTS=Object.freeze(['www.dazeddigital.com','www.life.com','life.com','thephotographersgallery.org.uk','www.thephotographersgallery.org.uk','www.booooooom.com','josharonson.us','www.josharonson.us','sophyrickett.com','www.sophyrickett.com','www.cobgallery.com','www.cheeriopublishing.com','www.climaxbooks.com','www.theguardian.com','www.artsy.net','www.windowseat.ph','windowseat.ph','www.gelitin.net','gelitin.net','www.itsnicethat.com']);
 const digest=value=>createHash('sha256').update(value).digest('hex');
 export const PROJECT_IMAGE_PARSER_VERSION='project-images-v2';
-const sourceKind=(url,label='')=>/sophyrickett\.com|josharonson\.us|gelitin\.net/i.test(new URL(url).hostname)?'artist':/gallery|photographersgallery/i.test(new URL(url).hostname+' '+label)?'gallery':/publisher|publishing|climaxbooks|book/i.test(new URL(url).hostname+' '+label)?'book_publisher':/dazeddigital|booooooom|life\.com|theguardian|windowseat/i.test(new URL(url).hostname)?'original_publisher':'project';
+const sourceKind=(url,label='')=>/sophyrickett\.com|josharonson\.us|gelitin\.net/i.test(new URL(url).hostname)?'artist':/gallery|photographersgallery/i.test(new URL(url).hostname+' '+label)?'gallery':/publisher|publishing|climaxbooks|book/i.test(new URL(url).hostname+' '+label)?'book_publisher':/dazeddigital|booooooom|life\.com|theguardian|windowseat|itsnicethat/i.test(new URL(url).hostname)?'original_publisher':'project';
 const knownPages=story=>[...(story.recordedProjectLinks||[]).map(l=>l.url),...(story.research||[]).map(r=>r.url),...(story.media||[]).map(m=>m.sourceUrl)].filter(url=>safePhotoReference(url));
 export function permittedProjectPage(story,url){return Boolean(safePhotoReference(url)&&PROJECT_PAGE_HOSTS.includes(new URL(url).hostname)&&knownPages(story).includes(url));}
 
@@ -49,6 +49,10 @@ export function automaticPhotoPlan(story,{direction='best',custom=''}={}){
  const pages=[...new Set(knownPages(story))].filter(url=>permittedProjectPage(story,url));
  const hints={behind:/contact|backstage|behind|studio|making/i,archive:/archive|contact|unpublished/i,candid:/candid|street/i,surprise:/outtake|alternative|experiment/i};
  if(hints[direction])pages.sort((a,b)=>Number(hints[direction].test(b))-Number(hints[direction].test(a)));
+ // Prefer a named maker/project and image-led publisher before general factual
+ // coverage or a marketplace record. Previously checked sources are still
+ // removed by the existing progression ledger.
+ const priority=u=>{const kind=sourceKind(u);if(kind==='artist')return 0;if(kind==='gallery')return 1;if(/windowseat\.ph|itsnicethat\.com/.test(new URL(u).hostname))return 2;if(/theguardian\.com/.test(new URL(u).hostname))return 5;if(/artsy\.net/.test(new URL(u).hostname))return 6;return 3;};pages.sort((a,b)=>priority(a)-priority(b));
  // A project-labelled link precedes a multi-project roundup. Directions alter
  // query and metadata ranking; they cannot invent an unrecorded source URL.
  const originals=[...new Set(knownPages(story))],sourceUrl=pages[0]||originals[0]||null;

@@ -47,7 +47,7 @@ function photoProgressionNote(p){
  }
  const partial=[...states.values()].some(s=>count(s.remainingReferences)>0||s.state==='bounded_scan_no_additions'||s.completeScan===false),reused=memory.reuse?.length;
  const note=p.plan?.route==='sources_checked'?'No page was repeated. Other project sources may still exist.':reused?'Continued from saved source evidence.':memory.states?.length&&!memory.refreshSources?p.sourceCalls>0?'Checked the next recorded project source.':'Used the saved source history to avoid repeating checked pages.':'';
- return (note?'<p class="small">'+esc(note)+'</p>':'')+progress.slice(0,2).map(line=>'<p class="small muted">'+esc(line)+'</p>').join('')+(partial&&!progress.length?'<p class="small muted">A saved page still has references to check. Find more photos will continue from the saved evidence or another recorded project source.</p>':'');
+ return (p.sourceProgressIncomplete?'<p class="small">Some sources could not be fully checked. Available image evidence is retained; the uncertain source will not be repeated automatically.</p>':'')+(note?'<p class="small">'+esc(note)+'</p>':'')+progress.slice(0,2).map(line=>'<p class="small muted">'+esc(line)+'</p>').join('')+(partial&&!progress.length?'<p class="small muted">A saved page still has references to check. Find more photos will continue from the saved evidence or another recorded project source.</p>':'');
 }
 function photoSuppressionNote(p){
  const earlier=(p.sourceProgression||p.plan?.sourceProgression)?.suppressedImageUrls?.length||0;

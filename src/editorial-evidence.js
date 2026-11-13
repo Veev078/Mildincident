@@ -35,6 +35,18 @@ export function photoEvidenceTools(publicReference) {
       const caption=(m[0].match(/<p\b[^>]*class=["'][^"']*\bwp-caption-text\b[^"']*["'][^>]*>([\s\S]*?)<\/p>/i)||[])[1];
       if(caption)figures.push({start:m.index,end:m.index+m[0].length,html:m[0],images:1,caption:captionText(caption)});
     }
+    // This observed publisher uses adjacent image paragraphs and short italic
+    // captions, including Hase's sketch. Bind at most two contiguous project
+    // images to their explicit following caption; never borrow article prose.
+    if(/^https:\/\/(?:www\.)?windowseat\.ph\/giant-pink-bunny-in-italy\/?$/.test(page)){
+      const paragraphs=[...body.matchAll(/<p\b[^>]*>[\s\S]*?<\/p>/gi)];
+      for(let i=1;i<paragraphs.length;i++){
+        const current=paragraphs[i],caption=captionText(current[0]);if(/<img\b/i.test(current[0])||caption.length>180||!(/^(?:During construction|Original sketch|Hase during winter|Rabbit|Rosa Hase)\b/i.test(caption)||/^(?:19|20)\d{2}$/.test(caption)))continue;
+        let start=i,images=0;
+        for(let j=i-1;j>=0&&i-j<=2;j--){const p=paragraphs[j],between=body.slice(p.index+p[0].length,paragraphs[j+1].index).replace(/<\/?(?:div|span|br)\b[^>]*>/gi,'').trim(),n=[...p[0].matchAll(/<img\b/gi)].length;if(between||n!==1||!/gelitin\.net\/cache\/projects\/hase\//i.test(p[0]))break;start=j;images+=n;}
+        if(images)figures.push({start:paragraphs[start].index,end:current.index+current[0].length,html:body.slice(paragraphs[start].index,current.index+current[0].length),images,caption,captionGroup:true});
+      }
+    }
     const referencedCaptions=new Map();for(const m of [...body.matchAll(/<(figcaption|p|span)\b([^>]*)>([\s\S]*?)<\/\1>/gi)].slice(0,500)){const a=attrs(m[2]);if(a.id)referencedCaptions.set(a.id,captionText(m[3]));}
     const add=(url,caption,isCover,width,height,captionBasis='image_alt',researchLinks=[],imageMetadata={})=>{url=resolve(url,page);if(!url||/\/(?:logo|favicon|avatar|icon|sprite|pixel|spinner|placeholder|no-image|image-not-found|default-image)[._/-]/i.test(url)||/\.svg(?:[?#]|$)/i.test(url))return;
       const key=fileKey(url);const previous=candidates.get(key);const referenceVariants=[...new Set([...(previous?.referenceVariants||[]),url])];if(previous&&!previous.isCover){if(!previous.caption&&caption){previous.caption=String(caption).slice(0,2000);previous.captionBasis=captionBasis;previous.researchLinks=researchLinks;}if(imageMetadata.basis&&!previous.imageMetadata?.basis)previous.imageMetadata=imageMetadata;previous.referenceVariants=referenceVariants;previous.duplicateBasis=referenceVariants.length>1?'source_file_reference_variant':'none';return;}
@@ -56,9 +68,9 @@ export function photoEvidenceTools(publicReference) {
       const url=((width&&width<100)||(height&&height<100))&&picture?picture:direct||picture;
       if(((width&&width<100)||(height&&height<100))&&!a['data-src']&&!a['data-lazy-src']&&!a['data-original']&&!a.srcset&&!a['data-srcset']&&!picture)continue;
       const referenced=String(a['aria-describedby']||'').split(/\s+/).map(id=>referencedCaptions.get(id)).filter(Boolean).join(' ');
-      const nearby=referenced||(figure?.images===1?figure.caption:'');const alt=a.alt||a.title||'';
+      const nearby=referenced||(figure?.images===1||figure?.captionGroup?figure.caption:'');const alt=a.alt||a.title||'';
       let caption=alt,basis=a.alt?'image_alt':a.title?'image_title':'missing';
-      if(nearby){caption=/^(?:©|copyright|photo(?:graph)?(?: by|:))/i.test(nearby)?[alt,nearby].filter(Boolean).join(' '):nearby;basis=referenced?'linked_caption':'figure_caption';}
+      if(nearby){caption=/^(?:©|copyright|photo(?:graph)?(?: by|:))/i.test(nearby)?[alt,nearby].filter(Boolean).join(' '):nearby;basis=referenced?'linked_caption':figure?.captionGroup?'source_caption_group':'figure_caption';}
       // Follow only explicitly labeled links in this image's single-figure caption, never an article byline or shared gallery caption.
       const researchLinks=[];const captionHtml=figure?.images===1?(figure.html.match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/i)||[])[1]||'':'';
       for(const link of captionHtml.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)){
