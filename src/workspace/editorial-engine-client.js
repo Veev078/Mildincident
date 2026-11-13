@@ -7,6 +7,7 @@ import {editorialHookOptions} from '../editorial-hooks.js';
 import {CAPTION_DIRECTIONS,captionSourceExcerpt} from './caption-generation.js';
 import {validateVisualJob,PHOTO_VISION_LIMITS} from '../photography/visual-assessment.js';
 import {DRAFT_RECOVERY_BUDGET} from '../n8n/editorial-draft-recovery.js';
+import {editorialFailureCode} from '../n8n/editorial-failure.js';
 export const EDITORIAL_ENGINE_ORIGIN='https://rickywelch.app.n8n.cloud';
 export const requestFingerprint=request=>createHash('sha256').update(JSON.stringify({kind:request.kind,prompt:request.prompt,sourceUrl:request.sourceUrl||'',...(request.editorialContext?{editorialContext:request.editorialContext}:{})})).digest('hex');
 const text=(value,max=10000)=>typeof value==='string'?value.slice(0,max):'';
@@ -106,8 +107,8 @@ export class EditorialEngineClient {
     requireThat(response.ok,'ENGINE_DISPATCH_UNCERTAIN','Generation dispatch did not complete cleanly. Reconcile before considering another execution.');
     let bytes=0;const chunks=[];for await(const chunk of response.body||[]){bytes+=chunk.byteLength;requireThat(bytes<=65536,'ENGINE_DISPATCH_UNCERTAIN','Generation receipt exceeded its limit. Reconcile before considering another execution.');chunks.push(chunk);}
     let receipt;try{receipt=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw new HandoffError('ENGINE_DISPATCH_UNCERTAIN','Generation did not return a valid receipt. Reconcile read-only.');}
-    requireThat(receipt?.accepted===true&&receipt.scope==='development_only'&&receipt.productionApplied===false&&receipt.jobId===request.id&&/^[0-9]{1,30}$/.test(String(receipt.executionId||''))&&['ready_to_review','needs_research','rejected'].includes(receipt.status),'ENGINE_DISPATCH_UNCERTAIN','Generation receipt does not match the requested development job. Reconcile read-only; do not resend.');
-    return {jobId:request.id,executionId:String(receipt.executionId),status:receipt.status,scope:'development_only',productionApplied:false};
+    requireThat(receipt?.accepted===true&&receipt.scope==='development_only'&&receipt.productionApplied===false&&receipt.jobId===request.id&&/^[0-9]{1,30}$/.test(String(receipt.executionId||''))&&['ready_to_review','needs_research','rejected','failed'].includes(receipt.status),'ENGINE_DISPATCH_UNCERTAIN','Generation receipt does not match the requested development job. Reconcile read-only; do not resend.');
+    return {jobId:request.id,executionId:String(receipt.executionId),status:receipt.status,scope:'development_only',productionApplied:false,...(receipt.status==='failed'?{failureCode:editorialFailureCode(receipt.failureCode)}:{})};
   }
 }
 export async function loadEditorialEngineClient({filename='.local/engine-build/development-connection.json',apiKey=process.env.N8N_API_KEY}={}) {

@@ -5,6 +5,8 @@ import {requireThat} from '../errors.js';
 import {captureEditorialEvidence} from '../editorial-evidence.js';
 import {requestFingerprint} from './editorial-engine-client.js';
 import {captionGenerationState,validateCaptionBinding,CAPTION_DIRECTIONS} from './caption-generation.js';
+import {captureResearchFailure} from './research-failure.js';
+import {editorialFailureCode} from '../n8n/editorial-failure.js';
 const COMPLETED_STATES=new Set(['ready_to_review','needs_research','approved','rejected']);
 const REMOTE_STATES=new Set(['queued','generating','ready_to_review','needs_research','failed','rejected','approved']);
 export class EditorialEngineService {
@@ -47,13 +49,20 @@ export class EditorialEngineService {
         requireThat(!(local.candidates?.length&&!result.length),'ENGINE_RECONCILIATION_INCOMPLETE','An earlier imported result is missing from this read. The saved Studio result is preserved; refresh read-only.');
         requireThat(result.every(c=>c.provenance.kind===request.kind&&(!executionId||c.provenance.executionId===executionId)),'INVALID_ENGINE_RESULT','Candidate execution or mode does not match its job.');
         if(['ready_to_review','needs_research','approved','rejected'].includes(row.status))requireThat(result.length===1,'INVALID_ENGINE_RESULT','Completed development job is missing its correlated result.');
-        let observedState=row.status;let failure=row.error?'REMOTE_EXECUTION_FAILED':null;
+        let observedState=row.status;let failure=row.error?editorialFailureCode(row.error):null;
+        let failureDetail=local.failure||null,failureCheckedExecutionId=local.failureCheckedExecutionId||null;
+        if(row.status==='failed'&&executionId&&failureDetail?.executionId!==executionId&&failureCheckedExecutionId!==executionId){
+          failureCheckedExecutionId=executionId;
+          try{failureDetail=captureResearchFailure(await this.client.executionDetails(executionId),{jobId:request.id,requestHash:row.request_hash});}catch{/* The confirmed failed row still stands when detailed evidence is unavailable. */}
+        }
+        if(row.status==='failed'&&failureDetail)failure=failureDetail.code;
         let resultPending=false;let resultMissingSince=local.resultMissingSince||null;
         if((row.status==='generating'||row.status==='queued'&&local.receiptExecutionId)&&executionId){const execution=await this.client.executionStatus(executionId);resultPending=execution.status==='success'&&!result.length;if(resultPending){resultMissingSince ||= new Date().toISOString();if(Date.now()-Date.parse(resultMissingSince)>60000){observedState='failed';failure='ENGINE_RESULT_MISSING';resultPending=false;}}else resultMissingSince=null;if(execution.status==='running'&&Date.parse(execution.startedAt)&&Date.now()-Date.parse(execution.startedAt)>360000){observedState='dispatch_uncertain';failure='ENGINE_EXECUTION_STALE';}if(['error','failed','crashed','canceled'].includes(execution.status)){observedState='failed';failure='REMOTE_EXECUTION_FAILED';}}
         if(row.status==='queued'&&['dispatching','dispatch_uncertain','generating','failed'].includes(local.state)&&observedState!=='failed')observedState=local.state;
+        if(local.dispatchReceipt?.status==='failed'&&['queued','generating'].includes(row.status)){observedState='failed';resultPending=false;failure=local.lastError||'DEVELOPMENT_EXECUTION_FAILED';}
         if(COMPLETED_STATES.has(local.state)&&!COMPLETED_STATES.has(row.status)&&result.length){observedState=local.state;failure='STALE_ENGINE_OBSERVATION';}
-        const data={nativeStatus:row.status,remoteRowId:String(row.id),executionId,candidates:result,resultPending,resultMissingSince,lastError:failure};
-        if(local.state!==observedState||local.nativeStatus!==row.status||local.lastError!==data.lastError||JSON.stringify(local.candidates||[])!==JSON.stringify(result)||local.executionId!==data.executionId||Boolean(local.resultPending)!==resultPending||local.resultMissingSince!==resultMissingSince)this.research.recordEngineState(request.id,observedState,data);
+        const data={nativeStatus:row.status,remoteRowId:String(row.id),executionId,candidates:result,resultPending,resultMissingSince,lastError:failure,failure:failureDetail,failureCheckedExecutionId};
+        if(local.state!==observedState||local.nativeStatus!==row.status||local.lastError!==data.lastError||local.failureCheckedExecutionId!==failureCheckedExecutionId||JSON.stringify(local.failure||null)!==JSON.stringify(failureDetail)||JSON.stringify(local.candidates||[])!==JSON.stringify(result)||local.executionId!==data.executionId||Boolean(local.resultPending)!==resultPending||local.resultMissingSince!==resultMissingSince)this.research.recordEngineState(request.id,observedState,data);
       }if(this.captionPilot){await this.captionPilot.inspect();await this.captionPilot.captureUsage();}return this.status();})();try{return await this.refreshing;}finally{this.refreshing=null;}
   }
   async adoptObservedResults(jobs,candidates,sanitize){
@@ -98,9 +107,10 @@ export class EditorialEngineService {
   async acceptReceipt(id,dispatchId,receipt){
     const current=this.research.engineJob(id);requireThat(current?.dispatchId===dispatchId,'EDIT_CONFLICT','Dispatch ownership changed; reconcile read-only.');
     requireThat(!current.executionId||current.executionId===receipt.executionId,'INVALID_ENGINE_RESULT','Receipt execution conflicts with the observed job.');
-    this.research.recordEngineState(id,COMPLETED_STATES.has(current.state)||current.state==='failed'?current.state:'generating',{dispatchReceipt:receipt,receiptExecutionId:receipt.executionId,executionId:receipt.executionId,resultPending:!current.candidates?.length,lastError:null});
+    const failed=receipt.status==='failed';
+    this.research.recordEngineState(id,COMPLETED_STATES.has(current.state)||current.state==='failed'?current.state:failed?'failed':'generating',{dispatchReceipt:receipt,receiptExecutionId:receipt.executionId,executionId:receipt.executionId,resultPending:!failed&&!current.candidates?.length,lastError:failed?editorialFailureCode(receipt.failureCode):null});
     try{await this.refresh();}catch{
-      const latest=this.research.engineJob(id);this.research.recordEngineState(id,latest.state,{lastError:'ENGINE_RECONCILIATION_PENDING'});
+      const latest=this.research.engineJob(id);this.research.recordEngineState(id,latest.state,{lastError:failed?latest.lastError:'ENGINE_RECONCILIATION_PENDING'});
     }
   }
   async start(id,expectedVersion,{beforeClaim}={}){requireThat(Number.isSafeInteger(expectedVersion),'EDIT_CONFLICT','An expected engine-job version is required.');const inspection=await this.inspect();requireThat(inspection.generationAvailable,'GENERATION_NOT_APPROVED','The bounded AI worker is inactive or its exact version/spend has not been approved. Queueing alone does not spend credits.');const request=this.research.get(id);requireThat(request,'RESEARCH_REQUEST_NOT_FOUND','Research request is unavailable.');this.assertExecutionScope(this.requestForEngine(request));const dispatchId=randomUUID();const claimed=this.research.claimEngineDispatch(id,expectedVersion,dispatchId,this.client.connection.authorization||null,{beforeClaim:()=>{this.captionPilot?.guardLegacyStart(id);beforeClaim?.();}});

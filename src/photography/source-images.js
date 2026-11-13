@@ -15,7 +15,11 @@ const CDN_HOSTS={
  'sophyrickett.com':['images.squarespace-cdn.com','static1.squarespace.com'],
  'www.sophyrickett.com':['images.squarespace-cdn.com','static1.squarespace.com'],
  'www.cheeriopublishing.com':['images.squarespace-cdn.com','static1.squarespace.com'],
- 'www.climaxbooks.com':['cdn.shopify.com']
+ 'www.climaxbooks.com':['cdn.shopify.com'],
+ // Relationships observed on the retained Hase article/artwork, not guessed URLs.
+ 'www.artsy.net':['d7hftxdivxxvm.cloudfront.net','d32dm0rphc51dk.cloudfront.net'],
+ 'www.windowseat.ph':['www.gelitin.net','c1.staticflickr.com'],
+ 'windowseat.ph':['www.gelitin.net','c1.staticflickr.com']
 };
 export function permittedSourceImage(sourceUrl,imageUrl){
  if(!safePhotoReference(sourceUrl)||!safePhotoReference(imageUrl))return false;

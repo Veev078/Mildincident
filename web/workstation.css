@@ -259,6 +259,8 @@ dialog::backdrop { background:rgb(21 28 24 / .66);backdrop-filter:blur(3px); }
  .selected-sequence-list { grid-column:1/-1;display:flex;gap:12px;order:3;max-height:none;overflow:auto; }
  .selected-sequence-list li { flex:0 0 200px;border-top:0;padding:4px 0; }
  .sequence-arrange { margin:0; }
+ .selected-sequence-panel .sequence-arrange { grid-column:2;grid-row:1; }
+ .selected-sequence-panel .sequence-empty { grid-column:1/-1;grid-row:2;margin:4px 0; }
  .photo-results-workspace { min-width:0; }
  .asset-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
  .compare-tray { left:200px; }
