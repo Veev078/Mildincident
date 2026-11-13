@@ -42,8 +42,9 @@ export function photoRelevance(asset,identity){
  const caption=[asset.title,asset.sourceCaption,asset.description,asset.series].filter(Boolean).join(' '),named=contains(caption+' '+(asset.creator||''),identity.photographer),series=contains(caption,identity.series);
  const nonPhotographic=/oil on|painting|lithograph|etching|sculpture|watercolou?r|woodcut|drawing/i.test(asset.sourceRecordMedium||'')&&!/photo|gelatin|albumen|chromogenic|daguerre/i.test(asset.sourceRecordMedium||'');
  const describedMaterial=/book cover|cover of|book jacket/i.test(caption)?'publication_cover':/book spread|double.page|pages from|spread from/i.test(caption)?'publication_spread':/installation view|exhibition view/i.test(caption)?'installation':/behind.the.scenes|backstage|contact sheet|outtake/i.test(caption)?'process_or_outtake':'photograph_unclassified';
- const material=['publication_cover','publication_spread','installation','design_documentation','page_cover'].includes(asset.materialType)?asset.materialType:describedMaterial;
- const projectContext=asset.projectContext||projectImageContext(identity,{url:asset.sourcePreviewUrl||asset.previewUrl||asset.fileUrl,sourceUrl:asset.sourceUrl,caption,materialType:material,relation:asset.sourceRelation});
+ let material=['publication_cover','publication_spread','installation','design_documentation','page_cover'].includes(asset.materialType)?asset.materialType:describedMaterial;
+ const projectContext=projectImageContext(identity,{url:asset.sourcePreviewUrl||asset.previewUrl||asset.fileUrl,sourceUrl:asset.sourceUrl,caption,materialType:material,relation:asset.sourceRelation})||asset.projectContext;
+ if(projectContext?.materialType)material=projectContext.materialType;
  const match=projectCorrespondence({...asset,projectContext},identity),subjectInstallation=material==='installation'&&identity.projectKind==='installation'&&match.matched;
  const documentation=['publication_cover','publication_spread','design_documentation','page_cover'].includes(material)||material==='installation'&&!subjectInstallation;
  const makerWords=new Set(normal(identity.photographer).split(' ')),subjectWords=[...new Set(normal(identity.subject).split(' ').filter(t=>t.length>=4&&!makerWords.has(t)&&!['photographed','photographer','photographs','photography','photos','series','project','from','with','this','that'].includes(t)))];

@@ -1,4 +1,12 @@
-# Current checkpoint — V17 Sprint B implemented locally
+# Current checkpoint — V17.1 polish and fresh vision acceptance prepared
+
+[V17.1 findings, exact approval package and next product scope](release/V17_1_POLISH_AND_VISION.md). Sprint B `cea7c0d` is live and founder-accepted. The read-only hosted diagnostic confirms six genuine saved Hase JPEGs with matching hashes and full decoding. Missing external references are distinct from these healthy files. Lost & Found's old staging-page 401 produced no images; its exact verified public Dazed article is now supported locally without changing historical evidence. Preview errors distinguish saved files from references, the known Hase sketch stays outside photo suggestions, and Arrange presents one suggested edit with accessible alternatives and explicit Apply.
+
+Fresh vision preparation passes on deployed Studio with the same six Jack files, working version 0 and preserved recurring policy. Proposed graph `5043b436…` is derived from active `adc2ed9e…` / `b971c6f5…`; its exact expanded representation uses current execution 2367. Native normalization/evaluation proves six real inline JPEG inputs with transport blocked. Fresh job `15023fef-60a6-45fb-8b16-598e924db6f7` has no grant or dispatch. One bounded real GPT-5.4 assessment requires separate approval; the current caption/story worker remains unchanged. No deployment, live native/policy/credential mutation, paid call or publishing occurred in this sprint.
+
+---
+
+# Earlier checkpoint — V17 Sprint B implemented locally
 
 [Sprint B evidence and next release](release/V17_SPRINT_B.md): Hase project matching is independent of photographer attribution/rights, observed Windowseat → Gelitin image routes are prioritized, and useful captured evidence survives a later uncertain source. The existing reader also supports the actual Dog Pound Days publisher/CDN gallery. No fresh hosted photographic acquisition is claimed.
 

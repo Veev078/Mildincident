@@ -1,4 +1,5 @@
 import {photoDesk} from "../photography/story-intelligence.js";
+import {recordedPublisherAlternatives} from '../photography/publisher-alternatives.js';
 import {editorialDirectionV14,editorialTasteCase} from '../editorial-v14.js';
 import {ApprovalRequests} from './approval-requests.js';
 import {pipeline} from 'node:stream/promises';
@@ -90,7 +91,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       story.captionGeneration=engine?.captionStatus(story,workspace.researchRequests)||captionGenerationState(story,workspace.researchRequests,null,{});
       if(story.captionGeneration.result&&!story.hookOptions?.length)story.hookOptions=story.captionGeneration.result.hookOptions;
       const photoRequests=photography?.storyRequestsFor(story)||[];
-      story.recordedProjectLinks=[...new Map([...(story.recordedProjectLinks||[]),...(photography?.storyProjectTrails(story)||[])].map(l=>[l.url,l])).values()].slice(0,8);
+      story.recordedProjectLinks=[...new Map([...(story.recordedProjectLinks||[]),...recordedPublisherAlternatives(story),...(photography?.storyProjectTrails(story)||[])].map(l=>[l.url,l])).values()].slice(0,8);
       story.photoRequests=[...photoRequests,...workspace.researchRequests.filter(r=>r.continuation?.origin?.storyId===story.id&&!photoRequests.some(p=>p.id===r.id)).map(r=>({id:r.id,state:'authorization_required',message:'Earlier request preserved. Prepare a new exact story request for an archive search; native sourcing still needs separate approval.',createdAt:r.createdAt}))];
       for(const photo of photography?.storyMedia(story)||[])if(!story.media.some(m=>m.id===photo.id))story.media.push(photo);
     }
@@ -341,7 +342,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       const message = error instanceof HandoffError ? error.message : 'The local operation did not complete. No production changes were made.';
       const status = code==='PREVIEW_BUSY'?429:['INVALID_HOST', 'INVALID_ORIGIN', 'INTENT_REQUIRED'].includes(code) ? 403 :
         ['STALE_SOURCE', 'STALE_LOCAL_DRAFT', 'EDIT_CONFLICT', 'GENERATION_NOT_APPROVED', 'ENGINE_ALREADY_DISPATCHED'].includes(code) ? 409 :
-          ['STORY_NOT_FOUND', 'DRAFT_NOT_FOUND', 'FILE_NOT_FOUND', 'PREVIEW_NOT_FOUND', 'RESEARCH_REQUEST_NOT_FOUND'].includes(code) ? 404 : ['SOURCE_UNAVAILABLE','ENGINE_NOT_CONFIGURED','ENGINE_NETWORK_UNCERTAIN'].includes(code) ? 503 : 400;
+          ['STORY_NOT_FOUND', 'DRAFT_NOT_FOUND', 'FILE_NOT_FOUND', 'PREVIEW_NOT_FOUND', 'LOCAL_PREVIEW_MISSING', 'RESEARCH_REQUEST_NOT_FOUND'].includes(code) ? 404 : ['SOURCE_UNAVAILABLE','ENGINE_NOT_CONFIGURED','ENGINE_NETWORK_UNCERTAIN'].includes(code) ? 503 : 400;
       if (!response.headersSent) json(response, status, { error: { code, message } });
       else response.end();
     }

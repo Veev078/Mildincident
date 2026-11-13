@@ -4,6 +4,7 @@ import {inspectPhotoSourceWindow} from '../editorial-evidence.js';
 import {storyPhotoIdentity,planStoryPhotos,photoRelevance,recordedProjectTrails} from './story-intelligence.js';
 import {requireThat} from '../errors.js';
 import {projectImageContext} from './project-image-context.js';
+import {recordedPublisherAlternatives} from './publisher-alternatives.js';
 
 // Page readers, not an image proxy or arbitrary URL downloader. Only exact URLs
 // already present in this story's retained research may be fetched.
@@ -11,7 +12,7 @@ export const PROJECT_PAGE_HOSTS=Object.freeze(['www.dazeddigital.com','www.life.
 const digest=value=>createHash('sha256').update(value).digest('hex');
 export const PROJECT_IMAGE_PARSER_VERSION='project-images-v2';
 const sourceKind=(url,label='')=>/sophyrickett\.com|josharonson\.us|gelitin\.net/i.test(new URL(url).hostname)?'artist':/gallery|photographersgallery/i.test(new URL(url).hostname+' '+label)?'gallery':/publisher|publishing|climaxbooks|book/i.test(new URL(url).hostname+' '+label)?'book_publisher':/dazeddigital|booooooom|life\.com|theguardian|windowseat|itsnicethat/i.test(new URL(url).hostname)?'original_publisher':'project';
-const knownPages=story=>[...(story.recordedProjectLinks||[]).map(l=>l.url),...(story.research||[]).map(r=>r.url),...(story.media||[]).map(m=>m.sourceUrl)].filter(url=>safePhotoReference(url));
+const knownPages=story=>[...recordedPublisherAlternatives(story).map(l=>l.url),...(story.recordedProjectLinks||[]).map(l=>l.url),...(story.research||[]).map(r=>r.url),...(story.media||[]).map(m=>m.sourceUrl)].filter(url=>safePhotoReference(url));
 export function permittedProjectPage(story,url){return Boolean(safePhotoReference(url)&&PROJECT_PAGE_HOSTS.includes(new URL(url).hostname)&&knownPages(story).includes(url));}
 
 /** Expand only exact maker/project links supported by the captured page context. */
@@ -77,7 +78,7 @@ export function projectPageReferences(story,{url,html,direction='best',basis='fe
  const identity=storyPhotoIdentity(story),captureSha256=digest(html),contextSha256=digest(JSON.stringify({storyId:story.id,sourceRevision:story.revision||null,subject:identity.subject,photographer:identity.photographer,series:identity.series,direction})),capturedAt=new Date().toISOString();
  requireThat(cursor===null||cursor&&typeof cursor==='object'&&!Array.isArray(cursor)&&Object.keys(cursor).length===6&&Object.keys(cursor).every(k=>['version','parserVersion','captureSha256','sourceUrl','contextSha256','offset'].includes(k))&&cursor.version===1&&cursor.parserVersion===PROJECT_IMAGE_PARSER_VERSION&&cursor.captureSha256===captureSha256&&cursor.sourceUrl===url&&cursor.contextSha256===contextSha256&&Number.isSafeInteger(cursor.offset)&&cursor.offset>0&&cursor.offset<=10000&&cursor.offset%40===0,'INVALID_PHOTO_CURSOR','Continue only the exact captured page and unchanged photo direction.');
  const {images,coverage}=inspectPhotoSourceWindow(html,url,story,{offset:cursor?.offset||0});
- for(const image of images){const context=projectImageContext(identity,{url:image.url,sourceUrl:url,caption:image.caption,materialType:image.materialType,relation:image.relation});if(context){image.relation=context.relation;image.projectContext=context;}}
+ for(const image of images){const context=projectImageContext(identity,{url:image.url,sourceUrl:url,caption:image.caption,materialType:image.materialType,relation:image.relation});if(context){image.relation=context.relation;image.projectContext=context;if(context.materialType)image.materialType=context.materialType;}}
  requireThat(!cursor||cursor.offset<coverage.referenceCount,'INVALID_PHOTO_CURSOR','The captured page has no remaining reference window at this position.');
  const photos=images.map(m=>({id:'project:'+digest(url+'|'+m.url).slice(0,32),source:'project',query:identity.subject,title:m.caption||'Uncaptioned source-page reference',creator:m.creator||m.imageMetadata?.creatorReported||'',date:m.years.join(', '),description:m.caption,series:'',sourceUrl:url,previewUrl:m.url,fileUrl:'',rightsLabel:'Unknown — source reference only',rightsGranted:false,publicationApproved:false,sourceRelation:m.relation,projectContext:m.projectContext||null,creatorBasis:m.creatorBasis,sourceCredit:m.credit||m.imageMetadata?.creditReported||'',copyrightHolder:m.copyrightHolder||m.imageMetadata?.copyrightHolderReported||'',licenseUrl:m.imageMetadata?.licenseReportedUrl||'',sourceYears:m.years,sourceCaptionBasis:m.captionBasis,sourceResearchLinks:m.researchLinks,materialType:m.materialType,materialBasis:m.materialBasis,dateContext:m.dateContext,imageMetadata:m.imageMetadata,captureCoverage:m.captureCoverage,referenceVariants:m.referenceVariants,reportedWidth:m.reportedWidth,reportedHeight:m.reportedHeight,photoExplorationDirection:direction,sourceCaptureBasis:basis,sourceCaptureSha256:captureSha256,sourceParserVersion:PROJECT_IMAGE_PARSER_VERSION,sourceReferenceIndex:m.referenceIndex,pixelAnalysisPerformed:false,originalDownloadVerified:false}));
  const ranked=photos.sort((a,b)=>photoRelevance({...b,sourceCaption:b.description},identity).score-photoRelevance({...a,sourceCaption:a.description},identity).score);

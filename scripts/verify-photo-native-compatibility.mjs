@@ -135,21 +135,29 @@ for(const [n,block]of imageBlocks.entries()){
  images.push({position:n+1,assetId:original.assetId,inputSha256:sha(bytes),width:meta.width,height:meta.height,bytes:bytes.length});
 }
 await fs.mkdir(out,{recursive:true,mode:0o700});
-// Exact, reviewable execution representation. Original nodes are unchanged on
-// the captured baseline and keep their observed expanded defaults. Only the six
-// added photo nodes are replaced; the model uses the native normalizer above.
-// This does not grant permission to accept arbitrary defaults during delivery.
-assert.equal(editorialGraphSha(baseline),'0e1777e5785f703bd9a77593af01912a820eed0cb9c30ea9c50721ee4bc91cf6');
+// Exact execution representation from the CURRENT baseline's own execution.
+// Every configured field must match; observed added defaults are retained in
+// full, never stripped from either checksum. Historical mode remains pinned.
+const baselineExecution=args['--baseline-execution']?await readJson(args['--baseline-execution']):execution;
+if(args['--baseline-execution']){
+ stage='verify current baseline execution';
+ assert.equal(baselineExecution.workflowId,baseline.id);
+ assert.equal(baselineExecution.workflowVersionId||baselineExecution.workflowData?.versionId,baseline.versionId);
+ const contains=(saved,observed)=>{if(Array.isArray(saved)){assert(Array.isArray(observed));assert.equal(saved.length,observed.length);saved.forEach((v,i)=>contains(v,observed[i]));}else if(saved&&typeof saved==='object'){assert(observed&&typeof observed==='object');for(const [k,v]of Object.entries(saved)){assert(Object.hasOwn(observed,k));contains(v,observed[k]);}}else assert.deepEqual(observed,saved);};
+ for(const node of baseline.nodes)contains(node,baselineExecution.workflowData.nodes.find(n=>n.name===node.name));
+ assert.deepEqual(baselineExecution.workflowData.connections,baseline.connections);
+ assert.deepEqual(baselineExecution.workflowData.settings,baseline.settings);
+}else assert.equal(editorialGraphSha(baseline),'0e1777e5785f703bd9a77593af01912a820eed0cb9c30ea9c50721ee4bc91cf6');
 const originalNames=new Set(baseline.nodes.map(n=>n.name));
-const expandReviewed=w=>({...structuredClone(execution.workflowData),name:w.name,connections:structuredClone(w.connections),settings:structuredClone(w.settings),nodes:w.nodes.map(n=>{
- const observed=execution.workflowData.nodes.find(o=>o.name===n.name);assert(observed,'Unknown node in expanded snapshot preparation');
+const expandReviewed=w=>({...structuredClone(baselineExecution.workflowData),name:w.name,connections:structuredClone(w.connections),settings:structuredClone(w.settings),nodes:w.nodes.map(n=>{
+ const observed=(originalNames.has(n.name)?baselineExecution:execution).workflowData.nodes.find(o=>o.name===n.name);assert(observed,'Unknown node in expanded snapshot preparation');
  if(originalNames.has(n.name))return structuredClone(observed);
  return {...structuredClone(n),parameters:n.name==='Assess Photo Pixels'?normalize(n).parameters:{...structuredClone(observed.parameters),...structuredClone(n.parameters)}};
 })});
 let previousReview;try{previousReview=await readJson(path.join(out,'fresh-proposal-review.json'));}catch(error){if(error.code!=='ENOENT')throw error;}
 if(previousReview){assert.equal(previousReview.expectedVersion,baseline.versionId);assert.equal(previousReview.manifestSha256,packet.manifestSha256);assert.equal(previousReview.installed,false);}
 const fresh=preparePhotoVisualWorker(baseline,{expectedVersion:baseline.versionId,expectedSha256:editorialGraphSha(baseline),approvedJobId:previousReview?.approvedJobId||randomUUID(),approvalId:previousReview?.approvalId||randomUUID(),imageCount:6});
-const expandedFresh=expandReviewed(fresh.workflow),review={...fresh.review,approvedExecutionGraphSha256:editorialGraphSha(expandedFresh),executionDefaultsBasis:'Observed execution 2363; unchanged original nodes and reproduced native photo-node normalization',installedWorkerVersion:null,liveReadbackVerified:false,approvalStatus:'REVIEW ONLY; no grant, installation or paid execution authorized',manifestSha256:packet.manifestSha256,preparedModelMessagesSha256:sha(JSON.stringify(visualModelMessages(packet)))};
+const expandedFresh=expandReviewed(fresh.workflow),review={...fresh.review,approvedExecutionGraphSha256:editorialGraphSha(expandedFresh),executionDefaultsBasis:'Observed original nodes from execution '+baselineExecution.id+'; repaired photo defaults reproduced through the native normalizer',baselineExecutionId:String(baselineExecution.id),installedWorkerVersion:null,liveReadbackVerified:false,approvalStatus:'REVIEW ONLY; no grant, installation or paid execution authorized',manifestSha256:packet.manifestSha256,preparedModelMessagesSha256:sha(JSON.stringify(visualModelMessages(packet)))};
 if(previousReview){assert.equal(previousReview.graphSha256,review.graphSha256);assert.equal(previousReview.approvedExecutionGraphSha256,review.approvedExecutionGraphSha256);}
 await fs.writeFile(path.join(out,'fresh-proposed-graph.json'),JSON.stringify(fresh.workflow),{mode:0o600});
 await fs.writeFile(path.join(out,'fresh-expected-execution-graph.json'),JSON.stringify(expandedFresh),{mode:0o600});

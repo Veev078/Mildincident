@@ -7,6 +7,7 @@ test('retained Hase references become project candidates without inventing photo
  assert.notEqual(photoRelevance({title:'Another Gelitin project',creator:'Gelitin',sourceUrl:windowseat},identity).category,'direct');assert.notEqual(photoRelevance({title:'Hase book cover',materialType:'publication_cover',sourceUrl:windowseat},identity).category,'direct');
  const date=photoRelevance({title:'Hase, 2011',sourceUrl:windowseat,dateContext:'different_year_context'},identity);assert.equal(date.category,'direct');assert(date.dateNeedsReview);
  const installation=photoRelevance({title:'Rabbit installation view',sourceUrl:windowseat,previewUrl:'https://www.gelitin.net/cache/projects/hase/hase3_700.jpg',materialType:'installation'},identity);assert.equal(installation.category,'direct','an installation photograph can depict the actual story subject');
+ const sketch=photoRelevance({title:'hase1',sourceUrl:'https://www.gelitin.net/projects/hase/',previewUrl:'https://www.gelitin.net/cache/projects/hase/hase1_1400_w1400_cx0.jpg?cached=1768172604',sourceRelation:'subject_caption_match',projectContext:{relation:'subject_caption_match',project:'Hase'}},identity);assert.notEqual(sketch.category,'direct');assert.equal(sketch.material,'design_documentation');
 });
 test('observed Windowseat image paragraphs recover blank-alt construction photos and bind the sketch caption separately',()=>{
  // Structural replay of the founder's actual 200 response and public captions;

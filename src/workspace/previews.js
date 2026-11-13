@@ -147,7 +147,8 @@ export class LocalPreviewStore {
     requireThat(hash === undefined || /^[a-f0-9]{64}$/.test(hash), 'INVALID_PREVIEW_HASH', 'Invalid preview reference.');
     const preview = this.get(storyId, assetId, hash);
     requireThat(preview, 'PREVIEW_NOT_FOUND', 'No private preview is attached to this image.');
-    return { bytes: await this.#readBlob(preview.sha256, 'jpg'), preview };
+    try { return { bytes: await this.#readBlob(preview.sha256, 'jpg'), preview }; }
+    catch(error){if(error.code==='ENOENT')throw new HandoffError('LOCAL_PREVIEW_MISSING','The saved preview file is unavailable. No files or records were changed.');throw error;}
   }
 
   sourceInspection(storyId,assetId,hash){const row=this.db.prepare('SELECT * FROM local_source_preview_evidence WHERE story_id=? AND asset_id=? AND preview_sha256=?').get(storyId,assetId,hash);return row?{sourceUrl:row.source_url,imageUrl:row.image_url,executionId:row.acquisition_json?null:row.execution_id,inspectedAt:row.inspected_at,basis:row.acquisition_json?'direct_recorded_source_copy':'recorded_source_copy',...(row.acquisition_json?JSON.parse(row.acquisition_json):{}),identityVerified:false,rightsGranted:false}:null;}

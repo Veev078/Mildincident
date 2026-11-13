@@ -1,4 +1,5 @@
 import {updateStoryGenerationReview,reconcileStoryProgress,updateAiUsagePanel,storyProposal} from './ai-operations.js';
+import {previewFailureMessage} from './preview-state.js';
 import {researchAccess} from './discovery-flow.js';
 import {CAPTION_IMPROVEMENTS,captionRequestProposal,canConfirmCaption} from './caption-request-flow.js';
 import {launchSavedResearch} from './research-launch.js';
@@ -715,7 +716,7 @@ document.addEventListener('error', event => {
   if (!photo) return;
   photo.classList.add('preview-failed');
   const status = photo.querySelector('.preview-status');
-  if (status) status.textContent = photo.classList.contains('compact-preview')?'Preview unavailable':'This browser could not load the preview. Open the source record or attach a private file.';
+  if (status) status.textContent = previewFailureMessage(photo.dataset.previewKind,{compact:photo.classList.contains('compact-preview')});
   const retry = photo.querySelector('.preview-retry'); if (retry) retry.hidden = false;
 }, true);
 

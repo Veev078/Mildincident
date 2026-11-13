@@ -395,3 +395,7 @@ dialog::backdrop { background:rgb(21 28 24 / .66);backdrop-filter:blur(3px); }
 .sequence-suggestions ol { padding-left:18px; }
 .sequence-suggestions .text-button { text-align:left;overflow-wrap:anywhere; }
 .inspector-selection-note { margin:12px 0;padding:12px 16px;background:var(--soft,#f0f2ed); }
+.photo .preview-source-link { display:none;position:absolute;bottom:16px;left:20px;right:64px;font-size:12px;z-index:2; }
+.photo.preview-failed .preview-source-link,.photo.no-preview .preview-source-link { display:block; }
+.sequence-alternatives { border-top:1px solid var(--line,#d6dbd2);margin-top:16px;padding-top:12px; }
+.sequence-alternatives .text-button { text-align:left;overflow-wrap:anywhere; }

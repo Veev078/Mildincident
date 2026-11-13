@@ -76,6 +76,9 @@ test('tampered cached preview bytes are detected rather than silently served/rep
   await assert.rejects(store.readPreview(input.storyId, input.assetId, preview.sha256), { code: 'LOCAL_PREVIEW_CORRUPTED' });
   await assert.rejects(store.save(input), { code: 'LOCAL_PREVIEW_CORRUPTED' });
 });
+test('a missing saved preview has its own failure while the source record and original bytes remain intact',async t=>{
+ const {root,store,input,bytes}=await fixture(t),p=await store.save(input);await fs.unlink(path.join(root,'blobs',p.sha256+'.jpg'));await assert.rejects(store.readPreview(input.storyId,input.assetId,p.sha256),{code:'LOCAL_PREVIEW_MISSING'});assert.equal(store.get(input.storyId,input.assetId).sha256,p.sha256);assert.deepEqual(await fs.readFile(path.join(root,'blobs',p.originalSha256+'.original')),bytes);
+});
 
 test('HTTP preview upload requires existing scoped asset, intent and declaration; derivative stays private and proposals remain unapproved', async t => {
   const { root, store, input } = await fixture(t);

@@ -1,4 +1,5 @@
 import {creativeProgress} from './story-progress.js';
+import {previewKind} from './preview-state.js';
 export const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 export const human = value => String(value || 'Not recorded').replace(/_/g, ' ').replace(/^\w/, char => char.toUpperCase());
 export const safeUrl = value => {
@@ -66,7 +67,8 @@ export function leadPhoto(story) {
 }
 export function image(asset, { className = '', index, storyId, eager = false, compact = false } = {}) {
   const url = previewUrl(asset?.previewUrl);
-  return `<div class="photo ${compact?'compact-preview':''} ${esc(className)} ${url ? '' : 'no-preview'}">${url ? `<img src="${esc(url)}" alt="${esc(asset.title || 'Photographic reference')}" loading="${eager ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer"><span class="preview-status" role="status">Loading preview…</span><button type="button" class="preview-retry small-button" data-action="retry-preview" hidden>${compact?'Retry':'Retry preview'}</button>` : `<span class="photo-placeholder"><span aria-hidden="true">◫</span><small>No preview available</small></span>`}${index !== undefined ? `<span class="photo-number">${String(index + 1).padStart(2, '0')}</span>` : ''}${storyId && asset ? `<button class="photo-expand" data-action="inspect" data-story="${esc(storyId)}" data-asset="${esc(asset.id)}" aria-label="Review provenance: ${esc(asset.title || 'image')}">↗</button>` : ''}</div>`;
+  const kind=previewKind(asset),source=safeUrl(asset?.sourceUrl);
+  return `<div class="photo ${compact?'compact-preview':''} ${esc(className)} ${url ? '' : 'no-preview'}" data-preview-kind="${kind}">${url ? `<img src="${esc(url)}" alt="${esc(asset.title || 'Photographic reference')}" loading="${eager ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer"><span class="preview-status" role="status">Loading preview…</span><button type="button" class="preview-retry small-button" data-action="retry-preview" hidden>${compact?'Retry':'Retry preview'}</button>` : `<span class="photo-placeholder"><span aria-hidden="true">◫</span><small>No preview available</small><small>${kind==='saved'?'Saved file needs checking':'No photograph saved'}</small></span>`}${source&&!compact?`<a class="preview-source-link text-link" href="${esc(source)}" target="_blank" rel="noopener noreferrer">Open original source ↗</a>`:''}${index !== undefined ? `<span class="photo-number">${String(index + 1).padStart(2, '0')}</span>` : ''}${storyId && asset ? `<button class="photo-expand" data-action="inspect" data-story="${esc(storyId)}" data-asset="${esc(asset.id)}" aria-label="Review provenance: ${esc(asset.title || 'image')}">↗</button>` : ''}</div>`;
 }
 export function empty(title, message, action = '') { return `<div class="empty-state"><span aria-hidden="true">↳</span><h3>${esc(title)}</h3><p>${esc(message)}</p>${action}</div>`; }
 export function external(url, label, className = '') {
