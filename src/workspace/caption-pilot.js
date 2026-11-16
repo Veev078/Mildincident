@@ -47,7 +47,7 @@ export class CaptionPilot{
  }
  counts(){const key=day(this.now()),used=new Map();
   for(const row of this.research.db.prepare('SELECT id,day_key,data_json FROM studio_generation_actions WHERE confirmed_at IS NOT NULL').all())if(row.day_key===key)used.set(row.id,JSON.parse(row.data_json).operation||'caption');
-  for(const row of this.research.db.prepare("SELECT request_id,data_json,created_at FROM research_engine_events WHERE state='dispatching'").all())if(day(row.created_at)===key){const data=JSON.parse(row.data_json);used.set(row.request_id,data.captionTarget||data.editorialContext?.captionImprovement?'caption':'story');}
+  for(const row of this.research.db.prepare("SELECT request_id,data_json,created_at FROM research_engine_events WHERE state='dispatching'").all())if(day(row.created_at)===key){const data=JSON.parse(row.data_json);used.set(row.request_id,data.editorialContext?.photoAssessment?'photo':data.captionTarget||data.editorialContext?.captionImprovement?'caption':'story');}
   return {caption:[...used.values()].filter(k=>k==='caption').length,story:[...used.values()].filter(k=>k==='story').length};
  }
  result(p,job){return ['ready_to_review','needs_research','approved'].includes(job?.state)?job.candidates?.find(c=>{
@@ -62,7 +62,7 @@ export class CaptionPilot{
   const key=day(this.now()),ids=new Set(this.research.db.prepare('SELECT id,day_key FROM studio_generation_actions WHERE confirmed_at IS NOT NULL').all().filter(r=>allTime||r.day_key===key).map(r=>r.id));
   for(const row of this.research.db.prepare("SELECT request_id,created_at FROM research_engine_events WHERE state='dispatching'").all())if(allTime||day(row.created_at)===key)ids.add(row.request_id);
   let estimate=0,unmeasured=0;
-  for(const id of ids){const job=this.research.engineJob(id),usage=Object.values(job?.evidence||{})[0]?.usage;
+  for(const id of ids){const job=this.research.engineJob(id),photo=job?.photoResult?.usage||job?.photoFailure?.usage,usage=photo?{inputTokens:photo.input_tokens,outputTokens:photo.output_tokens}:Object.values(job?.evidence||{})[0]?.usage;
    if(!Number.isFinite(usage?.inputTokens)||!Number.isFinite(usage?.outputTokens)){unmeasured++;continue;}
    estimate+=usage.inputTokens*2.5/1e6+usage.outputTokens*15/1e6;
    for(const m of usage.models||[])if(Number.isFinite(m.toolCalls))estimate+=m.toolCalls*.01;

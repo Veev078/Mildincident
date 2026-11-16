@@ -1,5 +1,7 @@
 # V17.1 — preview cleanup and one real vision acceptance
 
+**November 16 update:** V17.1 is live at `28c6a9cfacd67673f15f10b3247f8d058e1f1ba9`. The fresh package below was authorized and dispatched once as execution **2369**. It reached all six real image inputs, but the response hit 1,200 output tokens and ended as invalid/incomplete JSON. No usable assessment or carousel was accepted. Original worker/settings and recurring-policy binding are restored; the founder's guarded Render PASS confirms consumed/revoked grant and caption/story/ordinary-start availability. No rerun occurred. The package is spent. See [reconciliation, compact correction and integrated engine work](INTEGRATED_EDITORIAL_ENGINE.md) for current facts and local-only implementation; the older preparation sections below are retained as history.
+
 ## Confirmed hosted baseline
 
 Render `srv-dbih0du1egvs73er26kg` is live on `cea7c0d9c1f538e456c2143648c648124e1b62db` (manual deploy `dep-dbrottu1egvs73d2gv9g`). The founder accepts Sprint B: six new Hase photographs saved, eleven project references, usable Dog Pound Days and working Jack sequence suggestions. This sprint changes local code only; no deployment, workflow/policy/credential mutation, grant, model call or publishing occurred.

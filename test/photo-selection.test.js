@@ -25,8 +25,20 @@ test('decoded structure produces inspectable opening choices and variety without
 test('simulated visual rankings never masquerade as a real model assessment; exact copies and uncertain dates cannot pad a suggestion',()=>{
  const s=story(),copy={...s.media[0],id:'copy'};s.media.push(copy,{...s.media[2],id:'wrong-date',dateContext:'different_year_context'});
  const fake={verified:true,simulation:true,result:{recommendedAssetIds:['detail'],images:[]}},r=selectPhotoSequence(s,{visualReview:fake});assert.equal(r.aiVisualAssessmentPerformed,false);assert(!r.slides.some(a=>['copy','wrong-date'].includes(a.assetId)));assert.equal(r.openingCandidates[0].assetId,'wide');
- const real={verified:true,simulation:false,executionId:'999',result:{recommendedAssetIds:['detail','portrait'],images:[{assetId:'detail',relevance:'project_match',composition:'SIMULATED contract value; not a photographic judgment.',carouselPotential:'SIMULATED detail'},{assetId:'portrait',relevance:'project_match',composition:'SIMULATED portrait',carouselPotential:'SIMULATED context'}]}};
+ const real={verified:true,simulation:false,executionId:'999',result:{recommendedAssetIds:['detail','portrait'],images:[{assetId:'detail',relevance:'project',composition:'SIMULATED contract value; not a photographic judgment.',carouselPotential:'SIMULATED detail'},{assetId:'portrait',relevance:'project',composition:'SIMULATED portrait',carouselPotential:'SIMULATED context'}]}};
  const verifiedContract=selectPhotoSequence(s,{visualReview:real});assert.equal(verifiedContract.aiVisualAssessmentPerformed,true);assert.deepEqual(verifiedContract.slides.map(a=>a.assetId),['detail','portrait']);assert.equal(verifiedContract.visualExecutionId,'999');
+});
+
+test('AI cover suggestions never expand a one-frame assessment into unreviewed gallery recommendations',()=>{
+ const s=story(),before=JSON.stringify(s),result={recommendedAssetIds:['detail'],images:[{assetId:'detail',relevance:'likely',composition:'SIMULATED review of one frame.',carouselPotential:'One frame only.'}]},r=selectPhotoSequence(s,{visualReview:{verified:true,simulation:false,executionId:'999',result}});
+ assert.deepEqual(r.openingCandidates.map(i=>i.assetId),['detail']);assert.deepEqual(r.slides.map(i=>i.assetId),['detail']);assert.equal(JSON.stringify(s),before);
+ result.images[0].relevance='uncertain';assert.equal(selectPhotoSequence(s,{visualReview:{verified:true,simulation:false,result}}).slides.length,0);
+});
+
+test('a redundant pair is withheld whichever direction the verified duplicate reference points',()=>{
+ const s=story();s.media[0].localPreview.fingerprint=null;s.media[1].localPreview.fingerprint=null;
+ const images=[{assetId:'wide',relevance:'project',duplicateOf:'variant'},{assetId:'variant',relevance:'project',duplicateOf:null},{assetId:'portrait',relevance:'project',duplicateOf:null}],r=selectPhotoSequence(s,{visualReview:{verified:true,simulation:false,executionId:'999',result:{images,recommendedAssetIds:['wide','variant','portrait']}}});
+ assert.deepEqual(r.slides.map(i=>i.assetId),['wide','portrait']);assert(r.withheld.some(w=>w.assetId==='variant'&&w.basis==='verified_ai_duplicate_suggestion'));assert.deepEqual(s.selectedAssetIds,['wide','portrait']);
 });
 
 test('real decoded thumbnail measurements describe color while preserving the existing similarity contract',async()=>{

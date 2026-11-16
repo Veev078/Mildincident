@@ -1,4 +1,5 @@
 import {captureVisualExecution} from '../photography/visual-assessment.js';
+import {captureVisualFailure} from '../photography/visual-failure.js';
 import {selectEditorialFeedback} from '../editorial-feedback.js';
 import {randomUUID} from 'node:crypto';
 import {requireThat} from '../errors.js';
@@ -50,8 +51,12 @@ export class EditorialEngineService {
         requireThat(result.every(c=>c.provenance.kind===request.kind&&(!executionId||c.provenance.executionId===executionId)),'INVALID_ENGINE_RESULT','Candidate execution or mode does not match its job.');
         if(['ready_to_review','needs_research','approved','rejected'].includes(row.status))requireThat(result.length===1,'INVALID_ENGINE_RESULT','Completed development job is missing its correlated result.');
         let observedState=row.status;let failure=row.error?editorialFailureCode(row.error):null;
-        let failureDetail=local.failure||null,failureCheckedExecutionId=local.failureCheckedExecutionId||null;
-        if(row.status==='failed'&&executionId&&failureDetail?.executionId!==executionId&&failureCheckedExecutionId!==executionId){
+        let failureDetail=local.failure||null,failureCheckedExecutionId=local.failureCheckedExecutionId||null,photoFailure=local.photoFailure||null;
+        if(photoPacket&&row.status==='failed'&&executionId&&!photoFailure&&failureCheckedExecutionId!==executionId){
+          failureCheckedExecutionId=executionId;
+          try{photoFailure=captureVisualFailure(await this.client.executionDetails(executionId),photoPacket,{approvedGraphSha256:local.photoGraphSha256,approvedExecutionGraphSha256:local.photoExecutionGraphSha256||null,approvedWorkerVersion:local.photoWorkerVersion||null});failure=photoFailure.code;}catch{/* Keep an unverified failure generic; never promote partial output or resend. */}
+        }
+        if(!photoPacket&&row.status==='failed'&&executionId&&failureDetail?.executionId!==executionId&&failureCheckedExecutionId!==executionId){
           failureCheckedExecutionId=executionId;
           try{failureDetail=captureResearchFailure(await this.client.executionDetails(executionId),{jobId:request.id,requestHash:row.request_hash});}catch{/* The confirmed failed row still stands when detailed evidence is unavailable. */}
         }
@@ -61,8 +66,9 @@ export class EditorialEngineService {
         if(row.status==='queued'&&['dispatching','dispatch_uncertain','generating','failed'].includes(local.state)&&observedState!=='failed')observedState=local.state;
         if(local.dispatchReceipt?.status==='failed'&&['queued','generating'].includes(row.status)){observedState='failed';resultPending=false;failure=local.lastError||'DEVELOPMENT_EXECUTION_FAILED';}
         if(COMPLETED_STATES.has(local.state)&&!COMPLETED_STATES.has(row.status)&&result.length){observedState=local.state;failure='STALE_ENGINE_OBSERVATION';}
-        const data={nativeStatus:row.status,remoteRowId:String(row.id),executionId,candidates:result,resultPending,resultMissingSince,lastError:failure,failure:failureDetail,failureCheckedExecutionId};
-        if(local.state!==observedState||local.nativeStatus!==row.status||local.lastError!==data.lastError||local.failureCheckedExecutionId!==failureCheckedExecutionId||JSON.stringify(local.failure||null)!==JSON.stringify(failureDetail)||JSON.stringify(local.candidates||[])!==JSON.stringify(result)||local.executionId!==data.executionId||Boolean(local.resultPending)!==resultPending||local.resultMissingSince!==resultMissingSince)this.research.recordEngineState(request.id,observedState,data);
+        if(photoFailure)failure=photoFailure.code;
+        const data={nativeStatus:row.status,remoteRowId:String(row.id),executionId,candidates:result,resultPending,resultMissingSince,lastError:failure,failure:failureDetail,failureCheckedExecutionId,...(photoFailure?{photoFailure}:{})};
+        if(local.state!==observedState||local.nativeStatus!==row.status||local.lastError!==data.lastError||local.failureCheckedExecutionId!==failureCheckedExecutionId||JSON.stringify(local.failure||null)!==JSON.stringify(failureDetail)||JSON.stringify(local.photoFailure||null)!==JSON.stringify(photoFailure)||JSON.stringify(local.candidates||[])!==JSON.stringify(result)||local.executionId!==data.executionId||Boolean(local.resultPending)!==resultPending||local.resultMissingSince!==resultMissingSince)this.research.recordEngineState(request.id,observedState,data);
       }if(this.captionPilot){await this.captionPilot.inspect();await this.captionPilot.captureUsage();}return this.status();})();try{return await this.refreshing;}finally{this.refreshing=null;}
   }
   async adoptObservedResults(jobs,candidates,sanitize){

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {inspectPhotoSourceWindow} from '../src/editorial-evidence.js';
-import {projectPageReferences} from '../src/photography/project-sources.js';
+import {projectPageReferences,PROJECT_IMAGE_PARSER_VERSION} from '../src/photography/project-sources.js';
 
 const page='https://www.dazeddigital.com/art-photography/article/123/1/test-project';
 const story={id:'CON-project-window',subject:'Test Maker, Test Project',research:[{url:page,capturedAccess:'source_text_captured',capturedTextExcerpt:'Test Maker made Test Project.'}],media:[]};
@@ -20,7 +20,7 @@ test('a 40-of-52 retained page continues through its twelve remaining references
  assert.equal(second.sourceCapture.extractionCursor,null);assert.deepEqual(second.sourceCapture.extractionInputCursor,first.sourceCapture.extractionCursor);
  assert.equal(second.sourceCapture.coverage.extractionComplete,true);assert.equal(second.sourceCapture.coverage.completeShootVerified,false);
  assert.equal(new Set([...first.photos,...second.photos].map(p=>p.id)).size,52);
- for(const p of [...first.photos,...second.photos]){assert.equal(p.sourceCaptureSha256,sha(gallery));assert.equal(p.sourceParserVersion,'project-images-v2');assert(Number.isInteger(p.sourceReferenceIndex));assert.equal(p.rightsGranted,false);assert.equal(p.pixelAnalysisPerformed,false);}
+ for(const p of [...first.photos,...second.photos]){assert.equal(p.sourceCaptureSha256,sha(gallery));assert.equal(p.sourceParserVersion,PROJECT_IMAGE_PARSER_VERSION);assert(Number.isInteger(p.sourceReferenceIndex));assert.equal(p.rightsGranted,false);assert.equal(p.pixelAnalysisPerformed,false);}
  assert.equal(first.sourceCapture.html,gallery);assert.equal(second.sourceCapture.sha256,first.sourceCapture.sha256);
 });
 
@@ -59,8 +59,10 @@ test('reparsing a legacy page derives supported artist and publisher leads witho
  const html='<h1>Test Maker, Test Project</h1><p>Visit <a href="https://sophyrickett.com/test-project">Test Maker</a>.</p><p>Test Maker discusses Test Project with its <a href="https://www.cheeriopublishing.com/test-project">publisher</a>.</p><h2>Another Maker, Tokyo</h2><p>Read more <a href="https://www.climaxbooks.com/unrelated">here</a>.</p><a href="https://unreviewed.example/project">Test Maker, Test Project</a><!-- <a href="https://www.climaxbooks.com/comment-decoy">Test Maker, Test Project</a> --><script><a href="https://sophyrickett.com/script-decoy">Test Maker, Test Project</a></script>';
  const legacy={url:page,html,sha256:sha(html),capturedAt:'2026-11-01T10:00:00Z'},before=JSON.stringify(legacy);
  const result=projectPageReferences(story,{url:legacy.url,html:legacy.html,basis:'fetched_project_page'});
- assert.deepEqual(result.sourceCapture.projectTrails.map(t=>t.sourceKind),['artist','book_publisher']);
- assert.deepEqual(result.sourceCapture.projectTrails.map(t=>t.url),['https://sophyrickett.com/test-project','https://www.cheeriopublishing.com/test-project']);
- for(const trail of result.sourceCapture.projectTrails){assert.equal(trail.captureSha256,legacy.sha256);assert.equal(trail.parserVersion,'project-images-v2');assert.equal(trail.destinationFetched,false);assert.equal(trail.identityVerified,false);assert.equal(trail.rightsGranted,false);}
+ const connected=result.sourceCapture.projectTrails.filter(t=>t.readerSupported);
+ assert.deepEqual(connected.map(t=>t.sourceKind),['artist','book_publisher']);
+ assert.deepEqual(connected.map(t=>t.url),['https://sophyrickett.com/test-project','https://www.cheeriopublishing.com/test-project']);
+ assert.equal(result.sourceCapture.projectTrails.find(t=>t.url==='https://unreviewed.example/project').readerSupported,false);
+ for(const trail of result.sourceCapture.projectTrails){assert.equal(trail.captureSha256,legacy.sha256);assert.equal(trail.parserVersion,PROJECT_IMAGE_PARSER_VERSION);assert.equal(trail.destinationFetched,false);assert.equal(trail.identityVerified,false);assert.equal(trail.rightsGranted,false);}
  assert.equal(JSON.stringify(legacy),before);
 });

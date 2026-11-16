@@ -1,6 +1,7 @@
 import {storyPhotoIdentity,photoFileKeys,photoRelevance} from './story-intelligence.js';
 import {PROJECT_PAGE_HOSTS,projectPageReferences} from './project-sources.js';
 import {createHash} from 'node:crypto';
+import {sourcePageKey} from './project-identity.js';
 
 const sameIdentity=(a,b)=>a&&b&&['subject','photographer','series'].every(k=>(a[k]||'')===(b[k]||''));
 const eligible=(photo,identity,direction)=>{const c=photoRelevance({...photo,sourceCaption:photo.description,photoExplorationDirection:direction},identity).category;return c==='direct'||direction==='context'&&c==='context';};
@@ -14,12 +15,13 @@ export function sourceProgression(story,requests,{direction='best',custom='',now
   for(const c of (p.sourceCaptures?.length?p.sourceCaptures:[p.sourceCapture])){
    if(!c?.networkFetched||c.basis!=='fetched_project_page'||!sameIdentity(c.identity,identity))continue;
    if(!Number.isFinite(Date.parse(c.capturedAt)))continue;
-   if(!groups.has(c.url))groups.set(c.url,{capture:c,request:p,windows:[]});
-   const g=groups.get(c.url);if(c.sha256===g.capture.sha256&&p.plan.direction===direction&&(p.plan.custom||'')===custom)g.windows.push(c);
+   const key=sourcePageKey(c.url);if(!key)continue;
+   if(!groups.has(key))groups.set(key,{capture:c,request:p,windows:[]});
+   const g=groups.get(key);if(c.sha256===g.capture.sha256&&c.url===g.capture.url&&p.plan.direction===direction&&(p.plan.custom||'')===custom)g.windows.push(c);
   }
  }
- for(const [url,g]of groups){
-  const c=g.capture;
+ for(const g of groups.values()){
+  const c=g.capture,url=c.url;
   if(typeof c.html!=='string'||createHash('sha256').update(c.html).digest('hex')!==c.sha256){states.push({url,state:'evidence_needs_review',requestId:g.request.id});continue;}
   const first=projectPageReferences(story,{url,html:c.html,direction}),coverage=first.sourceCapture.coverage||{};
   const total=coverage.referenceCount||0,ranges=[];
@@ -56,14 +58,14 @@ export function sourceProgression(story,requests,{direction='best',custom='',now
   states.push({url,state,requestId:g.request.id,captureSha256:c.sha256,checkedAt:c.capturedAt,completeScan:nextOffset===null&&!bounded,pendingImages:pending,unseenReferences:unseen,scanOffset:through,nextOffset,remainingReferences:Math.max(0,total-through),referenceCount:total});
   if(candidate)reuse.push(candidate);
  }
- for(const p of current)for(const a of p.sourceAttempts||[]){if(states.some(s=>s.url===a.url)||a.status!=='failed'||!Number.isFinite(Date.parse(p.startedAt)))continue;const denied=/^SOURCE_HTTP_(401|403|404|410)$/.test(a.errorCode||'');if(denied&&now-Date.parse(p.startedAt)>86400000)continue;states.push({url:a.url,state:denied?'source_unavailable':'outcome_unconfirmed',errorCode:a.errorCode,requestId:p.id});}
+ for(const p of current)for(const a of p.sourceAttempts||[]){if(states.some(s=>sourcePageKey(s.url)===sourcePageKey(a.url))||a.status!=='failed'||!Number.isFinite(Date.parse(p.startedAt)))continue;const denied=/^SOURCE_HTTP_(401|403|404|410)$/.test(a.errorCode||'');if(denied&&now-Date.parse(p.startedAt)>86400000)continue;states.push({url:a.url,state:denied?'source_unavailable':'outcome_unconfirmed',errorCode:a.errorCode,requestId:p.id});}
  return {version:2,states,reuse:reuse.slice(0,1),suppressedImageUrls:[...suppressed],projectExhausted:false};
 }
 
 /** Finish retained material before spending another source read. */
 export function advancePhotoPlan(plan,progression,{refreshSources=false}={}){
  if(plan.source!=='project'||plan.route==='source_assisted')return plan;
- const state=new Map(progression.states.map(s=>[s.url,s])),all=plan.sourceCandidates.filter(url=>PROJECT_PAGE_HOSTS.includes(new URL(url).hostname));
- const remaining=refreshSources?all:all.filter(url=>!state.has(url)),reuse=refreshSources?[]:progression.reuse,hasNext=remaining.length>0;
- return {...plan,sourcePolicy:'source_progression_v1',sourceCandidates:remaining,sourceUrl:reuse[0]?.url||(hasNext?remaining[0]:plan.sourceUrl),route:reuse.length?'cached_project_evidence':hasNext?'retained_project_page':'sources_checked',sourceCalls:reuse.length?0:hasNext?2:0,sourceProgression:{...progression,reuse,suppressedImageUrls:refreshSources?[]:progression.suppressedImageUrls,refreshSources},reason:reuse.length?reuse[0].reason==='continue_scan'?'Continue the remaining saved page without reading it again.':'Finish useful image files from saved source evidence.':hasNext?'Check the next recorded project sources; previously checked sources stay in history.':'These sources have no further supported additions at present. Other project sources may still exist.'};
+ const state=new Map(progression.states.map(s=>[sourcePageKey(s.url),s])),all=[...new Map(plan.sourceCandidates.filter(url=>PROJECT_PAGE_HOSTS.includes(new URL(url).hostname)).map(u=>[sourcePageKey(u),u])).values()];
+ const remaining=refreshSources?all:all.filter(url=>!state.has(sourcePageKey(url))),reuse=refreshSources?[]:progression.reuse,hasNext=remaining.length>0;
+ return {...plan,sourcePolicy:'source_progression_v1',sourceCandidates:remaining,sourceUrl:reuse[0]?.url||(hasNext?remaining[0]:plan.sourceUrl),route:reuse.length?'cached_project_evidence':hasNext?'retained_project_page':'sources_checked',sourceCalls:reuse.length?0:hasNext?2:0,sourceProgression:{...progression,reuse,suppressedImageUrls:refreshSources?[]:progression.suppressedImageUrls,refreshSources},reason:reuse.length?reuse[0].reason==='continue_scan'?'Continue the remaining saved page without reading it again.':'Finish useful image files from saved source evidence.':hasNext?'Check the next recorded project sources; previously checked sources stay in history.':plan.sourceConnections?.length?'The connected sources have no further additions. Other recorded project sources need a source connection; the project is not exhausted.':'These sources have no further supported additions at present. Other project sources may still exist.'};
 }

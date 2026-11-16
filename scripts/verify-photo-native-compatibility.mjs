@@ -10,11 +10,13 @@ import sharp from 'sharp';
 import {preparePhotoVisualWorker} from '../src/n8n/photo-visual-worker.js';
 import {editorialGraphSha} from '../src/n8n/v14-editorial-patch.js';
 import {visualModelMessages} from '../src/photography/visual-assessment.js';
+import {compactVisualMessages} from '../src/photography/compact-visual-result.js';
 
 let stage='setup';
 async function main(){
 const args=Object.fromEntries(Array.from({length:(process.argv.length-2)/2},(_,n)=>process.argv.slice(2+n*2,4+n*2)));
 for(const key of ['--runtime','--langchain','--baseline','--execution','--out'])assert(args[key],`Supply ${key}; see docs/release/V16_NATIVE_COMPATIBILITY_REPAIR.md.`);
+const outputFormat=args['--output-format']||'legacy';assert(['legacy','compact_v2'].includes(outputFormat));const modelMessages=outputFormat==='compact_v2'?compactVisualMessages:visualModelMessages;
 const runtime=path.resolve(args['--runtime']),source=path.resolve(args['--langchain']),out=path.resolve(args['--out']);
 assert(!out.endsWith('.json'),'--out must be a private directory');
 const sha=b=>createHash('sha256').update(b).digest('hex'),readJson=async p=>JSON.parse(await fs.readFile(p,'utf8'));
@@ -82,7 +84,7 @@ assert.deepEqual(reproduced,oldModel.parameters.responses.values);
 assert.deepEqual(normalize(failedModel).parameters,oldModel.parameters);
 const filter=requireRuntime(path.join(path.dirname(requireRuntime.resolve('n8n-workflow')),'node-parameters/filter-parameter.js'));
 
-const proposal=preparePhotoVisualWorker(baseline,{expectedVersion:baseline.versionId,expectedSha256:editorialGraphSha(baseline),approvedJobId:packet.jobId,approvalId:packet.approvalId,imageCount:6});
+const proposal=preparePhotoVisualWorker(baseline,{expectedVersion:baseline.versionId,expectedSha256:editorialGraphSha(baseline),approvedJobId:packet.jobId,approvalId:packet.approvalId,imageCount:6,outputFormat});
 stage='corrected routing and historical byte validation';
 for(const n of baseline.nodes)assert.deepEqual(proposal.workflow.nodes.find(p=>p.name===n.name),n);
 assert.deepEqual(proposal.workflow.settings,baseline.settings);
@@ -111,7 +113,7 @@ const workflow=new native.Workflow({id:'offline-photo-compatibility',nodes:[
 const runExecutionData={resultData:{runData:{'Verify Development Claim':[{data:{main:[[{json:row}]]}}],'Validate Photo Assessment':[{data:{main:[[{json:validated}]]}}]}}};
 const resolve=value=>workflow.expression.getParameterValue(value,runExecutionData,0,0,model.name,[{json:validated}],'manual',{});
 const resolvedMessages=resolve(model.parameters.responses.values);
-assert.deepEqual(resolvedMessages,visualModelMessages(packet));
+assert.deepEqual(resolvedMessages,modelMessages(packet));
 const context={getNode:()=>model,getExecutionCancelSignal:()=>new AbortController().signal,
  getNodeParameter:(name,_i,fallback,options)=>{const value=resolve(get(model.parameters,name,fallback));return options?.extractValue?value.value:value;},
  helpers:new Proxy({}, {get:()=>assert.fail('No credentials, binary download, HTTP or helper access expected')}),
@@ -120,7 +122,7 @@ stage='native operation request boundary';
 try{await operation.execute.call(context,0);assert.fail('Native request was not intercepted');}catch(error){assert.equal(error,captured);}
 assert.equal(interceptions,1);assert.equal(interceptedBody.model,'gpt-5.4');assert.equal(interceptedBody.max_output_tokens,1200);
 assert.equal(interceptedBody.store,false);assert.equal(interceptedBody.reasoning.effort,'low');assert.equal(interceptedBody.background,false);assert(!interceptedBody.tools?.length);
-const expectedBody=await responses.createRequest.call(context,0,{model:'gpt-5.4',messages:visualModelMessages(packet),options:resolve(model.parameters.options),builtInTools:resolve(model.parameters.builtInTools||{}),tools:undefined});
+const expectedBody=await responses.createRequest.call(context,0,{model:'gpt-5.4',messages:modelMessages(packet),options:resolve(model.parameters.options),builtInTools:resolve(model.parameters.builtInTools||{}),tools:undefined});
 assert.equal(JSON.stringify(interceptedBody),JSON.stringify(expectedBody));
 assert.equal(interceptedBody.input.length,7);
 assert.equal(interceptedBody.input[0].content[0].type,'input_text');assert(interceptedBody.input[0].content[0].text.trim());
@@ -156,13 +158,13 @@ const expandReviewed=w=>({...structuredClone(baselineExecution.workflowData),nam
 })});
 let previousReview;try{previousReview=await readJson(path.join(out,'fresh-proposal-review.json'));}catch(error){if(error.code!=='ENOENT')throw error;}
 if(previousReview){assert.equal(previousReview.expectedVersion,baseline.versionId);assert.equal(previousReview.manifestSha256,packet.manifestSha256);assert.equal(previousReview.installed,false);}
-const fresh=preparePhotoVisualWorker(baseline,{expectedVersion:baseline.versionId,expectedSha256:editorialGraphSha(baseline),approvedJobId:previousReview?.approvedJobId||randomUUID(),approvalId:previousReview?.approvalId||randomUUID(),imageCount:6});
-const expandedFresh=expandReviewed(fresh.workflow),review={...fresh.review,approvedExecutionGraphSha256:editorialGraphSha(expandedFresh),executionDefaultsBasis:'Observed original nodes from execution '+baselineExecution.id+'; repaired photo defaults reproduced through the native normalizer',baselineExecutionId:String(baselineExecution.id),installedWorkerVersion:null,liveReadbackVerified:false,approvalStatus:'REVIEW ONLY; no grant, installation or paid execution authorized',manifestSha256:packet.manifestSha256,preparedModelMessagesSha256:sha(JSON.stringify(visualModelMessages(packet)))};
+const fresh=preparePhotoVisualWorker(baseline,{expectedVersion:baseline.versionId,expectedSha256:editorialGraphSha(baseline),approvedJobId:previousReview?.approvedJobId||randomUUID(),approvalId:previousReview?.approvalId||randomUUID(),imageCount:6,outputFormat});
+const expandedFresh=expandReviewed(fresh.workflow),review={...fresh.review,approvedExecutionGraphSha256:editorialGraphSha(expandedFresh),executionDefaultsBasis:'Observed original nodes from execution '+baselineExecution.id+'; repaired photo defaults reproduced through the native normalizer',baselineExecutionId:String(baselineExecution.id),installedWorkerVersion:null,liveReadbackVerified:false,approvalStatus:'REVIEW ONLY; no grant, installation or paid execution authorized',manifestSha256:packet.manifestSha256,preparedModelMessagesSha256:sha(JSON.stringify(modelMessages(packet)))};
 if(previousReview){assert.equal(previousReview.graphSha256,review.graphSha256);assert.equal(previousReview.approvedExecutionGraphSha256,review.approvedExecutionGraphSha256);}
 await fs.writeFile(path.join(out,'fresh-proposed-graph.json'),JSON.stringify(fresh.workflow),{mode:0o600});
 await fs.writeFile(path.join(out,'fresh-expected-execution-graph.json'),JSON.stringify(expandedFresh),{mode:0o600});
 await fs.writeFile(path.join(out,'fresh-proposal-review.json'),JSON.stringify(review,null,2),{mode:0o600});
-const report={status:'PASS',basis:'Captured execution 2363, six real retained JPEG inputs; actual n8n normalization, expression evaluator and OpenAI v2.3 operation with request transport intercepted',packages:{node:'@n8n/n8n-nodes-langchain@2.46.6',workflow:'n8n-workflow@2.46.5'},cloudBuildAttested:false,oldPrototypeFailureReproduced:true,old59EmptyMessagesReproduced:true,fullOldPhotoParametersReproduced:true,correctedGateValid:true,correctedCollectionMessages:7,imageInputs:6,allImagesFullyDecoded:true,manifestSha256:packet.manifestSha256,preparedModelMessagesSha256:sha(JSON.stringify(visualModelMessages(packet))),resolvedNodeMessagesSha256:sha(JSON.stringify(resolvedMessages)),providerRequestSha256:sha(JSON.stringify(interceptedBody)),providerBodyExactlyMatchesPreparedMessages:true,images,orderAndHashesMatch:true,maxOutputTokens:1200,sourceHashes,requestBoundaryInterceptions:1,networkRequests:0,modelExecutions:0,grantsIssued:0,liveWorkflowMutations:0,rightsGranted:false,assessmentProduced:false,freshProposedSavedGraphSha256:review.graphSha256,freshExpectedExecutionGraphSha256:review.approvedExecutionGraphSha256,liveReadbackVerified:false};
+const report={status:'PASS',outputFormat,basis:'Captured execution 2363, six real retained JPEG inputs; actual n8n normalization, expression evaluator and OpenAI v2.3 operation with request transport intercepted',packages:{node:'@n8n/n8n-nodes-langchain@2.46.6',workflow:'n8n-workflow@2.46.5'},cloudBuildAttested:false,oldPrototypeFailureReproduced:true,old59EmptyMessagesReproduced:true,fullOldPhotoParametersReproduced:true,correctedGateValid:true,correctedCollectionMessages:7,imageInputs:6,allImagesFullyDecoded:true,manifestSha256:packet.manifestSha256,preparedModelMessagesSha256:sha(JSON.stringify(modelMessages(packet))),resolvedNodeMessagesSha256:sha(JSON.stringify(resolvedMessages)),providerRequestSha256:sha(JSON.stringify(interceptedBody)),providerBodyExactlyMatchesPreparedMessages:true,images,orderAndHashesMatch:true,maxOutputTokens:1200,sourceHashes,requestBoundaryInterceptions:1,networkRequests:0,modelExecutions:0,grantsIssued:0,liveWorkflowMutations:0,rightsGranted:false,assessmentProduced:false,freshProposedSavedGraphSha256:review.graphSha256,freshExpectedExecutionGraphSha256:review.approvedExecutionGraphSha256,liveReadbackVerified:false};
 await fs.writeFile(path.join(out,'compatibility-proof.json'),JSON.stringify(report,null,2),{mode:0o600});
 await fs.writeFile(path.join(out,'replay-only-graph.json'),JSON.stringify(proposal.workflow),{mode:0o600});
 console.log(JSON.stringify(report));

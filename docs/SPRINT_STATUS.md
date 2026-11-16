@@ -1,4 +1,10 @@
-# Current checkpoint — V17.1 polish and fresh vision acceptance prepared
+# November 16 — integrated editorial-engine checkpoint
+
+Execution 2369 is reconciled as a paid output-limit failure, not a usable visual assessment. Native full-graph verification and the founder's Render PASS confirm original worker/policy binding, grant revocation and ordinary caption/story starts restored. Local code now prepares compact opt-in visual output, preserves failed-vision usage, generalizes project-path/source-lead progression, avoids tracking-alias refetches and confines AI recommendations to assessed files. The accepted workstation is preserved. No deployment, live n8n mutation, new paid operation or publishing occurred. [Current evidence and substantial next-phase plan](release/INTEGRATED_EDITORIAL_ENGINE.md).
+
+---
+
+# Earlier checkpoint — V17.1 polish and fresh vision acceptance prepared
 
 [V17.1 findings, exact approval package and next product scope](release/V17_1_POLISH_AND_VISION.md). Sprint B `cea7c0d` is live and founder-accepted. The read-only hosted diagnostic confirms six genuine saved Hase JPEGs with matching hashes and full decoding. Missing external references are distinct from these healthy files. Lost & Found's old staging-page 401 produced no images; its exact verified public Dazed article is now supported locally without changing historical evidence. Preview errors distinguish saved files from references, the known Hase sketch stays outside photo suggestions, and Arrange presents one suggested edit with accessible alternatives and explicit Apply.
 
