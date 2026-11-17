@@ -399,3 +399,17 @@ dialog::backdrop { background:rgb(21 28 24 / .66);backdrop-filter:blur(3px); }
 .photo.preview-failed .preview-source-link,.photo.no-preview .preview-source-link { display:block; }
 .sequence-alternatives { border-top:1px solid var(--line,#d6dbd2);margin-top:16px;padding-top:12px; }
 .sequence-alternatives .text-button { text-align:left;overflow-wrap:anywhere; }
+
+/* Photo review joins the existing workstation; it never replaces the edit. */
+.photo-vision-panel{margin:24px 0;padding:20px;border:1px solid var(--line,#d8d5ce);border-radius:3px;background:var(--paper,#faf9f5)}
+.photo-vision-panel h3,.photo-vision-panel h4,.editorial-package-summary h3{margin:4px 0 10px}
+.photo-vision-panel .section-heading{align-items:start;gap:12px;flex-wrap:wrap}
+.photo-vision-panel details{margin-top:14px}.photo-vision-panel summary{cursor:pointer}
+.vision-choices,.vision-contact-sheet{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
+.vision-choices label{position:relative;display:grid;gap:6px;align-content:start;padding:8px;border:1px solid var(--line,#d8d5ce);font-size:12px;cursor:pointer;min-width:0}
+.vision-choices input{position:absolute;top:12px;left:12px;width:20px;height:20px;z-index:1;accent-color:#222}
+.vision-choices img,.vision-contact-sheet img{display:block;width:100%;height:120px;object-fit:contain;background:#eceae4}
+.vision-choices span,.vision-contact-sheet figcaption{overflow-wrap:anywhere;font-size:12px}
+.vision-contact-sheet figure{margin:0;min-width:0}.photo-vision-review{padding:16px 0;border-block:1px solid var(--line,#d8d5ce)}
+.photo-vision-panel>.text-button{margin-top:16px}.editorial-package-summary{padding:20px 0;border-block:1px solid var(--line,#d8d5ce);margin:20px 0}.editorial-package-summary details{margin:12px 0}.editorial-package-links{display:flex;flex-wrap:wrap;gap:10px 20px}.editorial-package-summary li{margin-bottom:8px}.editorial-package-summary.is-compact h3{font-size:20px}
+@media(max-width:600px){.photo-vision-panel{padding:16px}.vision-choices,.vision-contact-sheet{grid-template-columns:repeat(2,minmax(0,1fr))}.vision-choices img,.vision-contact-sheet img{height:116px}.photo-vision-panel .button{max-width:100%;white-space:normal;min-height:44px}}

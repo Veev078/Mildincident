@@ -1,5 +1,5 @@
 import {storyPhotoIdentity,photoFileKeys,photoRelevance} from './story-intelligence.js';
-import {PROJECT_PAGE_HOSTS,projectPageReferences} from './project-sources.js';
+import {supportedProjectPage,projectPageReferences} from './project-sources.js';
 import {createHash} from 'node:crypto';
 import {sourcePageKey} from './project-identity.js';
 
@@ -23,7 +23,7 @@ export function sourceProgression(story,requests,{direction='best',custom='',now
  for(const g of groups.values()){
   const c=g.capture,url=c.url;
   if(typeof c.html!=='string'||createHash('sha256').update(c.html).digest('hex')!==c.sha256){states.push({url,state:'evidence_needs_review',requestId:g.request.id});continue;}
-  const first=projectPageReferences(story,{url,html:c.html,direction}),coverage=first.sourceCapture.coverage||{};
+  const first=projectPageReferences(story,{url,html:c.html,direction,transport:c.transport}),coverage=first.sourceCapture.coverage||{};
   const total=coverage.referenceCount||0,ranges=[];
   for(const w of g.windows){
    if(typeof w.html!=='string'||createHash('sha256').update(w.html).digest('hex')!==c.sha256)continue;
@@ -31,7 +31,7 @@ export function sourceProgression(story,requests,{direction='best',custom='',now
    if(!Number.isInteger(start)||start<0||start%40!==0||start>=total)continue;
    if(start){
     if(w.parserVersion!==first.sourceCapture.parserVersion||w.extractionInputCursor?.offset!==start)continue;
-    try{const checked=projectPageReferences(story,{url,html:c.html,direction,cursor:w.extractionInputCursor});ranges.push({start,end:checked.sourceCapture.coverage.retainedThrough});}catch{continue;}
+    try{const checked=projectPageReferences(story,{url,html:c.html,direction,cursor:w.extractionInputCursor,transport:c.transport});ranges.push({start,end:checked.sourceCapture.coverage.retainedThrough});}catch{continue;}
    }else if(Number.isInteger(w.coverage?.retainedCount)&&w.coverage.retainedCount>=Math.min(40,total))ranges.push({start:0,end:Math.min(40,total)});
   }
   ranges.sort((a,b)=>a.start-b.start);let through=0;for(const r of ranges)if(r.start<=through)through=Math.max(through,r.end);
@@ -42,7 +42,7 @@ export function sourceProgression(story,requests,{direction='best',custom='',now
   let candidate=null,unseen=0,pending=0;
   const offsets=[...new Set([0,...ranges.map(r=>r.start)])];
   for(const offset of offsets){
-   const parsed=offset?projectPageReferences(story,{url,html:c.html,direction,cursor:cursorFor(offset)}):first;
+   const parsed=offset?projectPageReferences(story,{url,html:c.html,direction,cursor:cursorFor(offset),transport:c.transport}):first;
    let needs=false;
    for(const photo of parsed.photos.filter(a=>eligible(a,identity,direction))){
     if(suppressed.has(photo.previewUrl))continue;
@@ -65,7 +65,7 @@ export function sourceProgression(story,requests,{direction='best',custom='',now
 /** Finish retained material before spending another source read. */
 export function advancePhotoPlan(plan,progression,{refreshSources=false}={}){
  if(plan.source!=='project'||plan.route==='source_assisted')return plan;
- const state=new Map(progression.states.map(s=>[sourcePageKey(s.url),s])),all=[...new Map(plan.sourceCandidates.filter(url=>PROJECT_PAGE_HOSTS.includes(new URL(url).hostname)).map(u=>[sourcePageKey(u),u])).values()];
+ const state=new Map(progression.states.map(s=>[sourcePageKey(s.url),s])),all=[...new Map(plan.sourceCandidates.filter(url=>supportedProjectPage(url)).map(u=>[sourcePageKey(u),u])).values()];
  const remaining=refreshSources?all:all.filter(url=>!state.has(sourcePageKey(url))),reuse=refreshSources?[]:progression.reuse,hasNext=remaining.length>0;
  return {...plan,sourcePolicy:'source_progression_v1',sourceCandidates:remaining,sourceUrl:reuse[0]?.url||(hasNext?remaining[0]:plan.sourceUrl),route:reuse.length?'cached_project_evidence':hasNext?'retained_project_page':'sources_checked',sourceCalls:reuse.length?0:hasNext?2:0,sourceProgression:{...progression,reuse,suppressedImageUrls:refreshSources?[]:progression.suppressedImageUrls,refreshSources},reason:reuse.length?reuse[0].reason==='continue_scan'?'Continue the remaining saved page without reading it again.':'Finish useful image files from saved source evidence.':hasNext?'Check the next recorded project sources; previously checked sources stay in history.':plan.sourceConnections?.length?'The connected sources have no further additions. Other recorded project sources need a source connection; the project is not exhausted.':'These sources have no further supported additions at present. Other project sources may still exist.'};
 }

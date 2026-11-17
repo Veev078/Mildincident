@@ -60,9 +60,9 @@ test('reparsing a legacy page derives supported artist and publisher leads witho
  const legacy={url:page,html,sha256:sha(html),capturedAt:'2026-11-01T10:00:00Z'},before=JSON.stringify(legacy);
  const result=projectPageReferences(story,{url:legacy.url,html:legacy.html,basis:'fetched_project_page'});
  const connected=result.sourceCapture.projectTrails.filter(t=>t.readerSupported);
- assert.deepEqual(connected.map(t=>t.sourceKind),['artist','book_publisher']);
- assert.deepEqual(connected.map(t=>t.url),['https://sophyrickett.com/test-project','https://www.cheeriopublishing.com/test-project']);
- assert.equal(result.sourceCapture.projectTrails.find(t=>t.url==='https://unreviewed.example/project').readerSupported,false);
+ assert(connected.some(t=>t.sourceKind==='artist'));assert(connected.some(t=>t.sourceKind==='book_publisher'));assert.equal(connected.length,3);
+ assert.deepEqual(new Set(connected.map(t=>t.url)),new Set(['https://sophyrickett.com/test-project','https://www.cheeriopublishing.com/test-project','https://unreviewed.example/project']));
+ assert.equal(result.sourceCapture.projectTrails.find(t=>t.url==='https://unreviewed.example/project').readerSupported,true);
  for(const trail of result.sourceCapture.projectTrails){assert.equal(trail.captureSha256,legacy.sha256);assert.equal(trail.parserVersion,PROJECT_IMAGE_PARSER_VERSION);assert.equal(trail.destinationFetched,false);assert.equal(trail.identityVerified,false);assert.equal(trail.rightsGranted,false);}
  assert.equal(JSON.stringify(legacy),before);
 });

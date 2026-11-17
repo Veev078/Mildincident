@@ -1,6 +1,8 @@
 /** Operational classifications, not claims that a source or image does not exist. */
 export function photoSourceFailure(code,{supportedNow=false}={}){
  if(!code)return null;
+ if(code==='SOURCE_PINNED_TRANSPORT_UNAVAILABLE')return {kind:'network_verification_unavailable',label:'Network verification unavailable',message:'This environment routes HTTPS through a proxy, so Studio cannot verify and pin the public source endpoint. No source request was made. Use saved-page import or a network with verified direct HTTPS; access restrictions were not bypassed.'};
+ if(['SOURCE_NONPUBLIC_ADDRESS','SOURCE_DNS_CHANGED','SOURCE_UNSAFE_URL','SOURCE_UNSAFE_REDIRECT','SOURCE_REDIRECT_NOT_BOUND'].includes(code))return {kind:'source_safety_block',label:'Source connection stopped',message:'Studio stopped this source because its address or redirect could not be verified as a bound public destination. No automatic retry was made. Your saved photographs are unchanged.'};
  if(code==='SOURCE_READER_UNAVAILABLE'&&supportedNow)return {kind:'unsupported_reader',label:'Source connection now available',message:'This earlier search stopped before any website was contacted. Studio now supports the recorded sources. Find more photos will make a new source check; your saved photographs stay unchanged.'};
  if(code==='SOURCE_READER_UNAVAILABLE')return {kind:'unsupported_reader',label:'Source connection needed',message:'This search stopped because its source connection was unavailable. No website was contacted. Changing the photo direction will not fix this. Keep editing with your saved photographs; they are unchanged.'};
  const http=String(code).match(/^(?:SOURCE|ARCHIVE)_HTTP_(\d{3})$/),status=http?Number(http[1]):null;

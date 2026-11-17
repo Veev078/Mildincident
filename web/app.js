@@ -5,6 +5,7 @@ import {CAPTION_IMPROVEMENTS,captionRequestProposal,canConfirmCaption} from './c
 import {launchSavedResearch} from './research-launch.js';
 import {editorialDiscoveryRequest} from './discovery-request.js';
 import {photoOutcome} from './photo-requests.js';
+import {visionProposal,visionPending} from './photo-vision.js';
 import { esc, date, human, storyUrl, effective, mediaFor, proposalContent } from './components.js';
 import * as views from './views.js';
 import {navigation,resolveRoute,destination,libraryNavigation} from './navigation.js';
@@ -22,6 +23,7 @@ const saving = new Set();
 const inFlight = new Map();
 const savePromises = new Map();
 const captionRequestLocks=new Set();
+const visionLocks=new Set();
 const history = new Map();
 const timers = new Map();
 const versions = new Map();
@@ -150,6 +152,7 @@ async function loadWorkspace({ quiet = false, renderView = true } = {}) {
       }
     }
     for(const story of workspace.stories){
+      if(story.photoVision?.proposal){state.visionProposals ||= {};state.visionProposals[story.id]=story.photoVision.proposal;}
       const proposal=story.captionGeneration?.pilot?.proposal;
       if(proposal?.state==='completed'&&state.captionRequestedProposals?.[proposal.id]&&state.captionTools?.[story.id]==='improve'){
         state.captionTools[story.id]='compare';state.captionChoices ||= {};
@@ -238,6 +241,8 @@ async function flushDraft(id) {
       if(pending.has(id))invalidatePreparedApproval(current);
       if (result.readiness) {const panel=document.querySelector('[data-readiness-panel]');if(panel&&route().id===id)panel.innerHTML=route().tab==='overview'?views.workingReviewSummary(current):views.readinessPanel(current);}
       if (result.sourceSequencePlan) current.sourceSequencePlan=result.sourceSequencePlan;
+      if (result.editorialPackage) current.editorialPackage=result.editorialPackage;
+      if (result.photoVision) {current.photoVision=result.photoVision;state.visionProposals ||= {};state.visionProposals[id]=result.photoVision.proposal;}
       const sequenceIssues = document.querySelector('[data-direction-sequence-issues]');
       if (sequenceIssues && route().id === id) sequenceIssues.innerHTML = directionSequenceObservations(current);
       const checks = document.querySelector('[data-caption-checks]');
@@ -1074,3 +1079,55 @@ document.addEventListener('click',async event=>{
  else{await api('/api/stories/'+encodeURIComponent(story.id)+'/assets/'+encodeURIComponent(asset.id)+'/review',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({expectedVersion:asset.localReview?.version||0,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,previewSha256:asset.localPreview?.sha256||'',decision:'shortlist',reason:'Shortlisted for closer photographic inspection.',basis:'story_potential'})});await loadWorkspace({quiet:true});announce('Shortlisted for this story. Source identity and rights remain separate.');}
  }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
 });
+
+// Paid photo assessment has a separate private policy. Preparation is unpaid;
+// refresh observes one existing operation and never dispatches or retries it.
+document.addEventListener('change',event=>{
+ const batch=event.target.closest('[data-vision-batch]');
+ if(batch){const id=batch.dataset.visionBatch,story=storyById(id),next=story?.photoVision?.eligibleBatches?.find(b=>b.photoRequestId===batch.value);state.visionBatches ||= {};state.visionBatches[id]=batch.value;state.visionAssets ||= {};state.visionAssets[id]=next?.assetIds.slice(0,6)||[];render();return;}
+ const checkbox=event.target.closest('[data-vision-asset]');if(!checkbox)return;
+ const id=checkbox.dataset.story,story=storyById(id),batches=story?.photoVision?.eligibleBatches||[],selectedBatch=batches.find(b=>b.photoRequestId===state.visionBatches?.[id])||batches[0];
+ const previous=state.visionAssets?.[id]||selectedBatch?.assetIds.slice(0,6)||[],chosen=new Set(previous);
+ if(checkbox.checked)chosen.add(checkbox.dataset.visionAsset);else chosen.delete(checkbox.dataset.visionAsset);
+ if(chosen.size>6){checkbox.checked=false;announce('Choose up to six photographs for one assessment.');return;}
+ state.visionAssets ||= {};state.visionAssets[id]=[...chosen];render();
+});
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-vision-action]');if(!button||button.disabled)return;
+ const id=button.dataset.story,action=button.dataset.visionAction;if(visionLocks.has(id))return;
+ visionLocks.add(id);button.disabled=true;state.visionBusy ||= {};state.visionBusy[id]=true;state.visionErrors ||= {};delete state.visionErrors[id];
+ const post=body=>({method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(body)});
+ try{
+  if(action!=='disable'&&!await flushAllDrafts())throw Error('Save pending edits first.');
+  // Refresh after saving: exact caption version and pixel bindings are checked
+  // again server-side; an old browser plan cannot authorize changed inputs.
+  await loadWorkspace({quiet:true,renderView:false});const story=storyById(id);if(!story)throw Error('Reload this story before continuing.');
+  const path='/api/stories/'+encodeURIComponent(id)+'/vision/';
+  if(action==='disable'){await api('/api/generation/disable',post({}));await loadWorkspace({quiet:true});announce('Future AI starts disabled. Accepted operations may still finish.');}
+  else if(action==='prepare'||action==='reprepare'){
+   const batches=story.photoVision?.eligibleBatches||[],batch=batches.find(b=>b.photoRequestId===state.visionBatches?.[id])||batches[0];if(!batch)throw Error('No saved photographs are eligible yet.');
+   const chosen=state.visionAssets?.[id]||batch.assetIds.slice(0,6),assetIds=batch.assetIds.filter(a=>chosen.includes(a));if(!assetIds.length||assetIds.length>6)throw Error('Choose one to six saved photographs.');
+   const binding=JSON.stringify([id,story.revision,story.localDraft?.version||0,batch.photoRequestId,assetIds]);state.visionKeys ||= {};if(action==='reprepare')delete state.visionKeys[binding];const key=state.visionKeys[binding] ||= crypto.randomUUID();
+   const result=await api(path+'prepare',post({assetIds,photoRequestId:batch.photoRequestId,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:key}));
+   state.visionProposals ||= {};state.visionProposals[id]=result.proposal;announce('Photo review prepared. No AI has started.');
+  }else{
+   const proposal=visionProposal(story,state);if(!proposal||proposal.id!==button.dataset.proposal)throw Error('Review the current recorded operation first.');
+   if(action==='confirm'){
+    if(!proposal.canConfirm)throw Error('This photo review is not ready to confirm.');
+    state.visionProposals[id]={...proposal,state:'uncertain',canConfirm:false,message:'Confirmation sent. Waiting for its recorded outcome; do not submit again.'};render();
+    const result=await api(path+'confirm',post({proposalId:proposal.id,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,confirm:true}));state.visionProposals[id]=result.proposal;announce('One photo assessment confirmed. Your current edit is preserved.');
+   }else if(action==='refresh'){const result=await api(path+'refresh',post({proposalId:proposal.id}));state.visionProposals ||= {};state.visionProposals[id]=result.proposal;}
+   await loadWorkspace({quiet:true,renderView:false});
+  }
+ }catch(error){state.visionErrors[id]=error.message+(action==='confirm'?' Check the recorded result; this operation will not be resent automatically.':'');}
+ finally{visionLocks.delete(id);state.visionBusy[id]=false;button.disabled=false;render();}
+});
+// Poll only operations with a known queued/running state. Ambiguous operations
+// wait for an explicit check; no timer may create or confirm a request.
+setInterval(async()=>{
+ if(document.hidden)return;const current=route();if(current.view!=='story')return;
+ const story=storyById(current.id),proposal=story&&visionProposal(story,state);
+ if(!proposal||!visionPending(proposal)||proposal.state==='uncertain'||visionLocks.has(story.id))return;
+ visionLocks.add(story.id);
+ try{await api('/api/stories/'+encodeURIComponent(story.id)+'/vision/refresh',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({proposalId:proposal.id})});await loadWorkspace({quiet:true,renderView:current.tab==='images'||current.tab==='carousel'});}catch{/* The recorded operation is never resent. Manual check remains available. */}finally{visionLocks.delete(story.id);}
+},5000);

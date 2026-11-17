@@ -1,3 +1,9 @@
+# November 16 — V18 integrated editorial engine implemented locally
+
+Recovered the interrupted working tree over `3bcaa3b` and completed generalized evidence-bound public source/CDN acquisition, reusable disabled-by-default founder-confirmed photo assessment, image-bound cover/carousel packages and selected-image context for the existing caption contract. Studio retains the accepted workstation, explicit Apply, versioned edits, approval handoff and live caption/story boundaries. Actual local desktop/mobile browser journeys use six real retained Jack JPEGs and labelled simulated outcomes; native interception verifies the actual JPEG bytes through one-to-six structural inputs with zero provider requests. No new hosted photographs, real complete visual judgments, deployment, live n8n/policy/credential changes or publishing are claimed. [Implementation, evidence, exact native proposal and coordinated next approval](release/V18_INTEGRATED_EDITORIAL_ENGINE.md).
+
+---
+
 # November 16 — integrated editorial-engine checkpoint
 
 Execution 2369 is reconciled as a paid output-limit failure, not a usable visual assessment. Native full-graph verification and the founder's Render PASS confirm original worker/policy binding, grant revocation and ordinary caption/story starts restored. Local code now prepares compact opt-in visual output, preserves failed-vision usage, generalizes project-path/source-lead progression, avoids tracking-alias refetches and confines AI recommendations to assessed files. The accepted workstation is preserved. No deployment, live n8n mutation, new paid operation or publishing occurred. [Current evidence and substantial next-phase plan](release/INTEGRATED_EDITORIAL_ENGINE.md).

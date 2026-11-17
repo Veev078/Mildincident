@@ -13,6 +13,8 @@ import {validatePacketImport} from '../production-packet-contract.js';
 import {prepareProductionPacket} from './production-bridge.js';
 import {assessStudioReadiness,imageEvidenceState} from '../editorial-readiness.js';
 import {buildSourceSequencePlan,sourceSequenceDraft} from '../editorial-sequence.js';
+import {buildEditorialPackage} from '../editorial-package.js';
+import {PhotoVisionPilot} from './photo-vision-pilot.js';
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -64,9 +66,10 @@ async function imageBody(request) {
   return Buffer.concat(chunks);
 }
 
-export function createWorkspaceServer({ source, drafts, previews, research, engine, captionPilot=null, photography=research?new PhotographyService(research,{previews}):null, founderReviews=research?new FounderReviewStore(research):null, feeds=research?new PublicationFeeds(research):null, access=null,backups=null,delivery=null,serverFactory=http.createServer, webRoot = WEB_ROOT }) {
+export function createWorkspaceServer({ source, drafts, previews, research, engine, captionPilot=null, photography=research?new PhotographyService(research,{previews}):null, photoVisionPilot=research&&photography&&previews?new PhotoVisionPilot({research,photography,engine,captionPilot,createClient:captionPilot?.createClient}):null, founderReviews=research?new FounderReviewStore(research):null, feeds=research?new PublicationFeeds(research):null, access=null,backups=null,delivery=null,serverFactory=http.createServer, webRoot = WEB_ROOT }) {
   if(photography&&!photography.previews)photography.previews=previews;
   if(captionPilot&&engine)engine.captionPilot=captionPilot;
+  if(captionPilot)captionPilot.visualReviewForStory=story=>photography?.selectionReview?.(story)||null;
   const themes=research?new StudioThemes(research):null,approvalRequests=research?new ApprovalRequests(research):null;
   const isPhotoOperation=id=>Object.hasOwn(research?.engineJob(id)?.editorialContext||{},'photoAssessment');
   const view = () => {
@@ -97,7 +100,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     }
     for(const story of workspace.stories){if(story.draftRecovery?.sourceJobId){const original='CON-DEV-'+story.draftRecovery.sourceJobId;if(workspace.stories.some(s=>s.id===original))story.recoveryOfStoryId=original;}const result=story.captionGeneration?.result;if(result){const version=workspace.stories.find(s=>s.id===result.storyId);if(version)version.recoveryOfStoryId=story.id;}}
     attachLocalPreviews(workspace,previews);
-    for (const story of workspace.stories) { story.photography=photoDesk(story);story.organization=drafts.organization(story.id);story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.sourceSequencePlan = buildSourceSequencePlan(story,{visualReview:photography?.selectionReview?.(story)||null}); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity};story.approvalRequest=approvalRequests?.status(story)||null; }
+    for (const story of workspace.stories) { story.photography=photoDesk(story);story.organization=drafts.organization(story.id);story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.photoVision=photoVisionPilot?.status(story)||null;const visualReview=photography?.selectionReview?.(story)||null;story.sourceSequencePlan=buildSourceSequencePlan(story,{visualReview});story.editorialPackage=buildEditorialPackage(story,{visualReview}); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity};story.approvalRequest=approvalRequests?.status(story)||null; }
     workspace.photoHunts=photography?.all()||[];
     workspace.founderReviews=founderReviews?.all()||{};
     workspace.sourceInputs={publications:feeds?.status()||[],leads:feeds?.list()||[]};
@@ -132,6 +135,16 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       const backupRoute=url.pathname.match(/^\/api\/backups\/([^/]+)\/archive$/);
       if(backupRoute&&request.method==='GET'){requireThat(access&&backups,'BACKUP_UNAVAILABLE','Hosted backups are unavailable.');const backupId=backupRoute[1]==='latest'?backups.status().id:backupRoute[1];requireThat(backupId,'BACKUP_UNAVAILABLE','No verified backup is available yet.');const stream=await backups.archive(backupId);response.writeHead(200,{'Content-Type':'application/gzip','Content-Disposition':'attachment; filename="mildincident-private-backup-'+backupRoute[1]+'.tar.gz"'});await pipeline(stream,response);return;}
       const discoveryPhotos=url.pathname.match(/^\/api\/stories\/([^/]+)\/photo-discovery$/);
+      const visionAction=url.pathname.match(/^\/api\/stories\/([^/]+)\/vision\/(prepare|confirm|refresh)$/);
+      if(visionAction&&request.method==='POST'){
+        requireThat(photoVisionPilot,'PHOTO_VISION_UNAVAILABLE','Photo assessment is unavailable.');
+        const id=decodeURIComponent(visionAction[1]),readStory=()=>view().stories.find(s=>s.id===id),story=readStory();
+        requireThat(story,'STORY_NOT_FOUND','Open an existing story.');
+        const input=await body(request),action=visionAction[2];
+        if(action==='refresh')requireThat(input&&Object.keys(input).length===1&&typeof input.proposalId==='string','INVALID_PHOTO_VISION','Check one recorded assessment only.');
+        const proposal=action==='prepare'?await photoVisionPilot.prepare(story,input):action==='confirm'?await photoVisionPilot.confirm(story,input,{readStory}):await photoVisionPilot.refresh(story,input.proposalId,{readStory});
+        json(response,action==='confirm'?202:action==='prepare'?201:200,{proposal,productionApplied:false});return;
+      }
       if(discoveryPhotos&&request.method==='POST'){
         requireThat(photography,'RESEARCH_UNAVAILABLE','Private photographic research is unavailable.');
         const input=await body(request,4200000),id=decodeURIComponent(discoveryPhotos[1]),story=view().stories.find(s=>s.id===id);
@@ -302,7 +315,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
           requireThat(current, 'STORY_NOT_FOUND', 'Story was removed from the source snapshot.');
           const draft = drafts.save(current, input);
           const updated = view().stories.find(s => s.id === id);
-          json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, editorialDirection: updated.editorialDirection, editorialAudit:updated.editorialAudit, readiness:updated.readiness, sourceSequencePlan:updated.sourceSequencePlan, productionPreparation:updated.productionPreparation, productionDecisions:updated.productionDecisions, approvalRequest:updated.approvalRequest, scope: 'local_only', productionApplied: false }); return;
+          json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, editorialDirection: updated.editorialDirection, editorialAudit:updated.editorialAudit, readiness:updated.readiness, sourceSequencePlan:updated.sourceSequencePlan, editorialPackage:updated.editorialPackage, photoVision:updated.photoVision, productionPreparation:updated.productionPreparation, productionDecisions:updated.productionDecisions, approvalRequest:updated.approvalRequest, scope: 'local_only', productionApplied: false }); return;
         }
         if (operation === 'draft/history' && request.method === 'GET') { json(response, 200, { versions: drafts.history(id), scope: 'local_only' }); return; }
         if (operation === 'draft/rebase' && request.method === 'POST') {
@@ -311,7 +324,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
           requireThat(current, 'STORY_NOT_FOUND', 'Story was removed from the source snapshot.');
           const draft = drafts.rebase(current, input);
           const updated = view().stories.find(s => s.id === id);
-          json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, editorialDirection: updated.editorialDirection, editorialAudit:updated.editorialAudit, readiness:updated.readiness, sourceSequencePlan:updated.sourceSequencePlan, productionPreparation:updated.productionPreparation, productionDecisions:updated.productionDecisions, approvalRequest:updated.approvalRequest, scope: 'local_only', productionApplied: false }); return;
+          json(response, 200, { draft: { ...draft, stale: false }, intelligence: updated.intelligence, musicRecommendations: updated.musicRecommendations, editorialDirection: updated.editorialDirection, editorialAudit:updated.editorialAudit, readiness:updated.readiness, sourceSequencePlan:updated.sourceSequencePlan, editorialPackage:updated.editorialPackage, photoVision:updated.photoVision, productionPreparation:updated.productionPreparation, productionDecisions:updated.productionDecisions, approvalRequest:updated.approvalRequest, scope: 'local_only', productionApplied: false }); return;
         }
         if(operation==='production-packet/check'&&request.method==='POST'){const input=await body(request);const current=view().stories.find(s=>s.id===id);requireThat(current,'STORY_NOT_FOUND','Story is no longer available.');json(response,200,validatePacketImport(input.packet,prepareProductionPacket(current)));return;}
         if(operation==='production-packet'&&request.method==='GET'){response.setHeader('Content-Disposition',`attachment; filename="${id}-production-review.json"`);json(response,200,prepareProductionPacket(story));return;}

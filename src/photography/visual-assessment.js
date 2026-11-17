@@ -69,6 +69,18 @@ export function validateVisualResult(result,packet){
  requireThat(Array.isArray(result.recommendedAssetIds)&&new Set(result.recommendedAssetIds).size===result.recommendedAssetIds.length&&result.recommendedAssetIds.every(id=>result.images.some(i=>i.assetId===id&&!['unrelated','uncertain'].includes(i.relevance))),'INVALID_VISUAL_RESULT','Recommend only supported images in this manifest.');return result;
 }
 
+/** The reusable native graph has six dormant structural model routes, with
+ * exactly one model run for the manifest's input count. Its exact native
+ * version remains required even when saved/execution graph hashes coincide. */
+export function reusableVisualModelRun(execution,packet,{approvedWorkerVersion}={}){
+ const nodes=execution.workflowData?.nodes||[],reusable=nodes.some(n=>/^Assess Photo Pixels [1-6]$/.test(n.name));
+ if(!reusable)return null;
+ const runs=execution.data?.resultData?.runData||{},name='Assess Photo Pixels '+packet.images.length;
+ requireThat(typeof approvedWorkerVersion==='string'&&approvedWorkerVersion.length>0&&execution.workflowVersionId===approvedWorkerVersion&&nodes.filter(n=>/^Assess Photo Pixels [1-6]$/.test(n.name)).length===6&&nodes.some(n=>n.name==='Validate Photo Assessment'&&n.parameters?.jsCode?.includes('REUSABLE_PHOTO_VISION_COMPACT_V2')),'INVALID_VISUAL_RESULT','Reusable vision requires the exact reviewed native execution version and six bounded routes.');
+ requireThat(!['Research Candidates','Draft Editorial Concept','Assess Photo Pixels'].some(n=>runs[n]?.length)&&Object.entries(runs).filter(([n,r])=>/^Assess Photo Pixels [1-6]$/.test(n)&&r?.length).length===1&&runs[name]?.length===1&&runs[name][0].data?.main?.[0]?.length===1,'INVALID_VISUAL_RESULT','A photo-only execution must assess the exact input count once, with no research or drafting.');
+ return runs[name][0].data.main[0][0].json;
+}
+
 /** Read-only delivery proof; neither a model response nor a claimed ID alone is sufficient. */
 export function captureVisualExecution(execution,packet,{offline=false,approvedGraphSha256=null,approvedExecutionGraphSha256=null,approvedWorkerVersion=null}={}){
  requireThat(execution?.workflowId===packet.workerId&&execution.status==='success'&&/^\d+$/.test(String(execution.id)),'INVALID_VISUAL_RESULT','Use one successful execution from the reviewed worker.');
@@ -78,6 +90,8 @@ export function captureVisualExecution(execution,packet,{offline=false,approvedG
  // defaults, ignore differences, or accept a version in place of a checksum.
  const expanded=approvedExecutionGraphSha256!==null;
  requireThat(offline||/^[a-f0-9]{64}$/.test(approvedGraphSha256||'')&&(!expanded||/^[a-f0-9]{64}$/.test(approvedExecutionGraphSha256||'')&&typeof approvedWorkerVersion==='string'&&approvedWorkerVersion.length>0&&execution.workflowVersionId===approvedWorkerVersion)&&execution.workflowData&&editorialGraphSha(execution.workflowData)===(expanded?approvedExecutionGraphSha256:approvedGraphSha256),'INVALID_VISUAL_RESULT','Live delivery requires the separately approved saved graph and exact execution graph/version.');
+ const model=reusableVisualModelRun(execution,packet,{approvedWorkerVersion});
+ if(model)requireThat(model.status==='completed','INVALID_VISUAL_RESULT','A reusable photo review requires a complete model response.');
  const one=name=>{const entries=(execution.data?.resultData?.runData?.[name]||[]).flatMap(r=>r.data?.main?.[0]||[]);requireThat(entries.length===1,'INVALID_VISUAL_RESULT','An unambiguous photo result is required.');return entries[0].json;};
  const validated=one('Validate Photo Assessment').packet,envelope=JSON.parse(one('Finalize Photo Assessment').result_json);
  requireThat(envelope.purpose==='private_photo_visual_assessment_result'&&envelope.rightsGranted===false&&envelope.publicationApproved===false&&validated.jobId===packet.jobId&&envelope.jobId===packet.jobId&&validated.manifestSha256===packet.manifestSha256&&envelope.manifestSha256===packet.manifestSha256&&envelope.executionId===String(execution.id)&&JSON.stringify(validated.manifest)===JSON.stringify(packet.manifest)&&JSON.stringify(validated.images)===JSON.stringify(packet.images),'INVALID_VISUAL_RESULT','Delivery must bind the prepared job, source manifest and actual input bytes.');

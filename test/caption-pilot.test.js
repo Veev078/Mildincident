@@ -239,3 +239,15 @@ test('source stories and older caption drafts remain available beyond the recent
  for(let i=0;i<105;i++)f.research.create({kind:'brief',prompt:'A later saved direction number '+i+'.'},[]);
  assert.equal(f.research.all().length,100);assert.ok(!f.research.all().some(r=>r.id===source.id));assert.ok(f.research.workspaceRequests().some(r=>r.id===source.id));assert.equal(f.research.workspaceRequests().length,101);
 });
+
+test('caption improvement carries only current selected-image observations through the existing source-bound native contract',async t=>{
+ const f=await fixture(t),s=f.story,hash=value=>createHash('sha256').update(value).digest('hex');
+ for(const a of s.media){a.localPreview={sha256:hash(a.id),originalSha256:hash('original-'+a.id)};a.sourceCaption='Test project photograph';a.sourceRelation='subject_caption_match';}
+ const manifest={storyId:s.id,sourceRevision:s.revision,workingVersion:s.localDraft.version,images:s.media.map(a=>({assetId:a.id,sourceUrl:a.sourceUrl,sourcePreviewSha256:a.localPreview.sha256,originalSha256:a.localPreview.originalSha256,inputSha256:hash('input-'+a.id)}))},manifestSha256=hash(JSON.stringify(manifest));
+ const review={verified:true,simulation:false,executionId:'9001',manifest,manifestSha256,result:{manifestSha256,images:manifest.images.map(i=>({assetId:i.assetId,inputSha256:i.inputSha256,relevance:'project',observations:'CONTRACT FIXTURE: two figures beside a wall.',composition:'CONTRACT FIXTURE: wide scene.',distinctiveness:'CONTRACT FIXTURE: scale.',carouselPotential:'CONTRACT FIXTURE: scene setting.',duplicateOf:null})),recommendedAssetIds:manifest.images.map(i=>i.assetId)}};
+ const pilot=f.pilot||f.captionPilot;assert(pilot);pilot.visualReviewForStory=()=>review;
+ const p=await pilot.prepare(s,body(s)),raw=pilot.raw(p.id);assert.equal(p.imageContext.included,true);assert.equal(p.imageContext.imageCount,1);assert.match(raw.packet.research.brandText,/SELECTED PHOTOGRAPH OBSERVATIONS/);assert.match(raw.packet.research.brandText,/retained source passages/);assert(raw.basePacket.research.brandText.length<raw.packet.research.brandText.length);assert.equal(raw.basePacket.research.imageWritingContext,undefined);
+ pilot.validateStoredPacket(raw.packet);const safe=JSON.stringify(p);assert(!safe.includes('CONTRACT FIXTURE: two'));assert(!safe.includes('synthetic-private-token'));
+ review.simulation=true;await assert.rejects(pilot.confirm(s,confirmation(s,p)),{code:'CAPTION_EVIDENCE_CHANGED'});assert.equal(f.state.queueCalls,0);review.simulation=false;
+ await pilot.confirm(s,confirmation(s,p));assert.equal(f.state.queueCalls,1);assert.equal(f.state.dispatches,1);const queued=JSON.parse(f.state.jobs[0].editorial_context_json).captionImprovement;assert.equal(queued.evidenceSha256,raw.packet.evidenceSha256);assert.equal(queued.research.imageWritingContext.digest,p.imageContext.digest);assert.equal(s.localDraft.caption,'The founder working caption must survive.');
+});

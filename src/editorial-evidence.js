@@ -11,7 +11,7 @@ export function photoEvidenceTools(publicReference) {
     if(named[entity.toLowerCase()]!==undefined)return named[entity.toLowerCase()];
     const hex=/^&#x/i.test(entity);const n=parseInt(entity.slice(hex?3:2,-1),hex?16:10);return n>31&&n<=0x10ffff?String.fromCodePoint(n):'';
   });
-  const attrs=tag=>{const out={};for(const m of tag.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g))out[m[1].toLowerCase()]=decode(m[2]??m[3]??'');return out;};
+  const attrs=tag=>{const out={};for(const m of tag.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g))out[m[1].toLowerCase()]=decode(m[2]??m[3]??m[4]??'');return out;};
   const resolve=(value,page)=>{const raw=decode(value).trim();if(!raw)return '';if(raw.startsWith('//'))return publicReference('https:'+raw);if(/^https:\/\//i.test(raw))return publicReference(raw);
     if(/^[a-z][a-z0-9+.-]*:/i.test(raw)||raw.startsWith('#')||raw.startsWith('?'))return '';
     const match=page.match(/^(https:\/\/[^/?#]+)(\/[^?#]*)?/i);if(!match)return '';
@@ -53,20 +53,23 @@ export function photoEvidenceTools(publicReference) {
       candidates.set(key,{url,referenceVariants,duplicateBasis:referenceVariants.length>1?'source_file_reference_variant':'none',sameImageVerified:false,caption:String(caption||'').trim().slice(0,2000),captionBasis,researchLinks,isCover,reportedWidth:width||null,reportedHeight:height||null,imageMetadata});};
     // Structured captions must belong to an individual ImageObject, never an article headline/byline.
     const visit=(value,depth=0)=>{if(!value||typeof value!=='object'||depth>6)return;if(Array.isArray(value)){for(const x of value.slice(0,80))visit(x,depth+1);return;}
-      if((Array.isArray(value['@type'])?value['@type']:[value['@type']]).includes('ImageObject')){const caption=typeof value.caption==='string'?value.caption:typeof value.description==='string'?value.description:'';const width=Number(value.width?.value??value.width)||0,height=Number(value.height?.value??value.height)||0;const person=v=>typeof v==='string'?captionText(v).slice(0,200):v&&typeof v.name==='string'?captionText(v.name).slice(0,200):'';const imageMetadata={creatorReported:person(value.creator),copyrightHolderReported:person(value.copyrightHolder),creditReported:typeof value.creditText==='string'?captionText(value.creditText).slice(0,500):'',licenseReportedUrl:typeof value.license==='string'?resolve(value.license,page):'',basis:'individual_image_object',rightsGranted:false,attributionVerified:false};add(value.contentUrl||value.url,caption,false,width,height,caption?'structured_image_caption':'missing',[],imageMetadata);}
+      if((Array.isArray(value['@type'])?value['@type']:[value['@type']]).some(type=>typeof type==='string'&&/(?:^|\/)ImageObject$/.test(type))){const caption=typeof value.caption==='string'?value.caption:typeof value.description==='string'?value.description:'';const width=Number(value.width?.value??value.width)||0,height=Number(value.height?.value??value.height)||0;const person=v=>typeof v==='string'?captionText(v).slice(0,200):v&&typeof v.name==='string'?captionText(v.name).slice(0,200):'';const imageMetadata={creatorReported:person(value.creator),copyrightHolderReported:person(value.copyrightHolder),creditReported:typeof value.creditText==='string'?captionText(value.creditText).slice(0,500):'',licenseReportedUrl:typeof value.license==='string'?resolve(value.license,page):'',basis:'individual_image_object',rightsGranted:false,attributionVerified:false};add(value.contentUrl||value.url,caption,false,width,height,caption?'structured_image_caption':'missing',[],imageMetadata);}
       for(const key of ['@graph','image','associatedMedia','hasPart','mainEntity'])visit(value[key],depth+1);
     };
     for(const script of html.slice(0,300000).matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){if(!/application\/ld\+json/i.test(attrs(script[1]).type||''))continue;try{visit(JSON.parse(script[2]));}catch{/* Malformed structured metadata is not source evidence. */}}
     for(const tag of [...body.matchAll(/<meta\b[^>]*>/gi)].slice(0,250)){const a=attrs(tag[0]);if(['og:image','og:image:secure_url','twitter:image','twitter:image:src'].includes((a.property||a.name||'').toLowerCase()))add(a.content,'Page cover / social preview',true);}
     const bestResponsive=value=>String(value||'').split(',').map(part=>{const [url,size]=part.trim().split(/\s+/);return {url,width:/^\d+w$/.test(size||'')?parseInt(size,10):/^\d+(?:\.\d+)?x$/.test(size||'')?Number.parseFloat(size)*100:0};}).filter(x=>resolve(x.url,page)).sort((a,b)=>b.width-a.width)[0]?.url;
+    const pictures=[...body.matchAll(/<picture\b[^>]*>[\s\S]*?<\/picture>/gi)].slice(0,260).map(m=>({start:m.index,end:m.index+m[0].length,html:m[0]}));
     const imageTags=[...body.matchAll(/<img\b[^>]*>/gi)];
     for(const tag of imageTags.slice(0,260)){
       const a=attrs(tag[0]);const figure=figures.find(f=>tag.index>=f.start&&tag.index<f.end);let picture='';
-      if(figure?.images===1){const source=[...figure.html.matchAll(/<source\b[^>]*>/gi)].map(m=>attrs(m[0])).find(s=>!s.type||/^image\/(jpeg|png|webp)$/i.test(s.type));if(source)picture=bestResponsive(source.srcset||source['data-srcset']);}
+      const ownPicture=pictures.find(p=>tag.index>=p.start&&tag.index<p.end);
+      if(ownPicture||figure?.images===1){const source=[...(ownPicture?.html||figure.html).matchAll(/<source\b[^>]*>/gi)].map(m=>attrs(m[0])).find(s=>!s.type||/^image\/(jpeg|png|webp)$/i.test(s.type));if(source)picture=bestResponsive(source.srcset||source['data-srcset']||source['data-lazy-srcset']);}
       const width=parseInt(a.width||'0',10)||0,height=parseInt(a.height||'0',10)||0;
-      const direct=bestResponsive(a.srcset||a['data-srcset'])||a['data-src']||a['data-image']||a['data-lazy-src']||a['data-original']||(resolve(a.src,page)?a.src:'');
-      const url=((width&&width<100)||(height&&height<100))&&picture?picture:direct||picture;
-      if(((width&&width<100)||(height&&height<100))&&!a['data-src']&&!a['data-lazy-src']&&!a['data-original']&&!a.srcset&&!a['data-srcset']&&!picture)continue;
+      const responsive=bestResponsive(a.srcset||a['data-srcset']||a['data-lazy-srcset']),lazy=a['data-src']||a['data-image']||a['data-lazy-src']||a['data-original']||a['data-original-src']||a['data-flickity-lazyload-src'];
+      const direct=responsive||lazy||(resolve(a.src,page)?a.src:'');
+      const url=responsive||lazy||direct||picture;
+      if(((width&&width<100)||(height&&height<100))&&!lazy&&!responsive&&!picture)continue;
       const referenced=String(a['aria-describedby']||'').split(/\s+/).map(id=>referencedCaptions.get(id)).filter(Boolean).join(' ');
       const nearby=referenced||(figure?.images===1||figure?.captionGroup?figure.caption:'');const alt=a.alt||a.title||'';
       let caption=alt,basis=a.alt?'image_alt':a.title?'image_title':'missing';

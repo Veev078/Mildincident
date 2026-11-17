@@ -68,11 +68,11 @@ test('a denied second source retains useful first-page evidence without retry',a
  await service.searchStoryRequest(story,p.id,confirm(story));assert.deepEqual(calls,[url,project]);assert.equal(JSON.stringify(story),before);
 });
 
-test('a named link cannot expand the reader to an unsupported host, or change a saved request relevance policy',async t=>{
+test('a captured named link connects an unfamiliar public host, while the saved relevance policy stays bound',async t=>{
  let calls=0;const {service,research}=await setup(t,{readProjectPage:async()=>{calls++;return html+'<a href="https://unreviewed.example/private">Test Maker, Test Project</a>';}}),story=makeStory(),p=service.prepareDiscovery(story,request(story));
- await service.searchStoryRequest(story,p.id,confirm(story));assert.equal(calls,1);
+ await service.searchStoryRequest(story,p.id,confirm(story));assert.equal(calls,2);
  const next=service.prepareDiscovery(story,request(story)),stored=service.storyRequest(next.id);stored.plan.relevancePolicy='accept_every_reference';research.db.prepare('UPDATE photo_story_requests SET data_json=? WHERE request_id=?').run(JSON.stringify(stored),next.id);
- await assert.rejects(service.searchStoryRequest(story,next.id,confirm(story)),{code:'INVALID_PHOTO_RECEIPT'});assert.equal(calls,1);
+ await assert.rejects(service.searchStoryRequest(story,next.id,confirm(story)),{code:'INVALID_PHOTO_RECEIPT'});assert.equal(calls,2);
 });
 
 test('a later image-specific match can recover a previously withheld reference without rewriting its earlier receipt',async t=>{

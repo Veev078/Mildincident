@@ -58,7 +58,7 @@ test('bad MIME, oversized streams, redirects and undecodable pixels never become
  await assert.rejects(readSourceImage('https://static.life.com/file',{fetchImpl:async()=>new Response('not an image',{headers:{'content-type':'text/html'}})}),{code:'INVALID_PREVIEW_TYPE'});
  await assert.rejects(readSourceImage('https://static.life.com/file',{fetchImpl:async()=>new Response('x',{headers:{'content-type':'image/jpeg','content-length':String(9*1024*1024)}})}),{code:'SOURCE_IMAGE_TOO_LARGE'});
  await assert.rejects(readSourceImage('https://static.life.com/file',{fetchImpl:async()=>new Response(Buffer.alloc(9*1024*1024),{headers:{'content-type':'image/jpeg'}})}),{code:'SOURCE_IMAGE_TOO_LARGE'});
- await assert.rejects(readSourceImage('https://static.life.com/file',{fetchImpl:async()=>new Response(null,{status:302,headers:{location:'https://evil.example'}})}),{code:'SOURCE_HTTP_302'});
+ await assert.rejects(readSourceImage('https://static.life.com/file',{fetchImpl:async()=>new Response(null,{status:302,headers:{location:'https://evil.example'}})}),{code:'SOURCE_REDIRECT_NOT_BOUND'});
  const {service,previews}=await setup(t,{fetchImage:async()=>new Response('not pixels',{headers:{'content-type':'image/jpeg'}})}),s=story(),p=service.prepareDiscovery(s,input(s)),result=await service.searchStoryRequest(s,p.id,confirm(s));assert.equal(result.decodedImageCount,0);assert.equal(previews.all().size,0);assert.equal(result.imageAttempts.length,1);
 });
 

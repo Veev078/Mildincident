@@ -1,3 +1,4 @@
+import {photoVisionPanel} from './photo-vision.js';
 import {sequenceSuggestionSummary} from './sequence-suggestions.js';
 import {photoRequestPanel} from './photo-requests.js';
 import {esc,human,storyUrl,effective,image,empty,badge,fieldDisabled,matchesEditorialReview,editorialReviewFilter} from './components.js';
@@ -30,6 +31,6 @@ export function photoDeskWorkspace(state,story){
  const archive=anchor?`<button class="small-button" data-photo-continuation="alternatives" data-story="${esc(story.id)}" data-asset="${esc(anchor.id)}" data-revision="${esc(story.revision)}" data-working="${story.localDraft?.version||0}" data-preview-hash="${esc(anchor.localPreview?.sha256||'')}" ${fieldDisabled(story)}>Review archive search</button>`:'';
  const earlier=candidates.filter(a=>duplicates.has(a.id)||a.localReview?.decision==='reject');
  return `<div class="workspace-full photo-desk" data-story-task="images"><div class="photo-desk-heading"><div><p class="eyebrow">Build the story in pictures</p><h2>Photographs</h2></div><p>${story.media.length} references · ${selected.length} selected</p></div>
- <div class="photo-workstation"><div class="photo-results-workspace">${photoRequestPanel(story,state,archive)}<div class="library-tools photo-gallery-tools">${editorialReviewFilter(state.imageEditorialFilter||'all')}<a class="text-link" href="#/library">Image library →</a></div>
+ <div class="photo-workstation"><div class="photo-results-workspace">${photoRequestPanel(story,state,archive)}${photoVisionPanel(story,state)}<div class="library-tools photo-gallery-tools">${editorialReviewFilter(state.imageEditorialFilter||'all')}<a class="text-link" href="#/library">Image library →</a></div>
  ${group('direct','From this project','Project-linked candidates. Check the image, photographer credit and permission separately.')}${group('context','Context & exploration','Related creator or an explicitly broader search; not established project images.',true)}${group('unconfirmed','Other projects / unconfirmed','Retained source references without an established project connection.',true)}${earlier.length?`<details class="photo-collection"><summary>Duplicates & rejected references · ${earlier.length}</summary><p class="small muted">Retained for review. Your selections have not been removed.</p>${grid(earlier)}</details>`:''}${desk.similar?.length?'<p class="small muted">Some decoded private files have similar visual fingerprints. Compare them before choosing.</p>':''}</div>${selectedSequencePanel(story,state)}</div></div>`;
 }
