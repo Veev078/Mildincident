@@ -8,7 +8,7 @@ test('frame feedback binds the displayed selected hero rather than the first unr
 });
 test('generated photographic continuations remain labeled and linked to their parent instead of implying a new subject discovery',()=>{
  const html=founderQueue({workspace:{stories:[make('follow-up',{continuationOf:{storyId:'CON-parent',assetId:'exact-frame'}})]}});
- assert.ok(html.includes('Further photographic research · existing story'));assert.ok(html.includes('#/story/CON-parent/images'));assert.ok(html.includes('exact earlier frame exact-frame'));
+ assert.ok(html.includes('Further photographic research · existing story'));assert.ok(html.includes('#/story/CON-parent/build'));assert.ok(html.includes('exact earlier frame exact-frame'));
 });
 
 test('Discover has one clear direction form and truthful saved status without exposing operational controls as the main action',()=>{

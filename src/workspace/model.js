@@ -45,9 +45,9 @@ function researchFor(story, records) {
 }
 
 /** Browser contract is built by allowlist. Never serialize raw n8n rows or founder tokens. */
-export function buildWorkspace(snapshot, drafts = new Map()) {
+export function buildWorkspace(snapshot, drafts = new Map(),{storyId=null}={}) {
   const { records, buffer } = snapshot;
-  const stories = records.stories.map(row => {
+  const stories = records.stories.filter(row=>!storyId||row.concept_id===storyId).map(row => {
     const packages = records.packages.filter(p => p.concept_id === row.concept_id);
     const p = packages.length === 1 ? packages[0] : null;
     const selectedAssetIds = jsonArray(p?.slide_sequence_asset_ids).filter(id => typeof id === 'string');

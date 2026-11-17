@@ -39,18 +39,18 @@ test('photo action layout keeps search, source assistance and archival explorati
 
 test('selected sequence preserves exact order, offers explicit removal and escapes source labels',()=>{
  const story={id:'CON-ui',selectedAssetIds:['two','one'],media:[{id:'one',title:'First frame',previewUrl:''},{id:'two',title:'Second <frame>',previewUrl:''}],revision:'r1'};
- const before=structuredClone(story),html=selectedSequencePanel(story);assert(html.indexOf('Inspect selected photograph 1: Second &lt;frame&gt;')<html.indexOf('Inspect selected photograph 2: First frame'));assert.match(html,/Remove Second &lt;frame&gt; from sequence/);assert.match(html,/Arrange sequence/);assert.deepEqual(story,before);
+ const before=structuredClone(story),html=selectedSequencePanel(story);assert(html.indexOf('data-asset="two"')<html.indexOf('data-asset="one"'));assert.match(html,/Remove photograph 1/);assert.match(html,/data-action="move-slide"/);assert.match(html,/Second &lt;frame&gt;/);assert.deepEqual(story,before);
 });
 
 test('photo selection pauses on stale source with an explanation; source relevance never grants rights',()=>{
  const html=assetCard({id:'CON-ui',selectedAssetIds:[],localDraft:{stale:true}},{id:'one',title:'A frame',photoRelevance:{label:'Project reference'},rightsStatus:'preview_unreviewed'},false);
- assert.match(html,/data-action="toggle-asset"[^>]* disabled/);assert.match(html,/Selection paused/);assert.match(html,/Rights pending/);assert(!html.includes('Clearance recorded'));
+ assert.match(html,/data-action="toggle-asset"[^>]* disabled/);assert.match(html,/Selection paused/);assert.match(html,/data-action="inspect"/);assert(!html.includes('Clearance recorded'));
 });
 
 test('an unavailable selected cover is reported without relabeling another photograph as the cover',()=>{
  const story={id:'CON-ui',selectedAssetIds:['missing-cover','one'],media:[{id:'one',title:'Second frame'}],revision:'r1'};
  const html=selectedSequencePanel(story);
- assert.match(html,/2 photographs/);assert.match(html,/Inspect selected photograph 2: Second frame/);assert.match(html,/<span>02<\/span>/);assert.match(html,/A selected reference is unavailable/);assert(!html.includes('<span>Cover</span>'));
+ assert.match(html,/2 photographs/);assert.match(html,/Second frame/);assert.match(html,/<strong>02<\/strong>/);assert.match(html,/Photograph 1 is unavailable/);assert(!html.includes('<strong>Cover</strong>'));
  assert.deepEqual(story.selectedAssetIds,['missing-cover','one']);
 });
 

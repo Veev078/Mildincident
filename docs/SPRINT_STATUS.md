@@ -1,3 +1,9 @@
+# November 16 — V19 Studio reset implemented locally
+
+The founder reports V18 acquisition working (Miami photographs/22 references, saved Hase files, Jack order preserved) and approves a substantial frontend reset. V19 replaces layered story activities with Discover → Build → Refine → Approve / Buffer, a saved-photo-first gallery, in-place cover/ordering, optional curation and quieter final review. Story-scoped rendering, compact workspace payloads, disposable private thumbnails and retained image DOM address measured loading costs without rewriting acquisition or native operations. Actual local desktop/mobile editing-to-approval and failure recovery pass with real retained Jack inputs; AI judgments remain explicitly simulated. [Implementation, measurements, evidence and next release](release/V19_STUDIO_RESET.md). No deployment, live native/policy/credential change, paid AI or publishing occurred.
+
+---
+
 # November 16 — V18 integrated editorial engine implemented locally
 
 Recovered the interrupted working tree over `3bcaa3b` and completed generalized evidence-bound public source/CDN acquisition, reusable disabled-by-default founder-confirmed photo assessment, image-bound cover/carousel packages and selected-image context for the existing caption contract. Studio retains the accepted workstation, explicit Apply, versioned edits, approval handoff and live caption/story boundaries. Actual local desktop/mobile browser journeys use six real retained Jack JPEGs and labelled simulated outcomes; native interception verifies the actual JPEG bytes through one-to-six structural inputs with zero provider requests. No new hosted photographs, real complete visual judgments, deployment, live n8n/policy/credential changes or publishing are claimed. [Implementation, evidence, exact native proposal and coordinated next approval](release/V18_INTEGRATED_EDITORIAL_ENGINE.md).

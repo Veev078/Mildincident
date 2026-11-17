@@ -1,3 +1,4 @@
+import {renderStudio} from './studio-render.js';
 import {updateStoryGenerationReview,reconcileStoryProgress,updateAiUsagePanel,storyProposal} from './ai-operations.js';
 import {previewFailureMessage} from './preview-state.js';
 import {researchAccess} from './discovery-flow.js';
@@ -24,6 +25,7 @@ const inFlight = new Map();
 const savePromises = new Map();
 const captionRequestLocks=new Set();
 const visionLocks=new Set();
+const storyReads=new Map();
 const history = new Map();
 const timers = new Map();
 const versions = new Map();
@@ -99,21 +101,23 @@ function render({ focusMain = false } = {}) {
   for(const node of document.querySelectorAll('[data-remember-disclosure]')) state.openDisclosures[node.dataset.rememberDisclosure]=node.open;
   const focus = rememberFocus();
   const current = route();
-  if(current.view==='story'&&storyById(current.id))state.lastStoryTabs[current.id]=['overview','research','images','direction','caption','carousel','music','publishing'].includes(current.tab)?current.tab:'overview';
+  const comparisonVisible=state.compared.length&&(current.view==='library'||current.view==='story'&&current.tab==='build');
+  if(current.view==='story'&&storyById(current.id))state.lastStoryTabs[current.id]=['build','refine','approve','overview','research','images','direction','caption','carousel','music','publishing'].includes(current.tab)?current.tab:'overview';
   const source = state.workspace?.source || {};
   const active = destination(current.view);
-  const viewTitle = current.view === 'story' ? 'Stories' : ({archive:'Published archive',analytics:'Insights'}[current.view] || nav.find(n => n[0] === current.view)?.[2]);
+  const viewTitle = current.view === 'story' ? 'Stories' : ({home:'Editorial desk',library:'Photographs & sources',archive:'Published archive',analytics:'Insights'}[current.view] || nav.find(n => n[0] === current.view)?.[2]);
   const count = state.workspace?.stories?.length || 0;
   let body;
   if (state.loading) body = `<div class="loading-state"><p class="eyebrow">Retrieving the existing source records</p><h1>Opening the editorial desk.</h1><p>Stories, selected photographs and publishing evidence are loading.</p><div class="loading-line" aria-hidden="true"></div></div>`;
   else if (state.error) body = `<div class="empty-state error-state"><p class="eyebrow">Connection needs attention</p><h1>The desk could not be loaded.</h1><p>${esc(state.error)}</p><button class="button button-dark" data-action="reload">Try again</button><p class="small muted">No example stories or invented publishing results are substituted.</p></div>`;
   else if (current.view === 'story') {
     const story = storyById(current.id);
-    body = story ? views.storyWorkspace(state, story, current.tab) : `<div class="empty-state"><h1>Story not found in this snapshot.</h1><p>The existing ID may be unavailable or the source may have changed.</p><a class="button button-dark" href="#/pipeline">Back to Stories</a></div>`;
+    body = story&&!story.detailsLoaded ? `<div class="story-loading" role="status"><p class="eyebrow">Build the story</p><h1>${esc(story.title)}</h1>${state.storyReadErrors?.[story.id]?`<p role="alert">${esc(state.storyReadErrors[story.id])}</p><p>Your saved work is preserved.</p><button class="button button-light" data-load-story="${esc(story.id)}">Try again</button>`:'<p>Opening photographs and saved writing…</p><div class="loading-line"></div>'}</div>` : story ? views.storyWorkspace(state, story, current.tab) : `<div class="empty-state"><h1>Story not found in this snapshot.</h1><p>The existing ID may be unavailable or the source may have changed.</p><a class="button button-dark" href="#/pipeline">Back to Stories</a></div>`;
   } else body = views[current.view](state);
   const warnings = source.warnings || [];
   const connection = `<details class="connection-details"><summary><i class="status-dot ${source.stale||warnings.length?'stale':''}" aria-hidden="true"></i>Connection status${source.stale?' · cached':''}</summary><div class="connection-panel"><div class="source-bar"><span>${source.kind==='live_snapshot'?'Connected':source.kind?human(source.kind):'Connecting'}${source.observedAt?`<small>Updated ${esc(date(source.observedAt))} ET</small>`:''}</span><button class="text-button" data-action="refresh" ${source.refreshing?'disabled':''}>${source.refreshing?'Checking…':'Check for updates ↻'}</button></div>${warnings.length?`<ul class="source-warnings">${warnings.map(w=>`<li>${esc(typeof w==='string'?w:w.message||w.code)}</li>`).join('')}</ul>`:''}</div></details>`;
-  document.querySelector('#app').innerHTML = `<div class="app-shell ${state.compared.length?'has-comparison':''}"><aside class="sidebar"><a class="masthead" href="#/today" aria-label="MILDINCIDENT Today">MILDINCIDENT<span>Independent visual culture</span></a><div class="sidebar-label">Your publication</div><nav class="primary-nav" aria-label="Main navigation">${nav.map(([id,url,label,num])=>`<a href="#/${url}" ${active===id?'aria-current="page"':''}><span aria-hidden="true">${num}</span><span class="nav-label">${label}</span>${id==='pipeline'?`<small>${count}</small>`:''}</a>`).join('')}</nav><div class="sidebar-foot"><details class="sidebar-tools"><summary>Studio tools</summary>${state.workspace?.hosted?`<button class="text-button" data-hosted-backup>Download private backup</button><p class="small">${state.workspace.backupStatus?.lastSuccess?'Backup verified '+esc(date(state.workspace.backupStatus.lastSuccess))+' ET':'First backup pending'}${state.workspace.backupStatus?.state==='failed'?' · backup needs attention':''}<br>Keep an offsite copy.</p>${state.workspace.backupStatus?.id?'<a class="text-link" href="/api/backups/latest/archive">Download last verified copy</a>':''}`:''}<div class="keyboard-hints"><kbd>/</kbd> Find a story<br><kbd>G</kbd> <kbd>H</kbd> Today</div><a href="https://rickywelch.app.n8n.cloud/webhook/founder-command-center" target="_blank" rel="noopener noreferrer">Original Founder Studio ↗</a></details>${state.workspace?.backupStatus?.state==='failed'?'<p class="error-text" role="status">Backup needs attention — open Studio tools.</p>':''}<span class="edition-mark">M / I</span></div></aside><div class="workspace-shell"><header class="topbar"><div class="breadcrumb"><span>MILDINCIDENT</span><span aria-hidden="true">/</span><strong>${esc(viewTitle)}</strong></div><label class="global-search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" placeholder="Find a story…" value="${esc(state.search)}" aria-label="Find a story"><kbd>/</kbd></label>${connection}${state.workspace?.hosted?'<form method="post" action="/auth/logout" data-hosted-logout><button class="text-button" type="submit">Sign out</button></form>':''}</header>${libraryNavigation(current.view)}<main id="main-content" data-view="${esc(current.view)}" data-story-tab="${esc(current.tab||'')}" tabindex="-1">${body}</main><footer class="workspace-footer"><span>MILDINCIDENT · Independent visual culture</span><span>Editorial work saves privately · publishing requires approval</span></footer></div></div>${state.compared.length?`<div class="compare-tray"><span>${state.compared.length} ${state.compared.length===1?'image · choose one more':'images to compare'}</span><button class="button button-dark" data-action="open-comparison" ${state.compared.length<2?'disabled':''}>Compare images →</button><button class="text-button" data-action="clear-comparison">Clear comparison</button></div>`:''}`;
+  renderStudio(document.querySelector('#app'), `<div class="app-shell ${comparisonVisible?'has-comparison':''}"><aside class="sidebar"><a class="masthead" href="#/discover" aria-label="MILDINCIDENT Discover">MILDINCIDENT<span>Independent visual culture</span></a><div class="sidebar-label">Your publication</div><nav class="primary-nav" aria-label="Main navigation">${nav.map(([id,url,label,num])=>`<a href="#/${url}" ${active===id?'aria-current="page"':''}><span aria-hidden="true">${num}</span><span class="nav-label">${label}</span>${id==='pipeline'?`<small>${count}</small>`:''}</a>`).join('')}</nav><div class="sidebar-foot"><details class="sidebar-tools"><summary>Studio tools</summary><a href="#/today">Editorial desk</a><a href="#/library">Photographs & sources</a><a href="#/archive">Published archive</a>${state.workspace?.hosted?`<button class="text-button" data-hosted-backup>Download private backup</button><p class="small">${state.workspace.backupStatus?.lastSuccess?'Backup verified '+esc(date(state.workspace.backupStatus.lastSuccess))+' ET':'First backup pending'}${state.workspace.backupStatus?.state==='failed'?' · backup needs attention':''}<br>Keep an offsite copy.</p>${state.workspace.backupStatus?.id?'<a class="text-link" href="/api/backups/latest/archive">Download last verified copy</a>':''}`:''}<div class="keyboard-hints"><kbd>/</kbd> Find a story<br><kbd>G</kbd> <kbd>H</kbd> Today</div><a href="https://rickywelch.app.n8n.cloud/webhook/founder-command-center" target="_blank" rel="noopener noreferrer">Original Founder Studio ↗</a></details>${state.workspace?.backupStatus?.state==='failed'?'<p class="error-text" role="status">Backup needs attention — open Studio tools.</p>':''}<span class="edition-mark">M / I</span></div></aside><div class="workspace-shell"><header class="topbar"><div class="breadcrumb"><span>MILDINCIDENT</span><span aria-hidden="true">/</span><strong>${esc(viewTitle)}</strong></div><label class="global-search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" placeholder="Find a story…" value="${esc(state.search)}" aria-label="Find a story"><kbd>/</kbd></label>${connection}${state.workspace?.hosted?'<form method="post" action="/auth/logout" data-hosted-logout><button class="text-button" type="submit">Sign out</button></form>':''}</header>${libraryNavigation(current.view)}<main id="main-content" data-view="${esc(current.view)}" data-story-tab="${esc(current.tab||'')}" tabindex="-1">${body}</main><footer class="workspace-footer"><span>MILDINCIDENT · Independent visual culture</span><span>Editorial work saves privately · publishing requires approval</span></footer></div></div>${comparisonVisible?`<div class="compare-tray"><span>${state.compared.length} ${state.compared.length===1?'image · choose one more':'images to compare'}</span><button class="button button-dark" data-action="open-comparison" ${state.compared.length<2?'disabled':''}>Compare images →</button><button class="text-button" data-action="clear-comparison">Clear comparison</button></div>`:''}`);
+  const curation=document.querySelector('#curation-dialog');if(curation&&!curation.open)curation.showModal();
   resizeCaption();
   syncDialogControls();
   if(current.view==='discovery'&&state.focusDiscoverySetup){state.focusDiscoverySetup=false;document.querySelector('#research-direction')?.scrollIntoView({block:'start'});}
@@ -127,7 +131,7 @@ function render({ focusMain = false } = {}) {
 }
 
 function focusStoryTask(){
- const current=route(),task=current.tab==='caption'||current.tab==='overview'?'caption':current.tab==='publishing'?'review':current.tab==='images'||current.tab==='carousel'?'images':null;
+ const current=route(),task=current.tab==='refine'||current.tab==='caption'||current.tab==='overview'?'caption':current.tab==='approve'||current.tab==='publishing'?'review':current.tab==='build'||current.tab==='images'||current.tab==='carousel'?'images':null;
  const target=current.view==='story'&&task?document.querySelector('[data-story-task="'+task+'"]'):null;
  if(target){target.setAttribute('tabindex','-1');target.focus({preventScroll:true});const offset=(document.querySelector('.story-stages')?.getBoundingClientRect().height||0)+18;window.scrollTo({top:Math.max(0,window.scrollY+target.getBoundingClientRect().top-offset),behavior:'instant'});}
  else {document.querySelector('#main-content')?.focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});}
@@ -136,7 +140,8 @@ function focusStoryTask(){
 async function loadWorkspace({ quiet = false, renderView = true } = {}) {
   if (!quiet) { state.loading = true; render(); }
   try {
-    const workspace = await api('/api/workspace');
+    const workspace = await api('/api/workspace?summary=1');
+    const activeRoute=route();if(activeRoute.view==='story'){try{const full=await api('/api/stories/'+encodeURIComponent(activeRoute.id));const index=workspace.stories.findIndex(story=>story.id===full.id);if(index>=0)workspace.stories[index]=full;state.storyReadErrors ||= {};delete state.storyReadErrors[full.id];}catch(error){state.storyReadErrors ||= {};state.storyReadErrors[activeRoute.id]=error.message;}}
     if (!Array.isArray(workspace.stories)) throw new Error('The source response does not contain a story collection.');
     const previous = new Map((state.workspace?.stories || []).map(story => [story.id, { draft: story.localDraft, revision: story.revision }]));
     state.workspace = workspace;
@@ -160,6 +165,7 @@ async function loadWorkspace({ quiet = false, renderView = true } = {}) {
         if(version)state.captionChoices[story.id]=version.id;
       }
     }
+    const currentRoute=route(),currentStory=storyById(currentRoute.id);if(currentRoute.view==='story'&&currentStory&&!currentStory.detailsLoaded&&currentRoute.id!==activeRoute.id)await loadStory(currentRoute.id).catch(()=>{});
     state.loading = false; state.error = null; if(renderView)render();
     return workspace;
   } catch (error) {
@@ -503,6 +509,7 @@ document.addEventListener('click', async event => {
     case 'inspect-step':
     case 'inspect': {
       const asset = story?.media?.find(item => item.id === button.dataset.asset);
+      if(asset&&!story.detailsLoaded){loadStory(story.id).then(full=>showInspection(full,full.media.find(a=>a.id===asset.id))).catch(error=>toast(error.message,{error:true}));break;}
       if(asset){if(imageReviewSaving.size){toast('Your image review is saving. Try the next photograph in a moment.');break;}if(button.dataset.action==='inspect-step'&&document.querySelector('[data-preview-upload] input[type=file]')?.files.length){toast('Save or clear the selected preview file before changing photographs.',{error:true});break;}showInspection(story,asset,{focusStep:button.dataset.action==='inspect-step'?(button.textContent.includes('Next')?'Next':'Previous'):null});}
       break;
     }
@@ -831,7 +838,7 @@ document.querySelector('#asset-dialog').addEventListener('close',()=>{
  if(dialogReturnRoute===location.hash&&dialogReturnFocus){const target=dialogReturnFocus.id?document.getElementById(dialogReturnFocus.id):document.querySelector(dialogReturnFocus.selector);target?.focus({preventScroll:true});}
  dialogReturnFocus=null;dialogReturnRoute=null;
 });
-window.addEventListener('hashchange', () => { document.querySelector('#asset-dialog').close(); const next=route();if(next.view==='story'&&['overview','caption'].includes(next.tab)){state.captionTools ||= {};state.captionTools[next.id]='edit';} state.pendingRouteFocus=true;render({ focusMain: true }); });
+window.addEventListener('hashchange', async () => { document.querySelector('#asset-dialog').close();state.curationStory=null;const next=route();if(next.view==='story'&&next.tab==='refine'){state.captionTools ||= {};state.captionTools[next.id]='edit';}state.pendingRouteFocus=true;render({focusMain:true});if(next.view==='story'){await flushAllDrafts();await loadStory(next.id).catch(error=>toast(error.message,{error:true}));} });
 window.addEventListener('beforeunload', event => { if (pending.size || saving.size || imageReviewDrafts.size || Object.keys(state.editorialSetupDrafts||{}).length || Object.keys(state.musicIntentDrafts||{}).length || state.researchDraft?.prompt?.trim()) { event.preventDefault(); event.returnValue = ''; } });
 
 render();
@@ -1129,5 +1136,26 @@ setInterval(async()=>{
  const story=storyById(current.id),proposal=story&&visionProposal(story,state);
  if(!proposal||!visionPending(proposal)||proposal.state==='uncertain'||visionLocks.has(story.id))return;
  visionLocks.add(story.id);
- try{await api('/api/stories/'+encodeURIComponent(story.id)+'/vision/refresh',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({proposalId:proposal.id})});await loadWorkspace({quiet:true,renderView:current.tab==='images'||current.tab==='carousel'});}catch{/* The recorded operation is never resent. Manual check remains available. */}finally{visionLocks.delete(story.id);}
+ try{await api('/api/stories/'+encodeURIComponent(story.id)+'/vision/refresh',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({proposalId:proposal.id})});await loadWorkspace({quiet:true,renderView:current.tab==='build'||current.tab==='images'||current.tab==='carousel'});}catch{/* The recorded operation is never resent. Manual check remains available. */}finally{visionLocks.delete(story.id);}
 },5000);
+
+async function loadStory(id){
+ if(storyReads.has(id))return storyReads.get(id);
+ state.storyReadErrors ||= {};delete state.storyReadErrors[id];
+ const task=(async()=>{const detail=await api('/api/stories/'+encodeURIComponent(id)),current=storyById(id);if(!current)return detail;
+  const changes={...(inFlight.get(id)||{}),...(pending.get(id)||{})},prior=current.localDraft;
+  Object.assign(current,detail);
+  if(Object.keys(changes).length){const baseRevision=prior?.baseRevision||detail.revision;current.localDraft={...(detail.localDraft||{}),...(prior||{}),...changes,baseRevision,stale:baseRevision!==detail.revision};}
+  if(!saving.has(id))versions.set(id,current.localDraft?.version||0);if(route().id===id)render();return current;
+ })();storyReads.set(id,task);try{return await task;}catch(error){state.storyReadErrors[id]=error.message;if(route().id===id)render();throw error;}finally{storyReads.delete(id);}
+}
+document.addEventListener('click',event=>{
+ if(event.target.closest('[data-show-selection]')){document.querySelector('.post-in-progress')?.scrollIntoView({block:'start',behavior:'smooth'});return;}
+ if(event.target.closest('[data-show-gallery]')){document.querySelector('.gallery-heading')?.scrollIntoView({block:'start',behavior:'smooth'});return;}
+ const retry=event.target.closest('[data-load-story]');if(retry){retry.disabled=true;loadStory(retry.dataset.loadStory).catch(error=>toast(error.message,{error:true}));return;}
+ const filter=event.target.closest('[data-gallery-filter]');if(filter){state.galleryFilters ||= {};state.galleryFilters[filter.dataset.story]=filter.dataset.galleryFilter;render();return;}
+ const more=event.target.closest('[data-gallery-more]');if(more){state.galleryLimits ||= {};state.galleryLimits[more.dataset.galleryMore]=(state.galleryLimits?.[more.dataset.galleryMore]||18)+18;render();return;}
+ const open=event.target.closest('[data-curation-open]');if(open){state.curationStory=open.dataset.curationOpen;render();return;}
+ if(event.target.closest('[data-curation-close]')){const id=state.curationStory;state.curationStory=null;render();document.querySelector('[data-curation-open="'+CSS.escape(id)+'"]')?.focus();}
+});
+document.addEventListener('cancel',event=>{if(event.target.id==='curation-dialog')state.curationStory=null;},true);

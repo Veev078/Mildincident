@@ -151,6 +151,28 @@ export class LocalPreviewStore {
     catch(error){if(error.code==='ENOENT')throw new HandoffError('LOCAL_PREVIEW_MISSING','The saved preview file is unavailable. No files or records were changed.');throw error;}
   }
 
+  /** Disposable display derivatives. Originals, editorial hashes and saved
+   * selections never change. Coalesce duplicate requests; bound memory to 8 MiB. */
+  async readThumbnail(storyId,assetId,hash,width){
+    requireThat([320,640].includes(width),'INVALID_PREVIEW_SIZE','Choose a supported private thumbnail size.');
+    const preview=this.get(storyId,assetId,hash);requireThat(preview,'PREVIEW_NOT_FOUND','No private preview is attached to this image.');
+    this.thumbnailCache ||= new Map();this.thumbnailPending ||= new Map();
+    const key=preview.sha256+':'+width,filename=path.join(this.root,'blobs',preview.sha256+'.jpg');
+    let stat;try{stat=await fs.stat(filename);}catch{throw new HandoffError('LOCAL_PREVIEW_MISSING','The saved preview file is unavailable. No files or records were changed.');}
+    const cached=this.thumbnailCache.get(key);
+    if(cached&&cached.size===stat.size&&cached.modified===stat.mtimeMs){this.thumbnailCache.delete(key);this.thumbnailCache.set(key,cached);return {...cached,preview};}
+    if(this.thumbnailPending.has(key))return {...await this.thumbnailPending.get(key),preview};
+    const work=(async()=>{
+      const input=await this.readPreview(storyId,assetId,preview.sha256);
+      const bytes=await sharp(input.bytes,{limitInputPixels:40000000}).resize({width,withoutEnlargement:true}).jpeg({quality:74,mozjpeg:true}).toBuffer();
+      const result={bytes,preview,size:stat.size,modified:stat.mtimeMs};this.thumbnailCache.delete(key);this.thumbnailCache.set(key,result);
+      let total=[...this.thumbnailCache.values()].reduce((n,r)=>n+r.bytes.length,0);
+      for(const [old,r] of this.thumbnailCache){if(total<=8*1024*1024)break;this.thumbnailCache.delete(old);total-=r.bytes.length;}
+      return result;
+    })();this.thumbnailPending.set(key,work);
+    try{return await work;}finally{this.thumbnailPending.delete(key);}
+  }
+
   sourceInspection(storyId,assetId,hash){const row=this.db.prepare('SELECT * FROM local_source_preview_evidence WHERE story_id=? AND asset_id=? AND preview_sha256=?').get(storyId,assetId,hash);return row?{sourceUrl:row.source_url,imageUrl:row.image_url,executionId:row.acquisition_json?null:row.execution_id,inspectedAt:row.inspected_at,basis:row.acquisition_json?'direct_recorded_source_copy':'recorded_source_copy',...(row.acquisition_json?JSON.parse(row.acquisition_json):{}),identityVerified:false,rightsGranted:false}:null;}
   recordSourceAcquisition(storyId,assetId,hash,{sourceUrl,imageUrl,sourceExecutionId,receiptId}){
     requireThat(this.get(storyId,assetId,hash)&&safePhotoReference(sourceUrl)&&safePhotoReference(imageUrl)&&/^\d{1,30}$/.test(sourceExecutionId)&&/^[a-f0-9-]{36}$/.test(receiptId),'INVALID_PREVIEW_SOURCE','A decoded scoped preview and original source execution are required.');

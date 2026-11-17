@@ -64,9 +64,9 @@ export class WorkspaceSource {
     } catch { this.lastError = { code: 'CACHE_UNAVAILABLE', message: 'No complete source snapshot is available. Refresh the read-only connections.' }; }
   }
 
-  view(drafts = new Map()) {
+  view(drafts = new Map(),options={}) {
     requireThat(this.snapshot, 'SOURCE_UNAVAILABLE', 'The editorial snapshot is not available yet. Refresh the read-only connections.');
-    const result = buildWorkspace(this.snapshot, drafts);
+    const result = buildWorkspace(this.snapshot, drafts,options);
     result.source.refreshing = Boolean(this.inflight);
     result.source.refreshError = this.lastError ? { ...this.lastError } : null;
     result.source.stale = this.now() - Date.parse(this.snapshot.observedAt) > 15 * 60_000;

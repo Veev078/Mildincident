@@ -72,8 +72,8 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
   if(captionPilot)captionPilot.visualReviewForStory=story=>photography?.selectionReview?.(story)||null;
   const themes=research?new StudioThemes(research):null,approvalRequests=research?new ApprovalRequests(research):null;
   const isPhotoOperation=id=>Object.hasOwn(research?.engineJob(id)?.editorialContext||{},'photoAssessment');
-  const view = () => {
-    const workspace = source.snapshot?source.view(drafts.all()):buildWorkspace({records:Object.fromEntries(Object.keys(WORKSPACE_TABLES).map(k=>[k,[]])),buffer:{posts:[],complete:false,observedAt:null},observedAt:new Date().toISOString(),warnings:[]});
+  const view = ({storyId=null,summary=false,mediaOnly=false}={}) => {
+    const workspace = source.snapshot?source.view(drafts.all(),{storyId}):buildWorkspace({records:Object.fromEntries(Object.keys(WORKSPACE_TABLES).map(k=>[k,[]])),buffer:{posts:[],complete:false,observedAt:null},observedAt:new Date().toISOString(),warnings:[]});
     if(!source.snapshot)workspace.source={...workspace.source,kind:'disconnected',observedAt:null,bufferObservedAt:null,stale:true,unavailable:true,warnings:['No authoritative production snapshot is available. Private photographic research remains usable; connect n8n/Buffer or restore your private backup to inspect existing stories.'],refreshError:{code:'SOURCE_UNAVAILABLE',message:'Production observations unavailable; no example stories were substituted.'}};
     workspace.hosted=Boolean(access);workspace.backupStatus=backups?.status()||null;workspace.editorialDirection=editorialDirectionV14();
     // Pixel packets and their single-use grants stay private; photo outcomes
@@ -84,27 +84,30 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     for(const request of workspace.researchRequests)if(captionPilot)request.generationProposal=captionPilot.storyStatus?.(request.id);
     workspace.engine = engine?.status() || {configured:false,generationAvailable:false,generationApproved:false,workerActive:false};
     for (const request of workspace.researchRequests) for (const candidate of request.engineJob?.candidates || []) {
+      if(storyId&&storyId!=='CON-DEV-'+candidate.jobId)continue;
       const story = developmentCandidateStory(candidate,{request,soundtrack:source.snapshot?.records?.soundtrack || [],drafts:drafts.all(),continuation:request.continuation||request.engineJob.editorialContext?.continuation||null,decision:request.engineJob.reviewDecisions?.[candidate.id]||null,evidence:request.engineJob.evidence?.[candidate.id]||null});
       requireThat(!workspace.stories.some(s=>s.id===story.id),'AMBIGUOUS_ENGINE_RESULT','Development story identity collides with an existing record.');
       story.engineReviewVersion=request.engineJob.version;
       story.recoveredHistory=request.engineJob.recoveredHistory===true;
       workspace.stories.push(story);
     }
+    if(storyId)workspace.stories=workspace.stories.filter(story=>story.id===storyId);
     for(const story of workspace.stories){
-      story.captionGeneration=engine?.captionStatus(story,workspace.researchRequests)||captionGenerationState(story,workspace.researchRequests,null,{});
-      if(story.captionGeneration.result&&!story.hookOptions?.length)story.hookOptions=story.captionGeneration.result.hookOptions;
-      const photoRequests=photography?.storyRequestsFor(story)||[];
-      story.recordedProjectLinks=[...new Map([...(story.recordedProjectLinks||[]),...recordedPublisherAlternatives(story),...(photography?.storyProjectTrails(story)||[])].map(l=>[l.url,l])).values()].slice(0,8);
+      if(!mediaOnly)story.captionGeneration=engine?.captionStatus(story,workspace.researchRequests)||captionGenerationState(story,workspace.researchRequests,null,{});
+      if(story.captionGeneration?.result&&!story.hookOptions?.length)story.hookOptions=story.captionGeneration.result.hookOptions;
+      const photoRequests=summary||mediaOnly?[]:photography?.storyRequestsFor(story)||[];
+      if(!summary&&!mediaOnly)story.recordedProjectLinks=[...new Map([...(story.recordedProjectLinks||[]),...recordedPublisherAlternatives(story),...(photography?.storyProjectTrails(story)||[])].map(l=>[l.url,l])).values()].slice(0,8);
       story.photoRequests=[...photoRequests,...workspace.researchRequests.filter(r=>r.continuation?.origin?.storyId===story.id&&!photoRequests.some(p=>p.id===r.id)).map(r=>({id:r.id,state:'authorization_required',message:'Earlier request preserved. Prepare a new exact story request for an archive search; native sourcing still needs separate approval.',createdAt:r.createdAt}))];
       for(const photo of photography?.storyMedia(story)||[])if(!story.media.some(m=>m.id===photo.id))story.media.push(photo);
     }
     for(const story of workspace.stories){if(story.draftRecovery?.sourceJobId){const original='CON-DEV-'+story.draftRecovery.sourceJobId;if(workspace.stories.some(s=>s.id===original))story.recoveryOfStoryId=original;}const result=story.captionGeneration?.result;if(result){const version=workspace.stories.find(s=>s.id===result.storyId);if(version)version.recoveryOfStoryId=story.id;}}
     attachLocalPreviews(workspace,previews);
-    for (const story of workspace.stories) { story.photography=photoDesk(story);story.organization=drafts.organization(story.id);story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.photoVision=photoVisionPilot?.status(story)||null;const visualReview=photography?.selectionReview?.(story)||null;story.sourceSequencePlan=buildSourceSequencePlan(story,{visualReview});story.editorialPackage=buildEditorialPackage(story,{visualReview}); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity};story.approvalRequest=approvalRequests?.status(story)||null; }
-    workspace.photoHunts=photography?.all()||[];
+    for(const story of workspace.stories){story.detailsLoaded=!summary&&!mediaOnly;story.organization=drafts.organization(story.id);if(summary){story.research=[];story.intelligence=null;}}
+    for (const story of (summary||mediaOnly?[]:workspace.stories)) { story.photography=photoDesk(story);story.organization=drafts.organization(story.id);story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.photoVision=photoVisionPilot?.status(story)||null;const visualReview=photography?.selectionReview?.(story)||null;story.sourceSequencePlan=buildSourceSequencePlan(story,{visualReview});story.editorialPackage=buildEditorialPackage(story,{visualReview}); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity};story.approvalRequest=approvalRequests?.status(story)||null; }
+    workspace.photoHunts=summary||mediaOnly?[]:photography?.all()||[];
     workspace.founderReviews=founderReviews?.all()||{};
     workspace.sourceInputs={publications:feeds?.status()||[],leads:feeds?.list()||[]};
-    for(const story of workspace.stories)story.tasteCase=editorialTasteCase(story,{founderReview:workspace.founderReviews[story.id]});
+    for(const story of (summary||mediaOnly?[]:workspace.stories))story.tasteCase=editorialTasteCase(story,{founderReview:workspace.founderReviews[story.id]});
     workspace.discovery = buildDiscoveryDesk(workspace.stories);
     workspace.researchHandoffAvailable = Boolean(research);
     return workspace;
@@ -207,7 +210,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       if(photoRoute&&photoRoute[1]==='hunts'&&request.method==='GET'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');json(response,200,{hunt:photography.get(decodeURIComponent(photoRoute[2]),Number(url.searchParams.get('offset')||0))});return;}
       if(photoRoute&&request.method==='POST'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request),id=decodeURIComponent(photoRoute[2]);if(photoRoute[1]==='decisions'){json(response,200,photography.decide(id,input));return;}const hunt=await photography.resume(id,input.pages??1);json(response,200,{hunt,productionApplied:false,rightsGranted:false});return;}
       if(url.pathname==='/api/research/themes'&&request.method==='POST'){requireThat(themes,'RESEARCH_UNAVAILABLE','Private themes are unavailable.');json(response,200,{theme:themes.save(await body(request)),scope:'local_only',productionApplied:false});return;}
-      if (url.pathname === '/api/workspace' && request.method === 'GET') { json(response, 200, view()); return; }
+      if (url.pathname === '/api/workspace' && request.method === 'GET') { json(response, 200, view({summary:url.searchParams.get('summary')==='1'})); return; }
       if (url.pathname === '/api/research/requests' && request.method === 'POST') {
         requireThat(research, 'RESEARCH_UNAVAILABLE', 'The private research request store is unavailable.');
         const input = await body(request); const workspace = view();
@@ -269,7 +272,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
         let assetId;
         try { assetId = decodeURIComponent(previewMatch[2]); } catch { throw new HandoffError('INVALID_PREVIEW_SCOPE', 'Invalid image reference.'); }
         const findAsset = () => {
-          const story = view().stories.find(s => s.id === storyId);
+          const story = view({storyId,mediaOnly:request.method==='GET'}).stories.find(s => s.id === storyId);
           requireThat(story && story.media.filter(m => m.id === assetId).length === 1, 'STORY_NOT_FOUND', 'An exact existing story/image record is required.');return {story,asset:story.media.find(m=>m.id===assetId)};
         };
         findAsset();
@@ -282,7 +285,8 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
           json(response, 200, { review: previews.saveReview(storyId, assetId, reviewInput,{context}), scope: 'local_only', rightsGranted: false, productionApplied: false }); return;
         }
         if (request.method === 'GET') {
-          const result = await previews.readPreview(storyId, assetId, url.searchParams.get('hash') ?? undefined);
+          const size=url.searchParams.get('size');requireThat(size===null||['320','640'].includes(size),'INVALID_PREVIEW_SIZE','Choose a supported private thumbnail size.');
+          const result = size?await previews.readThumbnail(storyId,assetId,url.searchParams.get('hash')??undefined,Number(size)):await previews.readPreview(storyId, assetId, url.searchParams.get('hash') ?? undefined);
           response.writeHead(200, { 'Content-Type': 'image/jpeg', 'Content-Length': result.bytes.length,
             'Cache-Control': url.searchParams.has('hash') ? 'private, max-age=300, immutable' : 'no-store',
             'Content-Disposition': 'inline; filename="private-review-preview.jpg"' });
@@ -305,7 +309,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       const match = url.pathname.match(/^\/api\/stories\/(CON-[A-Za-z0-9_-]{1,120})(?:\/(organization|draft|proposal|production-packet(?:\/check)?|draft\/history|draft\/rebase))?$/);
       if (match) {
         const [, id, operation] = match;
-        const story = view().stories.find(s => s.id === id);
+        const story = view({storyId:id}).stories.find(s => s.id === id);
         requireThat(story, 'STORY_NOT_FOUND', 'Existing story was not found in the source snapshot.');
         if (!operation && request.method === 'GET') { json(response, 200, story); return; }
         if(operation==='organization'&&request.method==='PATCH'){const organization=drafts.organize(story,await body(request));json(response,200,{organization,scope:'local_only',productionApplied:false});return;}
