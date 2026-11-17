@@ -1,4 +1,5 @@
 import {renderStudio} from './studio-render.js';
+import {bufferConfirmDialog} from './buffer-draft.js';
 import {updateStoryGenerationReview,reconcileStoryProgress,updateAiUsagePanel,storyProposal} from './ai-operations.js';
 import {previewFailureMessage} from './preview-state.js';
 import {researchAccess} from './discovery-flow.js';
@@ -60,7 +61,7 @@ async function api(url, options) {
   let data;
   try { data = await response.json(); } catch { throw new Error('The workspace returned an unreadable response.'); }
   if(response.status===401&&data.error?.code==='LOGIN_REQUIRED'){if(!state.workspace)location.assign('/login');else{document.querySelector('#session-reauth')?.remove();const link=document.createElement('a');link.id='session-reauth';link.href='/login';link.target='_blank';link.rel='noopener';link.textContent='Session expired — sign in in a new tab. Pending edits remain here.';link.className='notice warning';document.querySelector('#app').prepend(link);}}
-  if (!response.ok) throw Object.assign(new Error(data.error?.message || 'The operation did not complete.'), { code: data.error?.code || `HTTP_${response.status}` });
+  if (!response.ok) throw Object.assign(new Error(data.error?.message || 'The operation did not complete.'), { code: data.error?.code || `HTTP_${response.status}`,delivery:data.delivery });
   return data;
 }
 
@@ -105,18 +106,18 @@ function render({ focusMain = false } = {}) {
   if(current.view==='story'&&storyById(current.id))state.lastStoryTabs[current.id]=['build','refine','approve','overview','research','images','direction','caption','carousel','music','publishing'].includes(current.tab)?current.tab:'overview';
   const source = state.workspace?.source || {};
   const active = destination(current.view);
-  const viewTitle = current.view === 'story' ? 'Stories' : ({home:'Editorial desk',library:'Photographs & sources',archive:'Published archive',analytics:'Insights'}[current.view] || nav.find(n => n[0] === current.view)?.[2]);
-  const count = state.workspace?.stories?.length || 0;
+  const viewTitle = current.view === 'story' ? 'Posts' : ({home:'Editorial desk',library:'Photographs & sources',archive:'Published archive',analytics:'Insights'}[current.view] || nav.find(n => n[0] === current.view)?.[2]);
+  const count = state.workspace?.stories?.filter(s=>!s.organization?.trashed).length || 0;
   let body;
   if (state.loading) body = `<div class="loading-state"><p class="eyebrow">Retrieving the existing source records</p><h1>Opening the editorial desk.</h1><p>Stories, selected photographs and publishing evidence are loading.</p><div class="loading-line" aria-hidden="true"></div></div>`;
   else if (state.error) body = `<div class="empty-state error-state"><p class="eyebrow">Connection needs attention</p><h1>The desk could not be loaded.</h1><p>${esc(state.error)}</p><button class="button button-dark" data-action="reload">Try again</button><p class="small muted">No example stories or invented publishing results are substituted.</p></div>`;
   else if (current.view === 'story') {
     const story = storyById(current.id);
-    body = story&&!story.detailsLoaded ? `<div class="story-loading" role="status"><p class="eyebrow">Build the story</p><h1>${esc(story.title)}</h1>${state.storyReadErrors?.[story.id]?`<p role="alert">${esc(state.storyReadErrors[story.id])}</p><p>Your saved work is preserved.</p><button class="button button-light" data-load-story="${esc(story.id)}">Try again</button>`:'<p>Opening photographs and saved writing…</p><div class="loading-line"></div>'}</div>` : story ? views.storyWorkspace(state, story, current.tab) : `<div class="empty-state"><h1>Story not found in this snapshot.</h1><p>The existing ID may be unavailable or the source may have changed.</p><a class="button button-dark" href="#/pipeline">Back to Stories</a></div>`;
+    body = story&&!story.detailsLoaded ? `<div class="story-loading" role="status"><p class="eyebrow">Build your post</p><h1>${esc(story.title)}</h1>${state.storyReadErrors?.[story.id]?`<p role="alert">${esc(state.storyReadErrors[story.id])}</p><p>Your saved work is preserved.</p><button class="button button-light" data-load-story="${esc(story.id)}">Try again</button>`:'<p>Opening photographs and saved writing…</p><div class="loading-line"></div>'}</div>` : story ? views.storyWorkspace(state, story, current.tab) : `<div class="empty-state"><h1>Story not found in this snapshot.</h1><p>The existing ID may be unavailable or the source may have changed.</p><a class="button button-dark" href="#/pipeline">Back to Posts</a></div>`;
   } else body = views[current.view](state);
   const warnings = source.warnings || [];
   const connection = `<details class="connection-details"><summary><i class="status-dot ${source.stale||warnings.length?'stale':''}" aria-hidden="true"></i>Connection status${source.stale?' · cached':''}</summary><div class="connection-panel"><div class="source-bar"><span>${source.kind==='live_snapshot'?'Connected':source.kind?human(source.kind):'Connecting'}${source.observedAt?`<small>Updated ${esc(date(source.observedAt))} ET</small>`:''}</span><button class="text-button" data-action="refresh" ${source.refreshing?'disabled':''}>${source.refreshing?'Checking…':'Check for updates ↻'}</button></div>${warnings.length?`<ul class="source-warnings">${warnings.map(w=>`<li>${esc(typeof w==='string'?w:w.message||w.code)}</li>`).join('')}</ul>`:''}</div></details>`;
-  renderStudio(document.querySelector('#app'), `<div class="app-shell ${comparisonVisible?'has-comparison':''}"><aside class="sidebar"><a class="masthead" href="#/discover" aria-label="MILDINCIDENT Discover">MILDINCIDENT<span>Independent visual culture</span></a><div class="sidebar-label">Your publication</div><nav class="primary-nav" aria-label="Main navigation">${nav.map(([id,url,label,num])=>`<a href="#/${url}" ${active===id?'aria-current="page"':''}><span aria-hidden="true">${num}</span><span class="nav-label">${label}</span>${id==='pipeline'?`<small>${count}</small>`:''}</a>`).join('')}</nav><div class="sidebar-foot"><details class="sidebar-tools"><summary>Studio tools</summary><a href="#/today">Editorial desk</a><a href="#/library">Photographs & sources</a><a href="#/archive">Published archive</a>${state.workspace?.hosted?`<button class="text-button" data-hosted-backup>Download private backup</button><p class="small">${state.workspace.backupStatus?.lastSuccess?'Backup verified '+esc(date(state.workspace.backupStatus.lastSuccess))+' ET':'First backup pending'}${state.workspace.backupStatus?.state==='failed'?' · backup needs attention':''}<br>Keep an offsite copy.</p>${state.workspace.backupStatus?.id?'<a class="text-link" href="/api/backups/latest/archive">Download last verified copy</a>':''}`:''}<div class="keyboard-hints"><kbd>/</kbd> Find a story<br><kbd>G</kbd> <kbd>H</kbd> Today</div><a href="https://rickywelch.app.n8n.cloud/webhook/founder-command-center" target="_blank" rel="noopener noreferrer">Original Founder Studio ↗</a></details>${state.workspace?.backupStatus?.state==='failed'?'<p class="error-text" role="status">Backup needs attention — open Studio tools.</p>':''}<span class="edition-mark">M / I</span></div></aside><div class="workspace-shell"><header class="topbar"><div class="breadcrumb"><span>MILDINCIDENT</span><span aria-hidden="true">/</span><strong>${esc(viewTitle)}</strong></div><label class="global-search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" placeholder="Find a story…" value="${esc(state.search)}" aria-label="Find a story"><kbd>/</kbd></label>${connection}${state.workspace?.hosted?'<form method="post" action="/auth/logout" data-hosted-logout><button class="text-button" type="submit">Sign out</button></form>':''}</header>${libraryNavigation(current.view)}<main id="main-content" data-view="${esc(current.view)}" data-story-tab="${esc(current.tab||'')}" tabindex="-1">${body}</main><footer class="workspace-footer"><span>MILDINCIDENT · Independent visual culture</span><span>Editorial work saves privately · publishing requires approval</span></footer></div></div>${comparisonVisible?`<div class="compare-tray"><span>${state.compared.length} ${state.compared.length===1?'image · choose one more':'images to compare'}</span><button class="button button-dark" data-action="open-comparison" ${state.compared.length<2?'disabled':''}>Compare images →</button><button class="text-button" data-action="clear-comparison">Clear comparison</button></div>`:''}`);
+  renderStudio(document.querySelector('#app'), `<div class="app-shell ${comparisonVisible?'has-comparison':''}"><aside class="sidebar"><a class="masthead" href="#/discover" aria-label="MILDINCIDENT Discover">MILDINCIDENT<span>Independent visual culture</span></a><div class="sidebar-label">Your publication</div><nav class="primary-nav" aria-label="Main navigation">${nav.map(([id,url,label,num])=>`<a href="#/${url}" ${active===id?'aria-current="page"':''}><span aria-hidden="true">${num}</span><span class="nav-label">${label}</span>${id==='pipeline'?`<small>${count}</small>`:''}</a>`).join('')}</nav><div class="sidebar-foot"><details class="sidebar-tools"><summary>Studio tools</summary><a href="#/today">Editorial desk</a><a href="#/library">Photographs & sources</a><a href="#/archive">Published archive</a>${state.workspace?.hosted?`<button class="text-button" data-hosted-backup>Download private backup</button><p class="small">${state.workspace.backupStatus?.lastSuccess?'Backup verified '+esc(date(state.workspace.backupStatus.lastSuccess))+' ET':'First backup pending'}${state.workspace.backupStatus?.state==='failed'?' · backup needs attention':''}<br>Keep an offsite copy.</p>${state.workspace.backupStatus?.id?'<a class="text-link" href="/api/backups/latest/archive">Download last verified copy</a>':''}`:''}<div class="keyboard-hints"><kbd>/</kbd> Find a post<br><kbd>G</kbd> <kbd>H</kbd> Today</div><a href="https://rickywelch.app.n8n.cloud/webhook/founder-command-center" target="_blank" rel="noopener noreferrer">Original Founder Studio ↗</a></details>${state.workspace?.backupStatus?.state==='failed'?'<p class="error-text" role="status">Backup needs attention — open Studio tools.</p>':''}<span class="edition-mark">M / I</span></div></aside><div class="workspace-shell"><header class="topbar"><div class="breadcrumb"><span>MILDINCIDENT</span><span aria-hidden="true">/</span><strong>${esc(viewTitle)}</strong></div><label class="global-search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" placeholder="Find a post…" value="${esc(state.search)}" aria-label="Find a post"><kbd>/</kbd></label>${connection}${state.workspace?.hosted?'<form method="post" action="/auth/logout" data-hosted-logout><button class="text-button" type="submit">Sign out</button></form>':''}</header>${libraryNavigation(current.view)}<main id="main-content" data-view="${esc(current.view)}" data-story-tab="${esc(current.tab||'')}" tabindex="-1">${body}</main><footer class="workspace-footer"><span>MILDINCIDENT · Independent visual culture</span><span>Editorial work saves privately · publishing requires approval</span></footer></div></div>${comparisonVisible?`<div class="compare-tray"><span>${state.compared.length} ${state.compared.length===1?'image · choose one more':'images to compare'}</span><button class="button button-dark" data-action="open-comparison" ${state.compared.length<2?'disabled':''}>Compare images →</button><button class="text-button" data-action="clear-comparison">Clear comparison</button></div>`:''}`);
   const curation=document.querySelector('#curation-dialog');if(curation&&!curation.open)curation.showModal();
   resizeCaption();
   syncDialogControls();
@@ -351,10 +352,11 @@ function showRehearsal(story, index = 0, fit = 'frame') {
   if (!count) return;
   const focusAction = document.activeElement?.dataset.action;
   rehearsal = { storyId: story.id, index: Math.max(0, Math.min(count - 1, index)), fit };
-  openDialog(views.carouselRehearsal(story, rehearsal.index, fit));
+  const captionOpen=Boolean(document.querySelector('#asset-dialog .rehearsal-caption[open]')),evidenceOpen=Boolean(document.querySelector('#asset-dialog .preview-evidence[open]'));
+  openDialog(views.carouselRehearsal(story, rehearsal.index, fit,{captionOpen,evidenceOpen}));
   const nextFocus = ['rehearse-step'].includes(focusAction) ? document.querySelector(`#asset-dialog [data-action="${focusAction}"]:not(:disabled)`) : null;
   nextFocus?.focus();
-  announce(`Carousel rehearsal: slide ${rehearsal.index + 1} of ${count}.`);
+  announce(`Slide ${rehearsal.index + 1} of ${count}.`);
 }
 
 async function openHistory(story) {
@@ -472,6 +474,7 @@ document.addEventListener('click', async event => {
       break;
     }
     case 'rehearse-story': showRehearsal(story); break;
+    case 'rehearse-go': if(rehearsal)showRehearsal(storyById(rehearsal.storyId),Number(button.dataset.index),rehearsal.fit); break;
     case 'rehearse-step': if (rehearsal) showRehearsal(storyById(rehearsal.storyId), rehearsal.index + Number(button.dataset.step), rehearsal.fit); break;
     case 'prepare-discovery':
       button.disabled = true;
@@ -551,7 +554,7 @@ document.addEventListener('click', async event => {
       if(index<=0)break;
       selected.unshift(...selected.splice(index,1));
       editDraft(story.id,{selectedAssetIds:selected},{rerender:true,immediate:true});
-      announce('Opening photograph changed. Image order saves privately.');break;
+      announce('Cover changed. Image order saves privately.');break;
     }
     case 'move-slide': {
       if (!story) break;
@@ -914,7 +917,19 @@ document.addEventListener('click',async event=>{
 });
 
 // Library organization changes no caption, media, native approval or production record.
-document.addEventListener('click',async event=>{const button=event.target.closest('[data-organize-story]');if(!button)return;button.disabled=true;try{if(!await flushAllDrafts())throw new Error('Save pending edits first.');const story=storyById(button.dataset.organizeStory),field=button.dataset.field;const result=await api('/api/stories/'+encodeURIComponent(story.id)+'/organization',{method:'PATCH',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({baseRevision:story.revision,expectedVersion:story.organization?.version||0,[field]:!story.organization?.[field]})});story.organization=result.organization;render();toast(field==='archived'?(result.organization.archived?'Story archived. Restore it from Archived stories.':'Story restored.'):(result.organization.pinned?'Story pinned.':'Story unpinned.'));}catch(error){toast(error.message,{error:true});button.disabled=false;}});
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-organize-story]');if(!button||button.disabled)return;
+ const story=storyById(button.dataset.organizeStory),field=button.dataset.field;if(!story||!['pinned','archived','trashed'].includes(field))return;
+ if(field==='trashed'&&!story.organization?.trashed&&!button.dataset.trashConfirmed){
+  openDialog(`<div class="dialog-heading"><h2>Move this post to Trash?</h2><button class="icon-button" data-action="close-dialog" aria-label="Cancel">×</button></div><p>${esc(story.title)}</p><p>Your caption, photographs, sources, approvals and delivery history stay safe. You can restore this post from Posts → Trash.</p><div class="dialog-actions"><button class="button button-light" data-action="close-dialog">Keep post</button><button class="button button-dark" data-organize-story="${esc(story.id)}" data-field="trashed" data-trash-confirmed="true">Move to Trash</button></div>`);return;
+ }
+ const lock='organize:'+story.id;if(captionRequestLocks.has(lock))return;captionRequestLocks.add(lock);button.disabled=true;
+ try{if(!await flushAllDrafts())throw new Error('Save pending edits first.');const value=!story.organization?.[field];
+  const result=await api('/api/stories/'+encodeURIComponent(story.id)+'/organization',{method:'PATCH',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({baseRevision:story.revision,expectedVersion:story.organization?.version||0,[field]:value,...(field==='trashed'&&value?{confirm:'move_to_trash'}:{})})});
+  story.organization=result.organization;if(button.dataset.trashConfirmed)document.querySelector('#asset-dialog')?.close();render();
+  toast(field==='trashed'?(value?'Moved to Trash. Restore it from Posts → Trash.':result.organization.archived?'Post restored to Archived posts.':'Post restored.') :field==='archived'?(value?'Post archived.':'Post returned to drafts.'):(value?'Post pinned.':'Post unpinned.'));
+ }catch(error){toast(error.message,{error:true});}finally{captionRequestLocks.delete(lock);button.disabled=false;}
+});
 document.addEventListener('change',event=>{if(event.target.id==='story-status'){state.pipelineGroup=event.target.value;render();}if(event.target.id==='story-sort'){state.storySort=event.target.value;render();}if(event.target.id==='story-archive'){state.storyArchive=event.target.value;render();}});
 
 // Plans are unpaid; confirmation consumes one server-owned policy authorization.
@@ -1159,3 +1174,41 @@ document.addEventListener('click',event=>{
  if(event.target.closest('[data-curation-close]')){const id=state.curationStory;state.curationStory=null;render();document.querySelector('[data-curation-open="'+CSS.escape(id)+'"]')?.focus();}
 });
 document.addEventListener('cancel',event=>{if(event.target.id==='curation-dialog')state.curationStory=null;},true);
+
+let previewTouch=null;
+document.addEventListener('pointerdown',event=>{if(event.pointerType==='touch'&&event.target.closest('.instagram-slide'))previewTouch={x:event.clientX,y:event.clientY};});
+document.addEventListener('pointerup',event=>{if(!previewTouch)return;const start=previewTouch;previewTouch=null;if(!rehearsal||!event.target.closest('.instagram-slide'))return;const dx=event.clientX-start.x,dy=event.clientY-start.y;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.4)showRehearsal(storyById(rehearsal.storyId),rehearsal.index+(dx<0?1:-1),rehearsal.fit);});
+document.addEventListener('pointercancel',()=>{previewTouch=null;});
+document.addEventListener('click',event=>{if(!event.target.closest('.post-options'))for(const menu of document.querySelectorAll('.post-options[open]'))menu.open=false;});
+document.addEventListener('keydown',event=>{if(event.key==='Escape')for(const menu of document.querySelectorAll('.post-options[open]'))menu.open=false;});
+function positionPostMenus(){
+ for(const menu of document.querySelectorAll('.post-options[open]')){
+  const panel=menu.querySelector('div'),anchor=menu.querySelector('summary').getBoundingClientRect();
+  menu.classList.toggle('opens-up',anchor.bottom+panel.offsetHeight>innerHeight-16&&anchor.top>panel.offsetHeight+16);
+ }
+}
+document.addEventListener('toggle',event=>{if(event.target.matches('.post-options')&&event.target.open){for(const other of document.querySelectorAll('.post-options[open]'))if(other!==event.target)other.open=false;requestAnimationFrame(positionPostMenus);}},true);
+window.addEventListener('resize',()=>requestAnimationFrame(positionPostMenus));
+
+// Sending is an explicit founder action. No polling, create retry or timed resend.
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-buffer-action]');if(!button||button.disabled)return;
+ const id=button.dataset.story,action=button.dataset.bufferAction,lock='buffer:'+id;
+ if(captionRequestLocks.has(lock))return;captionRequestLocks.add(lock);button.disabled=true;
+ try{
+  if(!await flushAllDrafts())throw Error('Save your caption and slides first.');
+  const story=storyById(id);if(!story)throw Error('Open the original post.');
+  state.bufferReviews ||= {};state.bufferReviewKeys ||= {};
+  const binding=JSON.stringify([id,story.revision,story.localDraft?.version||0]);
+  const review=state.bufferReviews[id];
+  const input=action==='review'?{sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:state.bufferReviewKeys[binding] ||= crypto.randomUUID()}:action==='send'?{sourceRevision:review?.sourceRevision,workingVersion:review?.workingVersion,approvalRequestId:review?.approvalRequestId,reviewDigest:review?.reviewDigest,confirm:'send_unscheduled_buffer_draft'}:{};
+  if(action==='send'&&!review?.reviewDigest)throw Error('Review this exact post before confirming.');
+  const result=await api('/api/stories/'+encodeURIComponent(id)+'/buffer-draft/'+action,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(input)});
+  story.bufferDraft=result.delivery;if(result.approvalRequest)story.approvalRequest=result.approvalRequest;
+  if(action==='review'&&result.delivery.ready){state.bufferReviews[id]={...result.delivery,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0};openDialog(bufferConfirmDialog(story,result.delivery));}
+  else{delete state.bufferReviews[id];if(action==='send')document.querySelector('#asset-dialog')?.close();render();toast(result.delivery.message);}
+ }catch(error){
+  if(action==='send'||action==='check'){delete state.bufferReviews?.[id];if(action==='send')document.querySelector('#asset-dialog')?.close();const story=storyById(id);if(story)story.bufferDraft=error.delivery||{state:'needs_reconciliation',canSend:false,canCheck:false,message:'Delivery was not confirmed. Do not send again. Check the saved delivery and Buffer before taking another action.'};render();}
+  toast(error.message,{error:true});
+ }finally{captionRequestLocks.delete(lock);button.disabled=false;}
+});

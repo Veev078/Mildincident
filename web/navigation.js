@@ -2,7 +2,7 @@ import {storyStage} from './story-flow.js';
 // Keep stored links and old bookmarks working while presenting five editorial destinations.
 export const navigation = [
  ['discovery','discover','Discover','01'],
- ['pipeline','stories','Build','02'],
+ ['pipeline','stories','Posts','02'],
  ['publishing','production','Approve / Buffer','03'],
 ];
 const aliases = {today:'home',discover:'discovery',stories:'pipeline',production:'publishing',insights:'analytics'};

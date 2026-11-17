@@ -28,7 +28,7 @@ npm test
 npm run workspace
 ```
 
-The workspace starts on **loopback port 4174**, loads the last completed source cache and refreshes read-only n8n/Buffer observations. Local caption, sequence, notes and music edits autosave with history and revision checks. Proposal JSON downloads are review artifacts, not production updates. There is no send, schedule, publish, delete or rights-clearance endpoint. In a sandbox, HTTP/child-process/browser tests may require execution permission; do not skip them or call a denied test passing.
+The workspace starts on **loopback port 4174**, loads the last completed source cache and refreshes read-only n8n/Buffer observations. Local caption, sequence, notes and music edits autosave with history and revision checks. Proposal JSON downloads are review artifacts, not production updates. Recoverable Trash preserves underlying records. The guarded Buffer draft routes are locally integrated with the existing outbox but have **no enabled production transport**; scheduling, publication, permanent deletion and rights clearance remain unavailable. See [final polish and Buffer readiness](docs/release/V19_FINAL_POLISH_BUFFER.md). In a sandbox, HTTP/child-process/browser tests may require execution permission; do not skip them or call a denied test passing.
 
 `npm run test:browser` runs the local Chromium workflow/regression suite with labeled synthetic fixtures and a temporary private store. The system Chromium path is configurable with `CHROMIUM_PATH`. Screenshots/reports stay under ignored `.local/`. `npm run studio` still starts the older historical launch brief on port 4173; it is not the primary product-wide workspace.
 

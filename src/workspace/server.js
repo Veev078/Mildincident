@@ -2,6 +2,8 @@ import {photoDesk} from "../photography/story-intelligence.js";
 import {recordedPublisherAlternatives} from '../photography/publisher-alternatives.js';
 import {editorialDirectionV14,editorialTasteCase} from '../editorial-v14.js';
 import {ApprovalRequests} from './approval-requests.js';
+import {StudioBufferDrafts} from './buffer-drafts.js';
+import {DraftLedger} from '../ledger.js';
 import {pipeline} from 'node:stream/promises';
 import {buildWorkspace,WORKSPACE_TABLES} from './model.js';
 import {possibleVariants} from '../photography/fingerprint.js';
@@ -66,11 +68,15 @@ async function imageBody(request) {
   return Buffer.concat(chunks);
 }
 
-export function createWorkspaceServer({ source, drafts, previews, research, engine, captionPilot=null, photography=research?new PhotographyService(research,{previews}):null, photoVisionPilot=research&&photography&&previews?new PhotoVisionPilot({research,photography,engine,captionPilot,createClient:captionPilot?.createClient}):null, founderReviews=research?new FounderReviewStore(research):null, feeds=research?new PublicationFeeds(research):null, access=null,backups=null,delivery=null,serverFactory=http.createServer, webRoot = WEB_ROOT }) {
+export function createWorkspaceServer({ source, drafts, previews, research, engine, bufferConnection=null, captionPilot=null, photography=research?new PhotographyService(research,{previews}):null, photoVisionPilot=research&&photography&&previews?new PhotoVisionPilot({research,photography,engine,captionPilot,createClient:captionPilot?.createClient}):null, founderReviews=research?new FounderReviewStore(research):null, feeds=research?new PublicationFeeds(research):null, access=null,backups=null,delivery=null,serverFactory=http.createServer, webRoot = WEB_ROOT }) {
   if(photography&&!photography.previews)photography.previews=previews;
   if(captionPilot&&engine)engine.captionPilot=captionPilot;
   if(captionPilot)captionPilot.visualReviewForStory=story=>photography?.selectionReview?.(story)||null;
   const themes=research?new StudioThemes(research):null,approvalRequests=research?new ApprovalRequests(research):null;
+  // Reuse the existing durable outbox on the already-backed-up private database.
+  // There is deliberately no environment switch or browser-supplied live adapter.
+  const draftLedger=research?new DraftLedger(research.db.location()):null;
+  const bufferDrafts=new StudioBufferDrafts({approvals:approvalRequests,ledger:draftLedger,connection:bufferConnection});
   const isPhotoOperation=id=>Object.hasOwn(research?.engineJob(id)?.editorialContext||{},'photoAssessment');
   const view = ({storyId=null,summary=false,mediaOnly=false}={}) => {
     const workspace = source.snapshot?source.view(drafts.all(),{storyId}):buildWorkspace({records:Object.fromEntries(Object.keys(WORKSPACE_TABLES).map(k=>[k,[]])),buffer:{posts:[],complete:false,observedAt:null},observedAt:new Date().toISOString(),warnings:[]});
@@ -103,7 +109,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     for(const story of workspace.stories){if(story.draftRecovery?.sourceJobId){const original='CON-DEV-'+story.draftRecovery.sourceJobId;if(workspace.stories.some(s=>s.id===original))story.recoveryOfStoryId=original;}const result=story.captionGeneration?.result;if(result){const version=workspace.stories.find(s=>s.id===result.storyId);if(version)version.recoveryOfStoryId=story.id;}}
     attachLocalPreviews(workspace,previews);
     for(const story of workspace.stories){story.detailsLoaded=!summary&&!mediaOnly;story.organization=drafts.organization(story.id);if(summary){story.research=[];story.intelligence=null;}}
-    for (const story of (summary||mediaOnly?[]:workspace.stories)) { story.photography=photoDesk(story);story.organization=drafts.organization(story.id);story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.photoVision=photoVisionPilot?.status(story)||null;const visualReview=photography?.selectionReview?.(story)||null;story.sourceSequencePlan=buildSourceSequencePlan(story,{visualReview});story.editorialPackage=buildEditorialPackage(story,{visualReview}); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity};story.approvalRequest=approvalRequests?.status(story)||null; }
+    for (const story of (summary||mediaOnly?[]:workspace.stories)) { story.photography=photoDesk(story);story.organization=drafts.organization(story.id);story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.photoVision=photoVisionPilot?.status(story)||null;const visualReview=photography?.selectionReview?.(story)||null;story.sourceSequencePlan=buildSourceSequencePlan(story,{visualReview});story.editorialPackage=buildEditorialPackage(story,{visualReview}); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity};story.approvalRequest=approvalRequests?.status(story)||null;story.bufferDraft=bufferDrafts.status(story); }
     workspace.photoHunts=summary||mediaOnly?[]:photography?.all()||[];
     workspace.founderReviews=founderReviews?.all()||{};
     workspace.sourceInputs={publications:feeds?.status()||[],leads:feeds?.list()||[]};
@@ -113,7 +119,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     return workspace;
   };
   let previewUploads=0;
-  return serverFactory(async (request, response) => {
+  const server=serverFactory(async (request, response) => {
     response.setHeader('Cache-Control', 'no-store');
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Referrer-Policy',access?'same-origin':'no-referrer');
@@ -173,6 +179,19 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       if(photoSearch&&request.method==='POST'){
         requireThat(photography,'RESEARCH_UNAVAILABLE','Photographic research is unavailable.');const id=decodeURIComponent(photoSearch[1]),readStory=()=>view().stories.find(s=>s.id===id),story=readStory();requireThat(story,'STORY_NOT_FOUND','Open the original story.');
         const photoRequest=await photography.searchStoryRequest(story,photoSearch[2],await body(request),{readStory});json(response,200,{photoRequest,productionApplied:false,paidCalls:0});return;
+      }
+      const bufferRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/buffer-draft\/(review|send|check)$/);
+      if(bufferRoute&&request.method==='POST'){
+        requireThat(approvalRequests,'APPROVAL_UNAVAILABLE','Private post review is unavailable.');
+        const id=decodeURIComponent(bufferRoute[1]),readStory=()=>view({storyId:id}).stories.find(s=>s.id===id),story=readStory();
+        requireThat(story,'STORY_NOT_FOUND','Open the original post.');const input=await body(request),action=bufferRoute[2];
+        try{
+          const result=action==='review'?await bufferDrafts.review(story,input):action==='send'?{delivery:await bufferDrafts.send(story,input,{readStory})}:{delivery:await bufferDrafts.check(story,input)};
+          json(response,200,result);
+        }catch(error){
+          if(!(error instanceof HandoffError))throw error;
+          json(response,['EDIT_CONFLICT','RECONCILIATION_REQUIRED'].includes(error.code)?409:400,{error:{code:error.code,message:error.message},delivery:bufferDrafts.status(readStory()||story)});
+        }return;
       }
       const approvalRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/approval-requests(?:\/([a-f0-9-]{36}))?$/);
       if(approvalRoute&&['GET','POST'].includes(request.method)){
@@ -364,6 +383,8 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       else response.end();
     }
   });
+  server.once('close',()=>draftLedger?.close());
+  return server;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -10,7 +10,7 @@ export function proposalReviewState(story,reviews={}){
 }
 export function founderQueue(state){
  const stories=state.workspace.stories||[],reviews=state.workspace.founderReviews||{},filter=state.reviewFilter||'new';
- const candidates=stories.filter(s=>s.origin==='n8n_development'&&!s.organization?.archived);
+ const candidates=stories.filter(s=>s.origin==='n8n_development'&&!s.organization?.trashed&&!s.organization?.archived);
  const eligible=['saved','research','passed'].includes(filter)?stories:filter==='existing'?stories.filter(s=>s.origin!=='n8n_development'&&!['buffer_sent','buffer_sent_observed','instagram_posted_verified'].includes(s.publishing?.observed)):candidates.filter(s=>filter==='history'?s.recoveredHistory||s.recoveryOfStoryId:!s.recoveredHistory&&(!s.recoveryOfStoryId||s.localDraft||reviews[s.id]||s.organization?.pinned));
  const shown=eligible.filter(s=>{const {decision}=proposalReviewState(s,reviews);return filter==='saved'?['develop','save'].includes(decision):filter==='research'?['explore','alternatives'].includes(decision):filter==='passed'?decision==='pass':filter==='history'||filter==='existing'?true:decision==='reset';});
  if(filter==='new')shown.sort((a,b)=>(Date.parse(b.engineProvenance?.generatedAt)||0)-(Date.parse(a.engineProvenance?.generatedAt)||0));

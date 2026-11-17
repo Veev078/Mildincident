@@ -16,7 +16,7 @@ test('an editorial exception or empty codes cannot masquerade as image permissio
  const s=story({production:{package:{rightsStatus:'reviewed',sourceClaimsReviewed:true,finalApprovalStatus:'approved',finalCaption:'The working caption.'}},media:[{id:'a',rightsStatus:'editorial_exception_authorized',nativeRightsReview:{reviewed:true,kind:'recorded_editorial_exception',rightsGranted:false}}]});
  assert.equal(productionSummary(s).requirements.find(r=>r.key==='rights').recorded,false);
  s.media[0].nativeRightsReview.kind='recorded_human_clearance';assert.equal(productionSummary(s).requirements.find(r=>r.key==='rights').recorded,true);
- const summary=productionSummary(s);assert.equal(summary.publicationApproved,false);assert.equal(summary.productionApplied,false);assert.ok(readinessPanel(s).includes('Studio does not transfer, approve, send or schedule this post'));
+ const summary=productionSummary(s);assert.equal(summary.publicationApproved,false);assert.equal(summary.productionApplied,false);assert.match(readinessPanel(s),/Sending from Studio is not enabled/);assert.doesNotMatch(readinessPanel(s),/data-buffer-action="(?:review|send)"/);
 });
 test('existing or uncertain handoff and stale revision remain the first actions while preserving every other recorded check',()=>{
  const s=story({localDraft:{stale:true},production:{blockers:['UNRESOLVED_PROVIDER_RESULT','PER_IMAGE_RIGHTS_PENDING','UNRECOGNIZED_GATE']},productionDecisions:[{key:'claims',title:'Review sources',detail:'Keep this claim-level review.',tab:'research'},{key:'handoff',title:'Resolve previous handoff',detail:'Never retry an ambiguous create.',tab:'publishing'}]});

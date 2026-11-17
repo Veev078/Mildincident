@@ -1,3 +1,11 @@
+# November 17 — V19 final polish and guarded Buffer integration
+
+Implemented clear stage buttons, Posts/three-dot actions, confirmed recoverable Trash and an image-first 4:5 carousel Preview with caption access. Existing approval requests, JPG preparation and the durable outbox now form one local confirmation-to-draft journey. Production transport remains disabled.
+
+Actual desktop/mobile browsers verified retained Jack photographs and preservation; the full local HTTP handoff used generated JPGs and a simulated provider. Syntax checks and 602 regression tests pass. Native read-only inspection confirmed the existing staging/approval/send paths. Live sending still needs one coordinated native content/claim/read-back repair and narrow rotation of the internal handoff secret surfaced during inspection. No live writes, paid calls, deployment or publication occurred. [Details and next release](release/V19_FINAL_POLISH_BUFFER.md).
+
+---
+
 # November 16 — V19 Studio reset implemented locally
 
 The founder reports V18 acquisition working (Miami photographs/22 references, saved Hase files, Jack order preserved) and approves a substantial frontend reset. V19 replaces layered story activities with Discover → Build → Refine → Approve / Buffer, a saved-photo-first gallery, in-place cover/ordering, optional curation and quieter final review. Story-scoped rendering, compact workspace payloads, disposable private thumbnails and retained image DOM address measured loading costs without rewriting acquisition or native operations. Actual local desktop/mobile editing-to-approval and failure recovery pass with real retained Jack inputs; AI judgments remain explicitly simulated. [Implementation, measurements, evidence and next release](release/V19_STUDIO_RESET.md). No deployment, live native/policy/credential change, paid AI or publishing occurred.

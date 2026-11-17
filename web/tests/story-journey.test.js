@@ -37,7 +37,7 @@ test('clearer story journey retains stale-edit, permission and existing-provider
  const stale=storyWorkspace(state,original,'caption');assert.match(stale,/Compare source and local draft/);assert.match(stale,/id="caption-editor"[^>]*disabled/);
  original.localDraft=null;original.publishing.requiresReview=true;
  const action=nextAction(original);assert.equal(action.tab,'publishing');assert.equal(action.label,'Review existing activity');
- const production=storyWorkspace(state,original,'publishing');assert.match(production,/Your post/);assert.match(production,/Buffer|publishing record/);assert.match(production,/Studio does not transfer, approve, send or schedule/);
+ const production=storyWorkspace(state,original,'publishing');assert.match(production,/Your post/);assert.match(production,/Buffer|publishing record/);assert.match(production,/Sending from Studio is not enabled/);
 });
 
 test('Develop keeps the explicitly selected cover even when another reference has an available preview',()=>{
