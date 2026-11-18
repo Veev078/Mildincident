@@ -8,7 +8,7 @@ import { WORKSPACE_TABLES, buildWorkspace } from './model.js';
 import { HandoffError, requireThat } from '../errors.js';
 import {EDITORIAL_PRESET_TABLES} from './editorial-presets.js';
 
-export const PRODUCTION_CONTEXT_TABLES=Object.freeze({exports:'dbyxu6uxL2Tpiaxd',proofs:'NEO7s23dFiIdUb1u',guardedHandoffs:'lBncgD93WV9a8oMu',staging:'lLXVATP5mOBIoogV'});
+export const PRODUCTION_CONTEXT_TABLES=Object.freeze({exports:'dbyxu6uxL2Tpiaxd',proofs:'NEO7s23dFiIdUb1u',guardedHandoffs:'lBncgD93WV9a8oMu',staging:'lLXVATP5mOBIoogV',files:'HOjGxJlmAiJZHYsR',finalReviews:'Jiows2tODEIIOFa3'});
 
 async function atomicJson(filename, value) {
   await fs.mkdir(path.dirname(filename), { recursive: true, mode: 0o700 });

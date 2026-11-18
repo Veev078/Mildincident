@@ -85,3 +85,6 @@ the shared claim/read-back contracts in `docs/PRODUCTION_REVIEW.md`, ordered sta
 JPEG verification, a draft-only Studio entry and the narrow internal-secret rotation.
 Only after those prerequisites may a separately approved real unscheduled draft run.
 Never reset history, erase a claim or resend an uncertain outcome as rollback.
+
+
+The later [coordinated Buffer integration](V19_BUFFER_COORDINATED_RELEASE.md) implements the previously missing native transfer, shared reservation and delivery-readback path locally. Its separate live approvals remain outstanding.

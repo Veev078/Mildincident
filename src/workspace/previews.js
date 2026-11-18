@@ -151,6 +151,12 @@ export class LocalPreviewStore {
     catch(error){if(error.code==='ENOENT')throw new HandoffError('LOCAL_PREVIEW_MISSING','The saved preview file is unavailable. No files or records were changed.');throw error;}
   }
 
+  /** Internal custody check for native review transfer; never an arbitrary file route. */
+  async readOriginal(storyId,assetId,previewHash){
+    const preview=this.get(storyId,assetId,previewHash);requireThat(preview,'PREVIEW_NOT_FOUND','The selected saved photograph is unavailable.');
+    return {bytes:await this.#readBlob(preview.originalSha256,'original'),preview};
+  }
+
   /** Disposable display derivatives. Originals, editorial hashes and saved
    * selections never change. Coalesce duplicate requests; bound memory to 8 MiB. */
   async readThumbnail(storyId,assetId,hash,width){

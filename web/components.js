@@ -31,6 +31,13 @@ export const mediaFor = story => {
   const ids = effective(story).selectedAssetIds;
   return ids.map(id => (story.media || []).find(asset => asset.id === id)).filter(Boolean);
 };
+// Only the final post preview uses the native finished JPEGs. Original gallery
+// assets and all editorial selections remain untouched.
+export const postMediaFor = story => {
+  const assets=mediaFor(story),slides=story.nativePublishing?.preparedSlides;
+  if(!Array.isArray(slides)||slides.length!==assets.length||!slides.every((s,i)=>s.assetId===assets[i].id))return assets;
+  return assets.map((asset,i)=>({...asset,previewUrl:slides[i].previewUrl,localPreview:{...asset.localPreview,width:1080,height:1350},finalPostFile:true}));
+};
 export function badge(text, tone = '') { return `<span class="badge ${esc(tone)}">${esc(text)}</span>`; }
 export function stateLabel(story) {
   const observed = story.publishing?.observed;
@@ -55,7 +62,7 @@ export function nextAction(story) {
   return { label: 'Review the carousel', tab: 'carousel', reason: 'Check image order, caption and current package together.' };
 }
 export function previewUrl(value) {
-  if (typeof value === 'string' && /^\/api\/stories\/CON-[A-Za-z0-9_-]{1,120}\/assets\/[^/?#\\\s]+\/preview\?hash=[a-f0-9]{64}(?:&size=(?:320|640))?$/.test(value)) return value;
+  if (typeof value === 'string' && /^\/api\/stories\/CON-[A-Za-z0-9_-]{1,120}\/(?:assets\/[^/?#\\\s]+\/preview|buffer-draft\/files\/[^/?#\\\s]+)\?hash=[a-f0-9]{64}(?:&size=(?:320|640))?$/.test(value)) return value;
   return safeUrl(value);
 }
 // A cover reference, not a sequence edit or proof that the browser loaded pixels.

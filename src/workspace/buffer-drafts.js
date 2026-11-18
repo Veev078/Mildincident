@@ -1,5 +1,5 @@
 import {canonical,sha256,validateManifest,sourceFingerprint,preparePackage,assertDraftRights} from '../package.js';
-import {prepareAndSend,reconcileKnownDraft} from '../handoff.js';
+import {prepareAndSend,reconcileKnownDraft,reconcileNativeDraft} from '../handoff.js';
 import {prepareProductionPacket} from './production-bridge.js';
 import {validatePacketImport} from '../production-packet-contract.js';
 import {requireThat} from '../errors.js';
@@ -9,6 +9,7 @@ const working=story=>({...story,...(story.localDraft||{})});
 const messages={
  POST_IN_TRASH:'Restore this post before sending it.',
  BUFFER_CONNECTION_REVIEW_REQUIRED:'Sending from Studio is not enabled yet. The existing Buffer workflow needs its duplicate-send and delivery checks completed first.',
+ BUFFER_DRAFT_NOT_AUTHORIZED:'Creating a Buffer draft has not been authorised for this exact post.',
  FINAL_JPEGS_REQUIRED:'The final, approved JPEG files still need verification in the existing production workflow.',
  EXISTING_HANDOFF_RECONCILIATION_REQUIRED:'Check the earlier Buffer delivery before sending again.',
 };
@@ -20,17 +21,18 @@ const messages={
  */
 export class StudioBufferDrafts {
  constructor({approvals,ledger=null,connection=null}){this.approvals=approvals;this.ledger=ledger;this.connection=connection;}
- connected(){const c=this.connection;return Boolean(this.ledger&&c?.singleWriterVerified===true&&c.unscheduledDraftVerified===true&&c.channelId&&['readFinalPackage','readCurrentPackage','readExistingHandoffs'].every(k=>typeof c[k]==='function')&&typeof c.adapter?.createUnscheduledDraft==='function'&&typeof c.adapter?.readPost==='function');}
+ connected(){const c=this.connection;return Boolean(this.ledger&&c?.singleWriterVerified===true&&(c.unscheduledDraftVerified===true||c.draftOnlyContractReviewed===true)&&c.channelId&&['readFinalPackage','readCurrentPackage','readExistingHandoffs'].every(k=>typeof c[k]==='function')&&typeof c.adapter?.createUnscheduledDraft==='function'&&typeof c.adapter?.readPost==='function');}
  attempt(story){const attempts=this.ledger?.list().filter(a=>a.story_id===story.id)||[];return attempts.length===1?attempts[0]:null;}
  status(story){
   const packet=prepareProductionPacket(story),check=validatePacketImport(packet,packet),attempt=this.attempt(story),codes=[...check.issues.map(i=>i.code)];
   if((this.ledger?.list().filter(a=>a.story_id===story.id).length||0)>1)codes.unshift('DELIVERY_HISTORY_REVIEW_REQUIRED');
   if(story.organization?.trashed)codes.unshift('POST_IN_TRASH');
   if(!this.connected())codes.unshift('BUFFER_CONNECTION_REVIEW_REQUIRED');
+  else if(this.connection.canCreateDraft&& !this.connection.canCreateDraft(story))codes.unshift('BUFFER_DRAFT_NOT_AUTHORIZED');
   if(packet.production.package?.finalAssetsVerified!==true)codes.push('FINAL_JPEGS_REQUIRED');
-  const ready=codes.length===0&&!attempt,uncertain=attempt&&attempt.state!=='confirmed_draft';
-  return {state:attempt?(uncertain?'needs_reconciliation':'confirmed_draft'):ready?'ready':'blocked',ready,canSend:ready,canCheck:Boolean(attempt?.remote_id&&this.connected()),postId:attempt?.remote_id||null,verifiedAt:attempt?.verified_at||null,providerStatus:attempt?.observed_status||null,target:'unscheduled_draft',
-   message:attempt?(uncertain?'Delivery needs checking. Do not send again.':`An unscheduled Buffer draft was verified${attempt.verified_at?' on '+attempt.verified_at:''}. Check its current status before taking any further action.`):ready?'Review the final caption and slides, then confirm one unscheduled Buffer draft.':messages[codes[0]]||'Complete the caption, photo permissions and final approval in the existing workflow.',
+  const ready=codes.length===0&&!attempt,running=attempt?.state==='sending'&&attempt.native_execution_id,uncertain=attempt&&attempt.state!=='confirmed_draft';
+  return {state:running?'sending':attempt?(uncertain?'needs_reconciliation':'confirmed_draft'):ready?'ready':'blocked',ready,canSend:ready,canCheck:Boolean((attempt?.remote_id||attempt?.native_execution_id||attempt&&this.connection?.adapter?.nativeCoordinator)&&(this.connected()||this.connection?.readOnlyAvailable)),postId:attempt?.remote_id||null,executionId:attempt?.native_execution_id||null,verifiedAt:attempt?.verified_at||null,providerStatus:attempt?.observed_status||null,target:'unscheduled_draft',
+   message:running?'The native workflow is preparing your Buffer draft. Check this delivery; do not send again.':attempt?(uncertain?'Delivery needs checking. Do not send again.':`An unscheduled Buffer draft was verified${attempt.verified_at?' on '+attempt.verified_at:''}. Check its current status before taking any further action.`):ready?'Review the final caption and slides, then confirm one unscheduled Buffer draft.':messages[codes[0]]||'Complete the caption, photo permissions and final approval in the existing workflow.',
    blockers:[...new Set(codes)].map(code=>({code,message:messages[code]||check.issues.find(i=>i.code===code)?.message||'Review this requirement in the existing approval workflow.'}))};
  }
  assertContent(story,input){
@@ -68,8 +70,10 @@ export class StudioBufferDrafts {
  }
  async check(story,input){
   requireThat(input&&Object.keys(input).length===0,'INVALID_BUFFER_REQUEST','Check the recorded delivery without resending.');
-  const attempt=this.attempt(story);requireThat(attempt?.remote_id,'REMOTE_ID_UNKNOWN','No Buffer ID was returned. A read-only check of the existing native ledger and Buffer is required. Do not resend.');
-  requireThat(this.connected(),'BUFFER_CONNECTION_REVIEW_REQUIRED',messages.BUFFER_CONNECTION_REVIEW_REQUIRED);
+  const attempt=this.attempt(story);
+  requireThat(this.connected()||this.connection?.readOnlyAvailable,'BUFFER_CONNECTION_REVIEW_REQUIRED',messages.BUFFER_CONNECTION_REVIEW_REQUIRED);
+  if(attempt&&this.connection?.adapter?.nativeCoordinator){await reconcileNativeDraft({ledger:this.ledger,key:attempt.scope_key,adapter:this.connection.adapter});return this.status(story);}
+  requireThat(attempt?.remote_id,'REMOTE_ID_UNKNOWN','No Buffer ID was returned. A read-only check of the existing native ledger and Buffer is required. Do not resend.');
   await reconcileKnownDraft({ledger:this.ledger,key:attempt.scope_key,adapter:this.connection.adapter});return this.status(story);
  }
 }

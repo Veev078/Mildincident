@@ -1,4 +1,5 @@
 import {CaptionPilot,readCaptionPilotConfig} from './caption-pilot.js';
+import {NativeBufferConnection,readNativeBufferPolicy} from './native-buffer-connection.js';
 import sharp from 'sharp';import {HostedBackups} from './hosted-backups.js';
 import {researchConnection,OBSERVED_RESEARCH_CONNECTION} from './research-connection.js';
 import {closeStudioServer} from './shutdown.js';
@@ -15,7 +16,9 @@ export async function startWorkspace({createServer,env=process.env,installSignal
  }catch(error){console.error('Research connection unavailable: '+(error.code||'CONFIGURATION_ERROR'));}
  const captionPilot=engine?new CaptionPilot({research,engine,loadConfig:()=>readCaptionPilotConfig({env,config}),createClient:options=>createEngineClient({...options,apiKey:env.N8N_API_KEY})}):null;if(captionPilot){engine.captionPilot=captionPilot;await captionPilot.inspect();}
  const backups=config.hosted?await new HostedBackups({workspace:config.workspace,destinationRoot:config.backups,stateFile:path.join(config.dataRoot,'backup-state.json')}).initialize():null;
- const server=createServer({source,drafts,previews,research,engine,captionPilot,feeds,access,backups,delivery});
+ const bufferConnection=env.N8N_API_KEY?new NativeBufferConnection({loadPolicy:()=>readNativeBufferPolicy({env,config}),read:n8nReader(env.N8N_API_KEY),bufferReader:env.BUFFER_ACCESS_TOKEN?new BufferReader({token:env.BUFFER_ACCESS_TOKEN}):null,source,drafts,previews,workspace:config.workspace}):null;
+ await bufferConnection?.inspect();
+ const server=createServer({source,drafts,previews,research,engine,captionPilot,feeds,access,backups,delivery,bufferConnection});
  let closing=null;const close=()=>closing||=(async()=>{await delivery?.stop();await backups?.stop();await closeStudioServer(server);if(source.inflight)await source.inflight.catch(()=>{});drafts.close();previews.close();research.close();access?.close();})();
  try{await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(config.port,config.host,resolve);});}catch(error){drafts.close();previews.close();research.close();access?.close();throw error;}
  console.log('MILDINCIDENT '+(config.hosted?'private hosted':'local')+' Studio listening on port '+config.port+'. Production writes disabled.');

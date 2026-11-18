@@ -2,6 +2,7 @@ import {validatePacketImport} from '../production-packet-contract.js';
 import {captionIsInternalTest} from '../n8n/draft-guards.js';
 import {createHash} from 'node:crypto';
 import {canonical} from '../package.js';
+import {nativePackageDigestMaterial} from '../native-package-identity.js';
 const array=value=>{try{const v=typeof value==='string'?JSON.parse(value):value;return Array.isArray(v)?v:[];}catch{return [];}};
 const string=v=>v===undefined||v===null?'':String(v);
 const version=v=>Number.isSafeInteger(Number(v))&&Number(v)>0?Number(v):null;
@@ -30,14 +31,16 @@ export function projectProduction({row,records,buffer,observedAt,safeUrl}){
  if(provider.some(i=>!i.found)||active.some(i=>!i.postId))blockers.push('UNRESOLVED_PROVIDER_RESULT');
  if(active.length>1)blockers.push('MULTIPLE_HANDOFFS_ACROSS_VERSIONS');
  if(!Array.isArray(records.guardedHandoffs))blockers.push('GUARDED_HANDOFF_COVERAGE_UNKNOWN');
- const digest=p?createHash('sha256').update(canonical(Object.fromEntries(['id','concept_id','package_id','production_version','editorial_handoff_version','caption_draft','slide_sequence_asset_ids','final_caption','final_asset_urls','final_assets_verified','final_approval_status','source_claims_reviewed','source_claims_review_notes','rights_review_status','render_revision','render_preflight_status','proof_execution_id','updatedAt'].map(k=>[k,p[k]??null])))).digest('hex'):null;
+ const digest=p?createHash('sha256').update(canonical(nativePackageDigestMaterial(p))).digest('hex'):null;
+ const selectedIds=array(p?.slide_sequence_asset_ids),candidateFiles=(records.files||[]).filter(f=>f.concept_id===row.concept_id&&f.package_id===packageId&&version(f.package_version)===packageVersion&&f.render_batch_id===p?.render_batch_id&&f.storage_verified===true&&f.storage_status==='verified_private'&&f.render_quality_status==='passed'&&f.mime_type==='image/jpeg'&&Number(f.pixel_width)===1080&&Number(f.pixel_height)===1350&&/^[a-f0-9]{64}$/.test(f.checksum_sha256||'')).sort((a,b)=>Number(a.slide_number)-Number(b.slide_number));
+ const finalFiles=p?.final_assets_verified===true&&candidateFiles.length===selectedIds.length&&candidateFiles.every((f,i)=>Number(f.slide_number)===i+1&&f.source_asset_id===selectedIds[i])?candidateFiles.map(f=>({fileRecordId:f.file_record_id,assetId:f.source_asset_id,position:Number(f.slide_number),sha256:f.checksum_sha256,width:1080,height:1350,bytes:Number(f.size_bytes),rightsEvidenceStatus:f.rights_evidence_status})):[];
  return {authority:'existing_n8n_production',relationship:packages.length===1?'exact_concept_id':packages.length?'ambiguous':'not_linked',observedAt,
   package:p?{id:packageId,rowId:string(p.id),version:packageVersion,editorialHandoffVersion:version(p.editorial_handoff_version),status:string(p.production_status),finalApprovalStatus:string(p.final_approval_status||'unreviewed'),rightsStatus:string(p.rights_review_status||'unreviewed'),sourceClaimsReviewed:p.source_claims_reviewed===true,sourceReviewNotes:string(p.source_claims_review_notes),sourceReviewDate:p.source_claims_reviewed_date||null,renderRevision:version(p.render_revision),renderPreflightStatus:string(p.render_preflight_status),finalAssetsVerified:p.final_assets_verified===true,finalCaption:string(p.final_caption),finalAssetUrls:array(p.final_asset_urls).map(safeUrl).filter(Boolean),sourceDigest:digest}:null,
   exports:relatedExports.map(e=>({id:string(e.export_id||e.id),version:version(e.production_version),current:!!packageVersion&&version(e.production_version)===packageVersion,status:string(e.export_status),kind:string(e.export_kind),filename:string(e.archive_filename),slideCount:Number(e.slide_count)||0,executionId:string(e.execution_id),createdAt:e.created_date||e.createdAt||null})),
   archives:archives.map(e=>({id:string(e.export_key||e.id),packageId:string(e.package_id),version:version(e.package_version),current:!!packageId&&e.package_id===packageId&&!!packageVersion&&version(e.package_version)===packageVersion,filename:string(e.archive_filename),sha256:string(e.sha256_checksum),verifiedPrivate:e.verified_private===true,status:string(e.storage_status),url:safeUrl(e.private_view_url)})),
   proofs:proofs.map(e=>({id:string(e.proof_id),label:string(e.label),status:string(e.status),slide:Number(e.slide_number)||null,url:safeUrl(e.preview_url),relationship:'explicit_package_execution_reference',versionVerified:false})),
   coverage:{exports:Array.isArray(records.exports),proofs:Array.isArray(records.proofs),guardedHandoffs:Array.isArray(records.guardedHandoffs)},
-  handoffs,provider,providerObservedAt:buffer.observedAt,providerSnapshotComplete:buffer.complete===true,publicationApproved:false,productionApplied:false,blockers};
+  finalFiles,handoffs,provider,providerObservedAt:buffer.observedAt,providerSnapshotComplete:buffer.complete===true,publicationApproved:false,productionApplied:false,blockers};
 }
 
 /** Review packet for the existing backend. No import/create instruction, new publishing ledger or authority. */

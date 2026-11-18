@@ -64,8 +64,8 @@ export function validateManifest(input) {
     object(slide.source, ['url', 'creator'], 'Source');
     https(slide.source.url, 'source.url');
     text(slide.source.creator, 'source.creator');
-    object(slide.rights, ['status', 'evidence', 'reviewedBy', 'reviewedAt', 'credit'], 'Rights');
-    requireThat(['pending', 'cleared', 'restricted'].includes(slide.rights.status), 'INVALID_MANIFEST', 'Rights status must be pending, cleared, or restricted.');
+    object(slide.rights, ['status', 'evidence', 'reviewedBy', 'reviewedAt', 'credit', 'exception'], 'Rights');
+    requireThat(['pending', 'cleared', 'restricted','editorial_exception_authorized'].includes(slide.rights.status), 'INVALID_MANIFEST', 'Use a recorded rights status; an editorial exception is not a license.');
     requireThat(Array.isArray(slide.rights.evidence) && slide.rights.evidence.length <= 20, 'INVALID_MANIFEST', 'rights.evidence must be a list of HTTPS references.');
     for (const evidence of slide.rights.evidence) https(evidence, 'rights.evidence');
     if (slide.rights.reviewedBy !== undefined) text(slide.rights.reviewedBy, 'rights.reviewedBy');
@@ -73,9 +73,13 @@ export function validateManifest(input) {
       requireThat(typeof slide.rights.reviewedAt === 'string' && /^\d{4}-\d\d-\d\dT/.test(slide.rights.reviewedAt) && Number.isFinite(Date.parse(slide.rights.reviewedAt)), 'INVALID_MANIFEST', 'rights.reviewedAt must be an ISO timestamp.');
     }
     if (slide.rights.credit !== undefined) text(slide.rights.credit, 'rights.credit', 1000);
-    if (slide.rights.status === 'cleared') {
+    if (['cleared','editorial_exception_authorized'].includes(slide.rights.status)) {
       requireThat(slide.rights.evidence.length > 0 && slide.rights.reviewedBy && slide.rights.reviewedAt, 'RIGHTS_EVIDENCE_MISSING', 'Cleared rights need per-image evidence, a human reviewer, and a review timestamp.');
     }
+    if(slide.rights.status==='editorial_exception_authorized'){
+      const e=slide.rights.exception;object(e,['storyId','assetId','purpose','nature','amount','market'],'Editorial exception');
+      requireThat(e.storyId===input.storyId&&e.assetId===slide.assetId&&['purpose','nature','amount','market'].every(k=>typeof e[k]==='string'&&e[k].trim().length>0&&e[k].length<=6000),'RIGHTS_EVIDENCE_MISSING','Retain the exact post/photo scope and all four human-reviewed exception factors.');
+    }else requireThat(slide.rights.exception===undefined,'INVALID_MANIFEST','An exception belongs only to an explicitly reviewed editorial-exception record.');
   }
   return structuredClone(input);
 }
@@ -121,7 +125,7 @@ function exportFingerprint(receipt) {
 }
 
 export function assertDraftRights(prepared) {
-  requireThat(prepared.slides.every(slide => slide.rights.status === 'cleared'), 'RIGHTS_NOT_CLEARED', 'Private files may be prepared while rights are pending. External draft handoff requires recorded per-image clearance under this local policy.');
+  requireThat(prepared.slides.every(slide => ['cleared','editorial_exception_authorized'].includes(slide.rights.status)), 'RIGHTS_NOT_CLEARED', 'External handoff needs recorded per-image clearance or the existing scoped human editorial-exception review. Saved files alone grant no rights.');
 }
 
 export async function verifyPrepared(directory) {
@@ -149,7 +153,7 @@ export async function verifyPrepared(directory) {
   return { ...receipt, directory: await fs.realpath(directory) };
 }
 
-export async function preparePackage(manifest, { inputRoot, privateRoot }) {
+export async function preparePackage(manifest, { inputRoot, privateRoot, preserveVerifiedJpeg=false }) {
   const valid = validateManifest(manifest);
   await fs.mkdir(privateRoot, { recursive: true, mode: 0o700 });
   const temporary = await fs.mkdtemp(path.join(privateRoot, '.preparing-'));
@@ -159,9 +163,9 @@ export async function preparePackage(manifest, { inputRoot, privateRoot }) {
     for (const [index, slide] of valid.slides.entries()) {
       const bytes = await readWithin(inputRoot, slide.file);
       requireThat(sha256(bytes) === slide.sha256, 'SOURCE_CHANGED', 'Source file checksum differs from the approved selection.');
-      const image = await inspectJpeg(bytes);
+      const image = await inspectJpeg(bytes,{clean:preserveVerifiedJpeg});
       // Strip embedded metadata without resizing, overlays, or editorial reframing.
-      const clean = await image.rotate().jpeg({ quality: 95, chromaSubsampling: '4:4:4' }).toBuffer();
+      const clean = preserveVerifiedJpeg?bytes:await image.rotate().jpeg({ quality: 95, chromaSubsampling: '4:4:4' }).toBuffer();
       const file = `${String(index + 1).padStart(2, '0')}.jpg`;
       await fs.writeFile(path.join(temporary, file), clean, { flag: 'wx', mode: 0o600 });
       slides.push({ ...slide, file, originalSha256: slide.sha256, sha256: sha256(clean) });

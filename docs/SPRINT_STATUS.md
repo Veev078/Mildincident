@@ -1,3 +1,11 @@
+## November 17–18 — coordinated Buffer handoff (local, awaiting approvals)
+
+The accepted V19 layout is preserved. Exact saved captions/order now transfer into the existing native production/review flow behind a disabled private connection. Both native writers share canonical package claims; finished JPEG bytes, rights/facts/final approval, public staging and independent Buffer reads are bound to the current version. Pending/uncertain deliveries survive restart and never resubmit automatically.
+
+Exposed internal-token scope was checked without printing it. Retirement and dedicated Studio JWT authentication are prepared; **the live token has not been revoked**. No deployment, native/credential mutation, paid execution or Buffer write occurred. [One coordinated release and separate one-draft approval](release/V19_BUFFER_COORDINATED_RELEASE.md) contains the current evidence, native Cloud claim proof still required, exact proposed changes and safe rollback. Actual desktop/mobile screenshots under `.local/buffer-native-browser/` show generated test JPEGs with simulated native/provider I/O, not hosted editorial success.
+
+---
+
 # November 17 — V19 final polish and guarded Buffer integration
 
 Implemented clear stage buttons, Posts/three-dot actions, confirmed recoverable Trash and an image-first 4:5 carousel Preview with caption access. Existing approval requests, JPG preparation and the durable outbox now form one local confirmation-to-draft journey. Production transport remains disabled.

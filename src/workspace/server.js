@@ -4,6 +4,7 @@ import {editorialDirectionV14,editorialTasteCase} from '../editorial-v14.js';
 import {ApprovalRequests} from './approval-requests.js';
 import {StudioBufferDrafts} from './buffer-drafts.js';
 import {DraftLedger} from '../ledger.js';
+import {NativePostTransfers} from './native-post-transfer.js';
 import {pipeline} from 'node:stream/promises';
 import {buildWorkspace,WORKSPACE_TABLES} from './model.js';
 import {possibleVariants} from '../photography/fingerprint.js';
@@ -77,6 +78,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
   // There is deliberately no environment switch or browser-supplied live adapter.
   const draftLedger=research?new DraftLedger(research.db.location()):null;
   const bufferDrafts=new StudioBufferDrafts({approvals:approvalRequests,ledger:draftLedger,connection:bufferConnection});
+  const nativeTransfers=research&&typeof bufferConnection?.submitReview==='function'?new NativePostTransfers({approvals:approvalRequests,research,drafts,previews,connection:bufferConnection,refreshSource:()=>source.refresh(),readStory:id=>view({storyId:id}).stories.find(s=>s.id===id)}):null;
   const isPhotoOperation=id=>Object.hasOwn(research?.engineJob(id)?.editorialContext||{},'photoAssessment');
   const view = ({storyId=null,summary=false,mediaOnly=false}={}) => {
     const workspace = source.snapshot?source.view(drafts.all(),{storyId}):buildWorkspace({records:Object.fromEntries(Object.keys(WORKSPACE_TABLES).map(k=>[k,[]])),buffer:{posts:[],complete:false,observedAt:null},observedAt:new Date().toISOString(),warnings:[]});
@@ -109,7 +111,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     for(const story of workspace.stories){if(story.draftRecovery?.sourceJobId){const original='CON-DEV-'+story.draftRecovery.sourceJobId;if(workspace.stories.some(s=>s.id===original))story.recoveryOfStoryId=original;}const result=story.captionGeneration?.result;if(result){const version=workspace.stories.find(s=>s.id===result.storyId);if(version)version.recoveryOfStoryId=story.id;}}
     attachLocalPreviews(workspace,previews);
     for(const story of workspace.stories){story.detailsLoaded=!summary&&!mediaOnly;story.organization=drafts.organization(story.id);if(summary){story.research=[];story.intelligence=null;}}
-    for (const story of (summary||mediaOnly?[]:workspace.stories)) { story.photography=photoDesk(story);story.organization=drafts.organization(story.id);story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.photoVision=photoVisionPilot?.status(story)||null;const visualReview=photography?.selectionReview?.(story)||null;story.sourceSequencePlan=buildSourceSequencePlan(story,{visualReview});story.editorialPackage=buildEditorialPackage(story,{visualReview}); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity};story.approvalRequest=approvalRequests?.status(story)||null;story.bufferDraft=bufferDrafts.status(story); }
+    for (const story of (summary||mediaOnly?[]:workspace.stories)) { story.photography=photoDesk(story);story.organization=drafts.organization(story.id);story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.photoVision=photoVisionPilot?.status(story)||null;const visualReview=photography?.selectionReview?.(story)||null;story.sourceSequencePlan=buildSourceSequencePlan(story,{visualReview});story.editorialPackage=buildEditorialPackage(story,{visualReview}); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity};story.approvalRequest=approvalRequests?.status(story)||null;story.bufferDraft=bufferDrafts.status(story);story.nativePublishing=bufferConnection?.status?.(story)||null;story.nativeReviewTransfer=nativeTransfers?.latest(story.id)||null; }
     workspace.photoHunts=summary||mediaOnly?[]:photography?.all()||[];
     workspace.founderReviews=founderReviews?.all()||{};
     workspace.sourceInputs={publications:feeds?.status()||[],leads:feeds?.list()||[]};
@@ -180,6 +182,22 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
         requireThat(photography,'RESEARCH_UNAVAILABLE','Photographic research is unavailable.');const id=decodeURIComponent(photoSearch[1]),readStory=()=>view().stories.find(s=>s.id===id),story=readStory();requireThat(story,'STORY_NOT_FOUND','Open the original story.');
         const photoRequest=await photography.searchStoryRequest(story,photoSearch[2],await body(request),{readStory});json(response,200,{photoRequest,productionApplied:false,paidCalls:0});return;
       }
+      const nativeReviewRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/native-review\/(submit|approve|check)$/);
+      if(nativeReviewRoute&&request.method==='POST'){
+        requireThat(nativeTransfers,'NATIVE_REVIEW_DISABLED','The native publishing connection is not enabled.');const id=decodeURIComponent(nativeReviewRoute[1]),story=view({storyId:id}).stories.find(s=>s.id===id);requireThat(story,'STORY_NOT_FOUND','Open the original post.');const input=await body(request),action=nativeReviewRoute[2];
+        if(action==='check')requireThat(Object.keys(input).length===0,'INVALID_NATIVE_REVIEW','Observe the existing native request only.');
+        const prior=nativeTransfers.latest(id),completedCheck=action==='check'&&['native_review_saved','native_post_approved'].includes(prior?.state)&&prior.packageVersion===story.production?.package?.version;
+        const operation=completedCheck?prior:action==='submit'?await nativeTransfers.submit(story,input):action==='approve'?await nativeTransfers.approve(story,input):await nativeTransfers.reconcile(story);
+        if(['native_review_saved','native_post_approved'].includes(operation.state)){const latest=view({storyId:id}).stories[0];if(latest.production?.finalFiles?.length)await bufferConnection.preparePreview(latest);}
+        json(response,200,{operation,nativeApplied:['native_review_saved','native_post_approved'].includes(operation.state),bufferCreated:false,published:false});return;
+      }
+      const nativeFileRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/buffer-draft\/files\/([^/]+)$/);
+      if(nativeFileRoute&&request.method==='GET'){
+        const id=decodeURIComponent(nativeFileRoute[1]),story=view({storyId:id}).stories.find(s=>s.id===id),fileId=decodeURIComponent(nativeFileRoute[2]),hash=url.searchParams.get('hash');requireThat(story&&previews,'PREVIEW_NOT_FOUND','Open the original prepared post.');
+        const file=story.nativePublishing?.preparedSlides?.find(f=>f.fileRecordId===fileId&&f.sha256===hash);requireThat(file,'PREVIEW_NOT_FOUND','The final preview no longer matches this post.');const saved=previews.get(id,file.previewId);requireThat(saved?.originalSha256===hash,'PREVIEW_NOT_FOUND','This exact final JPEG is not cached.');
+        const size=url.searchParams.get('size');let bytes;if(size){requireThat(['320','640'].includes(size),'INVALID_PREVIEW_SIZE','Use a supported display size.');bytes=(await previews.readThumbnail(id,file.previewId,saved.sha256,Number(size))).bytes;}else bytes=(await previews.readOriginal(id,file.previewId,saved.sha256)).bytes;
+        response.writeHead(200,{'Content-Type':'image/jpeg','Content-Length':bytes.length,'Cache-Control':'private, max-age=300, immutable'});response.end(bytes);return;
+      }
       const bufferRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/buffer-draft\/(review|send|check)$/);
       if(bufferRoute&&request.method==='POST'){
         requireThat(approvalRequests,'APPROVAL_UNAVAILABLE','Private post review is unavailable.');
@@ -229,6 +247,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       if(photoRoute&&photoRoute[1]==='hunts'&&request.method==='GET'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');json(response,200,{hunt:photography.get(decodeURIComponent(photoRoute[2]),Number(url.searchParams.get('offset')||0))});return;}
       if(photoRoute&&request.method==='POST'){requireThat(photography,'RESEARCH_UNAVAILABLE','Private research is unavailable.');const input=await body(request),id=decodeURIComponent(photoRoute[2]);if(photoRoute[1]==='decisions'){json(response,200,photography.decide(id,input));return;}const hunt=await photography.resume(id,input.pages??1);json(response,200,{hunt,productionApplied:false,rightsGranted:false});return;}
       if(url.pathname==='/api/research/themes'&&request.method==='POST'){requireThat(themes,'RESEARCH_UNAVAILABLE','Private themes are unavailable.');json(response,200,{theme:themes.save(await body(request)),scope:'local_only',productionApplied:false});return;}
+      if(request.method==='GET'&&(url.pathname==='/api/workspace'||/^\/api\/stories\/[^/]+$/.test(url.pathname)))await bufferConnection?.inspect?.();
       if (url.pathname === '/api/workspace' && request.method === 'GET') { json(response, 200, view({summary:url.searchParams.get('summary')==='1'})); return; }
       if (url.pathname === '/api/research/requests' && request.method === 'POST') {
         requireThat(research, 'RESEARCH_UNAVAILABLE', 'The private research request store is unavailable.');

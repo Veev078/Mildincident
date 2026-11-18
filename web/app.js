@@ -1,5 +1,5 @@
 import {renderStudio} from './studio-render.js';
-import {bufferConfirmDialog} from './buffer-draft.js';
+import {bufferConfirmDialog,nativeReviewDialog} from './buffer-draft.js';
 import {updateStoryGenerationReview,reconcileStoryProgress,updateAiUsagePanel,storyProposal} from './ai-operations.js';
 import {previewFailureMessage} from './preview-state.js';
 import {researchAccess} from './discovery-flow.js';
@@ -184,6 +184,7 @@ function showSaveStatus(message, isError = false) {
 }
 
 function invalidatePreparedApproval(story){
+ if(story.nativePublishing)story.nativePublishing={...story.nativePublishing,preparedSlides:[],approveAvailable:false,finalFilesVerified:false};
  if(story.approvalRequest)story.approvalRequest={...story.approvalRequest,state:'changed',unchanged:false,nativePreflightAccepted:false,message:'The working copy changed. Your earlier review handoff is preserved; save and prepare the current version before handing it over.'};
 }
 
@@ -1211,4 +1212,29 @@ document.addEventListener('click',async event=>{
   if(action==='send'||action==='check'){delete state.bufferReviews?.[id];if(action==='send')document.querySelector('#asset-dialog')?.close();const story=storyById(id);if(story)story.bufferDraft=error.delivery||{state:'needs_reconciliation',canSend:false,canCheck:false,message:'Delivery was not confirmed. Do not send again. Check the saved delivery and Buffer before taking another action.'};render();}
   toast(error.message,{error:true});
  }finally{captionRequestLocks.delete(lock);button.disabled=false;}
+});
+
+// Each button performs one explicit action; checks only observe the recorded
+// execution. Reload/restart never causes an automatic native resubmission.
+document.addEventListener('click',async event=>{
+ const b=event.target.closest('[data-native-review]');if(!b||b.disabled)return;
+ const id=b.dataset.story,action=b.dataset.nativeReview,lock='native-review:'+id;
+ if(captionRequestLocks.has(lock))return;captionRequestLocks.add(lock);b.disabled=true;
+ try{
+  if(!await flushAllDrafts())throw Error('Save your caption and slide order first.');
+  const story=storyById(id);if(!story)throw Error('Reopen the post.');
+  if(action==='review-transfer'||action==='review-approval'){openDialog(nativeReviewDialog(story,action==='review-approval'));return;}
+  const common={sourceRevision:story.revision,workingVersion:story.localDraft?.version||0};let input={};
+  if(action==='submit'){
+   const a=await api('/api/stories/'+encodeURIComponent(id)+'/approval-requests',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({...common,idempotencyKey:crypto.randomUUID(),confirm:'prepare_review_only'})});
+   input={...common,approvalRequestId:a.approvalRequest.id,confirm:'submit_exact_post_for_native_review'};
+  }else if(action==='approve'){
+   if(!document.querySelector('[data-native-facts]')?.checked||!document.querySelector('[data-native-slides]')?.checked)throw Error('Confirm both the facts and the finished slides before approving.');
+   input={...common,idempotencyKey:crypto.randomUUID(),finalPostDigest:story.nativePublishing?.finalPostDigest,confirm:'approve_exact_native_post',factsReviewed:true,slidesReviewed:true};
+  }
+  const r=await api('/api/stories/'+encodeURIComponent(id)+'/native-review/'+action,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(input)});
+  document.querySelector('#asset-dialog')?.close();await loadWorkspace({quiet:true});
+  toast(['dispatching','running'].includes(r.operation.state)?'Preparation is in progress. Use Check preparation to confirm the result.':r.operation.state==='native_post_approved'?'Post approval verified. Buffer sending remains a separate confirmation.':'Saved caption and slide order verified in the approval workflow.');
+ }catch(error){toast(error.message,{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}
+ finally{captionRequestLocks.delete(lock);b.disabled=false;}
 });

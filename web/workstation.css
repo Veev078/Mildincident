@@ -42,7 +42,7 @@
 .button-dark { background:var(--accent);border-color:var(--accent);color:#fff; }
 .button-dark:hover:not(:disabled) { background:#274b3c;border-color:#274b3c; }
 .button-light,.small-button { background:var(--surface);border:1px solid var(--line);color:var(--ink); }
-.button-light:hover:not(:disabled),.small-button:hover:not(:disabled) { border-color:var(--quiet); }
+.button-light:hover:not(:disabled),.small-button:hover:not(:disabled) { border-color:var(--quiet);background:var(--surface);color:var(--ink); }
 .small-button { padding:10px 14px;font-size:12px; }
 .text-button { min-height:44px;padding:8px 2px;font-size:12px; }
 .icon-button { display:inline-grid;place-items:center;width:44px;min-width:44px;padding:8px;background:var(--surface);border:1px solid var(--line);font-size:18px; }
