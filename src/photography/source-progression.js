@@ -8,7 +8,8 @@ const eligible=(photo,identity,direction)=>{const c=photoRelevance({...photo,sou
 /** Derived only from immutable receipts. Source reads, extraction and file acquisition
  * have independent progress: changing a direction does not require rereading HTML. */
 export function sourceProgression(story,requests,{direction='best',custom='',now=Date.now(),hasPreview=a=>Boolean(a.localPreview)}={}){
- const identity=storyPhotoIdentity(story),groups=new Map(),states=[],reuse=[],suppressed=new Set();
+ const identity=storyPhotoIdentity(story),groups=new Map(),states=[],reuse=[],suppressed=new Set(),selected=new Set(story.localDraft?.selectedAssetIds??story.selectedAssetIds??[]),byKey=new Map();
+ for(const asset of [...(story.media||[])].sort((a,b)=>Number(selected.has(b.id))-Number(selected.has(a.id))))for(const key of photoFileKeys(asset))if(!byKey.has(key))byKey.set(key,asset);
  const current=requests.filter(p=>p.packet?.payload?.target?.sourceRevision===story.revision&&sameIdentity(p.plan?.identity,identity));
  for(const p of current){
   for(const a of p.imageAttempts||[])if(['unavailable','interrupted','fetching','unsupported_host','exact_duplicate'].includes(a.status)&&suppressed.size<120)suppressed.add(a.imageUrl);
@@ -39,26 +40,31 @@ export function sourceProgression(story,requests,{direction='best',custom='',now
   // the verified remainder to be examined without changing their old evidence.
   const nextOffset=through<total?through:null;
   const cursorFor=offset=>offset?{...first.sourceCapture.extractionCursor,offset}:null;
-  let candidate=null,unseen=0,pending=0;
+  let candidate=null,unseen=0,pending=0,selectedPending=0;
   const offsets=[...new Set([0,...ranges.map(r=>r.start)])];
   for(const offset of offsets){
    const parsed=offset?projectPageReferences(story,{url,html:c.html,direction,cursor:cursorFor(offset),transport:c.transport}):first;
    let needs=false;
-   for(const photo of parsed.photos.filter(a=>eligible(a,identity,direction))){
+   for(const photo of parsed.photos){
     if(suppressed.has(photo.previewUrl))continue;
-    const keys=photoFileKeys(photo),asset=(story.media||[]).find(a=>photoFileKeys(a).some(k=>keys.includes(k)));
+    const keys=photoFileKeys(photo),asset=keys.map(k=>byKey.get(k)).filter(Boolean).sort((a,b)=>Number(selected.has(b.id))-Number(selected.has(a.id)))[0];
+    // An explicit founder selection may acquire its own source file without
+    // promoting unconfirmed publisher neighbours into project photographs.
+    if(!eligible(photo,identity,direction)&&!(asset&&selected.has(asset.id)))continue;
     if(!asset){unseen++;needs=true;}else if(!hasPreview(asset)){pending++;needs=true;}
+    if(asset&&selected.has(asset.id)&&!hasPreview(asset)){selectedPending++;candidate={requestId:g.request.id,url,sha256:c.sha256,cursor:offset?cursorFor(offset):null,reason:'selected_files_pending'};}
    }
    if(needs&&!candidate)candidate={requestId:g.request.id,url,sha256:c.sha256,cursor:offset?cursorFor(offset):null,reason:'pending_images'};
   }
-  if(nextOffset!==null)candidate={requestId:g.request.id,url,sha256:c.sha256,cursor:cursorFor(nextOffset),reason:through?'continue_scan':'unseen_references'};
+  if(nextOffset!==null&&!selectedPending)candidate={requestId:g.request.id,url,sha256:c.sha256,cursor:cursorFor(nextOffset),reason:through?'continue_scan':'unseen_references'};
   const bounded=coverage.pageTruncated===true||coverage.imageTagsFound!==coverage.imageTagsConsidered;
   const state=nextOffset!==null?'scan_remaining':unseen?'available_references':pending?'images_pending':bounded?'bounded_scan_no_additions':'checked_no_additions';
   if(!candidate&&now-Date.parse(c.capturedAt)>86400000)continue;
-  states.push({url,state,requestId:g.request.id,captureSha256:c.sha256,checkedAt:c.capturedAt,completeScan:nextOffset===null&&!bounded,pendingImages:pending,unseenReferences:unseen,scanOffset:through,nextOffset,remainingReferences:Math.max(0,total-through),referenceCount:total});
+  states.push({url,state,requestId:g.request.id,captureSha256:c.sha256,checkedAt:c.capturedAt,completeScan:nextOffset===null&&!bounded,pendingImages:pending,selectedImagesPending:selectedPending,unseenReferences:unseen,scanOffset:through,nextOffset,remainingReferences:Math.max(0,total-through),referenceCount:total});
   if(candidate)reuse.push(candidate);
  }
  for(const p of current)for(const a of p.sourceAttempts||[]){if(states.some(s=>sourcePageKey(s.url)===sourcePageKey(a.url))||a.status!=='failed'||!Number.isFinite(Date.parse(p.startedAt)))continue;const denied=/^SOURCE_HTTP_(401|403|404|410)$/.test(a.errorCode||'');if(denied&&now-Date.parse(p.startedAt)>86400000)continue;states.push({url:a.url,state:denied?'source_unavailable':'outcome_unconfirmed',errorCode:a.errorCode,requestId:p.id});}
+ reuse.sort((a,b)=>Number(b.reason==='selected_files_pending')-Number(a.reason==='selected_files_pending'));
  return {version:2,states,reuse:reuse.slice(0,1),suppressedImageUrls:[...suppressed],projectExhausted:false};
 }
 

@@ -1,13 +1,20 @@
 import {storyGenerationReview,storyProposal,aiUsagePanel} from './ai-operations.js';
-import {discoverySetup,researchAccess} from './discovery-flow.js';
-import {founderQueue} from './review.js';
+import {discoverySetup} from './discovery-flow.js';
+import {canLaunchSavedResearch} from './research-launch.js';
+import {DEFAULT_DISCOVERY_PROMPT} from './discovery-request.js';
+import {founderQueue,reviewQueueSelection} from './review.js';
 import {esc,storyUrl} from './components.js';
 export function discovery(state){
  const requests=state.workspace.researchRequests||[],reviewed=storyProposal(state),active=requests.filter(r=>r.id!==reviewed?.id&&r.engineJob&&!r.engineJob.recoveredHistory&&!r.engineJob.candidates?.some(c=>(state.workspace.stories||[]).some(s=>s.id==='CON-DEV-'+c.jobId))).sort((a,b)=>Number(Boolean(a.engineJob.candidates?.length))-Number(Boolean(b.engineJob.candidates?.length))).slice(0,3);
- const saved=requests.find(r=>!r.engineJob&&!r.linkedStoryId&&!r.generationProposal&&!r.continuation);
- const savedDirection=saved?`<p class="saved-direction">Direction saved.${researchAccess(state.workspace.engine).canReview?` <button class="text-button" data-start-saved-research="${esc(saved.id)}">Generate Stories</button>`:''}</p>`:'';
- const progress=active.length?`<section class="generation-progress" aria-label="Generation progress">${active.map(r=>{const status=researchStatus(r),job=r.engineJob;return `<article data-request-id="${esc(r.id)}"><strong>${esc(status.label)}</strong><p>${esc(status.detail)}</p>${job.candidates?.length?job.candidates.map(c=>`<a class="text-link" href="${storyUrl('CON-DEV-'+c.jobId)}">Develop this story →</a>`).join(''):['queued'].includes(job.state)&&!job.dispatchId&&researchAccess(state.workspace.engine).canReview?`<button class="small-button" data-start-saved-research="${esc(r.id)}">Generate Stories</button>`:''}${job.lastError?'<button class="text-button" data-engine-action="refresh">Check for results</button><p class="small muted">This request will not be resent automatically.</p>':''}</article>`;}).join('')}</section>`:'';
- return `<header class="page-heading discovery-intro"><div><h1>Discover</h1><p>Find the next story worth making.</p></div></header>${discoverySetup(state)}${storyGenerationReview(state)}<details class="discovery-usage"><summary>AI usage & pause controls</summary>${aiUsagePanel(state)}</details>${savedDirection}${progress}${founderQueue(state)}`;
+ const saved=requests.filter(r=>!r.engineJob&&!r.linkedStoryId&&!r.generationProposal&&!r.continuation).slice(0,3);
+ const savedDirection=saved.length?`<section class="saved-directions" aria-label="Saved directions">${saved.map(request=>`<p class="saved-direction"><strong>Direction saved.</strong> ${esc(request.preset?.name||(request.prompt===DEFAULT_DISCOVERY_PROMPT?'Surprise Me':request.prompt.length>100?request.prompt.slice(0,97)+'…':request.prompt))}${canLaunchSavedResearch(request,state.workspace.engine)?` <button class="text-button" data-start-saved-research="${esc(request.id)}" aria-label="Review saved direction: ${esc(request.preset?.name||(request.prompt===DEFAULT_DISCOVERY_PROMPT?'Surprise Me':request.prompt.slice(0,100)))}">Review story plan</button>`:''}</p>`).join('')}</section>`:'';
+ const progress=active.length?`<section class="generation-progress" aria-label="Generation progress">${active.map(r=>{const status=researchStatus(r),job=r.engineJob;return `<article data-request-id="${esc(r.id)}"><strong>${esc(status.label)}</strong><p>${esc(status.detail)}</p>${job.candidates?.length?job.candidates.map(c=>`<a class="text-link" href="${storyUrl('CON-DEV-'+c.jobId)}">Develop this story →</a>`).join(''):['queued'].includes(job.state)&&!job.dispatchId&&canLaunchSavedResearch(r,state.workspace.engine)?`<button class="small-button" data-start-saved-research="${esc(r.id)}">Generate Stories</button>`:''}${job.lastError?'<button class="text-button" data-engine-action="refresh">Check for results</button><p class="small muted">This request will not be resent automatically.</p>':''}</article>`;}).join('')}</section>`:'';
+ const queue=founderQueue(state),hasProposals=reviewQueueSelection(state).shown.length>0,setup=discoverySetup(state),review=storyGenerationReview(state);
+ const delivered=reviewed?.state==='completed'&&!reviewed.deliveryPending&&(state.workspace.stories||[]).some(story=>story.id===(reviewed.resultStoryId||'CON-DEV-'+reviewed.id));
+ // A delivered proposal has one primary card. Its complete operation receipt
+ // remains inspectable without repeating the entire caption above that card.
+ const currentReview=delivered?`<details class="discovery-receipt"><summary>Latest story request · saved</summary>${review}</details>`:review;
+ return `<header class="page-heading discovery-intro"><div><h1>Discover</h1><p>Find the next story worth making.</p></div></header>${!delivered?currentReview:''}${progress}${hasProposals?queue+setup:setup+queue}${savedDirection}${delivered?currentReview:''}<details class="discovery-usage"><summary>AI usage & pause controls</summary>${aiUsagePanel(state)}</details>`;
 }
 export function researchStatus(request){
  const job=request.engineJob;

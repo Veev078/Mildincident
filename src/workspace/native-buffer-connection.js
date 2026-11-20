@@ -2,13 +2,14 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createHmac,randomUUID} from 'node:crypto';
 import sharp from 'sharp';
-import {canonical,sha256} from '../package.js';
+import {canonical,sha256,sourceFingerprint} from '../package.js';
 import {requireThat,HandoffError} from '../errors.js';
 import {readAllPages} from '../production-audit.js';
 import {publishingGraphSha} from '../n8n/buffer-handoff-security.js';
 import {STUDIO_PUBLISHING_PATH,STUDIO_PUBLISHING_AUDIENCE} from '../n8n/buffer-gateway-patch.js';
 import {PUBLISHING_TABLES as T} from '../n8n/buffer-release-patch.js';
 import {buildWorkspace} from './model.js';
+import {nativePreparationReadiness} from './native-post-readiness.js';
 
 export const BUFFER_CHANNEL_ID='6adfbc112f1f5ed648dee51f';
 const REQUIRED_GRAPHS=['BzMqQS8lfkwN7peQ','Q02tRHMtZ90Kib18','YdW8V9Qxl2qn5mC8','f0LkxPxzvqh3zyUQ','rhZU4CyF5t0kYMzz','v5ThKs5ZYP3RhZop'];
@@ -25,7 +26,8 @@ export async function readNativeBufferPolicy({env=process.env,config}){
  const root=await fs.realpath(config.dataRoot),file=await fs.realpath(env.STUDIO_BUFFER_POLICY_FILE),relative=path.relative(root,file),stat=await fs.stat(file);
  requireThat(relative&&!relative.startsWith('..')&&!path.isAbsolute(relative)&&stat.isFile()&&(stat.mode&0o077)===0&&stat.size<32000,'BUFFER_POLICY_INVALID','Keep the private publishing policy inside Studio storage with mode 0600.');
  let p;try{p=JSON.parse(await fs.readFile(file,'utf8'));}catch{throw new HandoffError('BUFFER_POLICY_INVALID','The private publishing policy is unreadable.');}
- requireThat(p.version===1,'BUFFER_POLICY_INVALID','Use the reviewed publishing policy version.');
+ requireThat([1,2].includes(p.version),'BUFFER_POLICY_INVALID','Use the reviewed publishing policy version.');
+ if(p.version===2)requireThat(/^[-a-f0-9]{36}$/.test(p.id||'')&&p.target==='unscheduled_draft'&&p.founderConfirmationRequired===true&&!p.acceptance,'BUFFER_POLICY_INVALID','Recurring draft access requires a named, founder-confirmed, unscheduled-only policy.');
  if(p.enabled&&p.approved)requireThat(p.channelId===BUFFER_CHANNEL_ID&&/^[a-f0-9]{64}$/.test(p.jwtSecret||'')&&Array.isArray(p.graphs)&&p.graphs.length>=4,'BUFFER_POLICY_INVALID','The approved private policy needs its exact graph bindings and dedicated authentication.');
  return p;
 }
@@ -48,12 +50,13 @@ export class NativeBufferConnection {
    this.singleWriterVerified=true;this.draftOnlyContractReviewed=p.draftOnlyContractReviewed===true;this.reviewAvailable=p.operations?.nativeReview===true;this.issue=null;
   }catch(error){this.#checkedAt=0;this.issue=error.code||'BUFFER_CONNECTION_UNAVAILABLE';}
  }
- canCreateDraft(story){const p=this.#policy,a=p?.acceptance;return Boolean(this.singleWriterVerified&&p.enabled&&p.approved&&p.operations?.bufferDraft===true&&a?.storyId===story.id&&a.packageVersion===story.production?.package?.version&&a.contentDigest===nativePostDigest(story)&&Date.parse(a.expiresAt)>Date.now());}
+ canCreateDraft(story){const p=this.#policy,a=p?.acceptance,recurring=p?.version===2&&p.target==='unscheduled_draft'&&p.founderConfirmationRequired===true&&/^[-a-f0-9]{36}$/.test(p.id||'')&&!p.acceptance;return Boolean(this.singleWriterVerified&&p.enabled&&p.approved&&p.operations?.bufferDraft===true&&!story.organization?.trashed&&!story.localDraft?.stale&&(recurring||a?.storyId===story.id&&a.packageVersion===story.production?.package?.version&&a.contentDigest===nativePostDigest(story)&&Date.parse(a.expiresAt)>Date.now()));}
  status(story){
   const p=story.production?.package,files=story.production?.finalFiles||[],slides=files.map(f=>{const saved=this.previews?.get(story.id,'native-final:'+f.fileRecordId);return saved?.originalSha256===f.sha256?{...f,previewUrl:'/api/stories/'+encodeURIComponent(story.id)+'/buffer-draft/files/'+encodeURIComponent(f.fileRecordId)+'?hash='+f.sha256,previewId:'native-final:'+f.fileRecordId}:null;});
   const sameCaption=!story.localDraft?.stale&&(story.localDraft?.caption??story.caption)===story.caption&&['title','hook','format','targetSlideCount'].every(k=>!Object.hasOwn(story.localDraft||{},k)||story.localDraft[k]===story[k]),complete=files.length>0&&slides.every(Boolean)&&canonical(files.map(f=>f.assetId))===canonical(story.localDraft?.selectedAssetIds??story.selectedAssetIds);
   const selected=story.localDraft?.selectedAssetIds??story.selectedAssetIds,rights=selected?.length&&selected.every(id=>story.media.find(a=>a.id===id)?.nativeRightsReview?.reviewed===true);
-  return {enabled:this.reviewAvailable,reviewAvailable:this.reviewAvailable&&!story.organization?.trashed&&story.origin!=='n8n_development',approveAvailable:Boolean(this.singleWriterVerified&&this.#policy?.operations?.finalApproval&&rights&&p?.finalApprovalStatus!=='approved'&&p?.finalAssetsVerified&&sameCaption&&complete),preparedSlides:sameCaption&&complete?slides:[],finalFilesVerified:Boolean(sameCaption&&complete),finalPostDigest:nativePostDigest(story),message:this.issue?'The native publishing connection needs verification.':'Native preparation keeps rights, facts and final approval separate.'};
+  const preparation=nativePreparationReadiness(story),preparationAvailable=Boolean(this.reviewAvailable&&this.#policy?.capabilities?.packagePreparation===true&&preparation.available),reviewAvailable=Boolean(this.reviewAvailable&&preparation.available&&(!preparation.required||preparationAvailable));
+  return {enabled:this.reviewAvailable,reviewAvailable,preparationRequired:preparation.required,preparationAvailable,preparationReason:preparation.reason||(preparation.required&&!preparationAvailable?'Post preparation is not enabled yet.':null),approveAvailable:Boolean(this.singleWriterVerified&&this.#policy?.operations?.finalApproval&&rights&&p?.finalApprovalStatus!=='approved'&&p?.finalAssetsVerified&&sameCaption&&complete),preparedSlides:sameCaption&&complete?slides:[],finalFilesVerified:Boolean(sameCaption&&complete),finalPostDigest:nativePostDigest(story),message:this.issue?'The native publishing connection needs verification.':preparation.reason||'Native preparation keeps rights, facts and final approval separate.'};
  }
  async #active(operation,story=null){await this.inspect({force:true});const p=this.#policy;requireThat(this.singleWriterVerified&&p?.enabled&&p.approved,'BUFFER_POLICY_DISABLED','Native publishing is not enabled.');requireThat(p.operations?.[operation]===true,'BUFFER_POLICY_DISABLED','This publishing action is not authorised.');if(operation==='bufferDraft')requireThat(story&&this.canCreateDraft(story),'BUFFER_DRAFT_NOT_AUTHORIZED','Only the separately approved post can create one unscheduled Buffer draft.');return p;}
  async #call(input,{readOnly=false}={}){
@@ -129,9 +132,20 @@ export class NativeBufferConnection {
   const rows=[...ctx.manual,...ctx.guarded],active=rows.filter(r=>r.state!=='abandoned'&&r.status!=='abandoned'||r.buffer_id||r.buffer_post_id);requireThat(!active.some(r=>!r.buffer_id&&!r.buffer_post_id),'RECONCILIATION_REQUIRED','An earlier native handoff has no confirmed provider ID.');
   return {complete:true,storyId,channelId,postIds:[...new Set(active.map(r=>r.buffer_id||r.buffer_post_id).filter(Boolean))],observedAt:new Date().toISOString()};
  }
- async createNativeDraft(request){
-  const ids=request.assets.map(a=>a.assetId),p=this.#policy,storyId=p?.acceptance?.storyId;requireThat(storyId,'BUFFER_DRAFT_NOT_AUTHORIZED','Approve one exact post before creating a Buffer draft.');const ctx=await this.context(storyId),story=this.#freshStory(ctx);await this.#active('bufferDraft',story);
+ /** The confirmed adapter is scoped to one durable, immutable approval row.
+  * It cannot be obtained from a browser-supplied grant or used to change posts.
+  * The common handoff core still commits its durable intent BEFORE this method. */
+ confirmedDraftAdapter({story,approval,manifest,reviewDigest,readApproval}){
+  requireThat(approval?.storyId===story.id&&typeof readApproval==='function','BUFFER_DRAFT_NOT_AUTHORIZED','Review the saved approval before sending.');
+  const binding={storyId:story.id,approvalId:approval.id,approvalDigest:approval.contentDigest,nativeDigest:nativePostDigest(story),manifestFingerprint:sourceFingerprint(manifest),reviewDigest};
+  requireThat(reviewDigest===sha256(canonical([approval.id,approval.contentDigest,binding.manifestFingerprint])),'BUFFER_DRAFT_NOT_AUTHORIZED','Confirm the exact reviewed files.');
+  return {...this.adapter,createUnscheduledDraft:request=>this.createNativeDraft(request,{...binding,readApproval})};
+ }
+ async createNativeDraft(request,confirmation=null){
+  const ids=request.assets.map(a=>a.assetId),p=await this.#loadPolicy(),storyId=p?.version===2?confirmation?.storyId:p?.acceptance?.storyId;requireThat(storyId,'BUFFER_DRAFT_NOT_AUTHORIZED','Approve one exact post before creating a Buffer draft.');const ctx=await this.context(storyId),story=this.#freshStory(ctx);await this.#active('bufferDraft',story);
+  if(this.#policy.version===2){requireThat(confirmation&&typeof confirmation.readApproval==='function','BUFFER_DRAFT_NOT_AUTHORIZED','Confirm the exact saved post before sending.');const saved=await confirmation.readApproval();requireThat(saved?.id===confirmation.approvalId&&saved.storyId===storyId&&saved.contentDigest===confirmation.approvalDigest&&nativePostDigest(story)===confirmation.nativeDigest,'BUFFER_DRAFT_NOT_AUTHORIZED','The saved founder approval or final post changed. Review it again.');}
   const manifest=await this.#manifest(ctx),files=this.#files(ctx);requireThat(request.channelId===BUFFER_CHANNEL_ID&&request.caption===manifest.caption&&canonical(ids)===canonical(manifest.slides.map(s=>s.assetId))&&request.assets.every((a,i)=>a.sha256===files[i].checksum_sha256),'EDIT_CONFLICT','The final native files differ from the confirmed post.');
+  if(this.#policy.version===2)requireThat(sourceFingerprint(manifest)===confirmation.manifestFingerprint&&confirmation.reviewDigest===sha256(canonical([confirmation.approvalId,confirmation.approvalDigest,sourceFingerprint(manifest)])),'EDIT_CONFLICT','The exact approved files or permission evidence changed.');
   const requestId=publishingRequestId(request.idempotencyKey),reply=await this.#call({action:'send',requestId,storyId,packageVersion:manifest.packageVersion,caption:manifest.caption,selectedAssetIds:ids,fileManifest:files.map(f=>({fileRecordId:f.file_record_id,assetId:f.source_asset_id,sha256:f.checksum_sha256})),confirm:'create_one_unscheduled_buffer_draft'});
   if(reply.state==='native_accepted')return {...reply,executionId:String(reply.executionId)};
   requireThat(/^[a-f0-9]{24}$/i.test(reply.bufferPostId||''),'NATIVE_PUBLISHING_UNCERTAIN','No usable Buffer ID was returned. Do not resubmit.');return {id:reply.bufferPostId};

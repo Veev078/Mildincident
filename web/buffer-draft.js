@@ -15,7 +15,7 @@ export function nativeReviewControls(story){
  if(pending)return `<p class="small" role="status">${t.state==='uncertain'?'Preparation needs confirmation. Your saved version is preserved; do not submit it again.':'Preparing this post in the existing approval workflow.'}</p><button class="small-button" data-native-review="check" data-story="${esc(story.id)}">Check preparation</button>`;
  if(n?.approveAvailable)return `<p class="small">Finished slides are ready. Preview the post before approving.</p><button class="button button-dark" data-native-review="review-approval" data-story="${esc(story.id)}">Approve post</button>`;
  if(n?.reviewAvailable&&t?.filesPrepared===true&&!n.finalFilesVerified)return '<p class="small">The finished slides are saved in production. Check their private previews before approving.</p><button class="small-button" data-native-review="check" data-story="'+esc(story.id)+'">Check finished slides</button>';
- if(!n?.reviewAvailable)return '';
+ if(!n?.reviewAvailable)return n?.preparationReason?`<p class="small" role="status">${esc(n.preparationReason)} Your saved edit is preserved.</p>`:'';
  if(story.production?.package?.finalApprovalStatus==='approved'&&story.bufferDraft?.canSend)return '';
  return `${t?.state==='native_review_saved'&&t.filesPrepared===false?'<p class="small" role="status">Caption and slide order saved. Photo permissions or eligible originals still need attention in the existing approval workflow.</p>':''}<button class="button button-dark" data-native-review="review-transfer" data-story="${esc(story.id)}">Prepare for approval</button><p class="small muted">Transfers the saved caption and slide order. Photo permissions and final approval remain separate.</p>`;
 }

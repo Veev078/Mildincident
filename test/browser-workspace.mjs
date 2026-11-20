@@ -49,7 +49,7 @@ try {
   page.on('dialog', dialog => dialog.accept());
   await page.route('https://example.org/**', route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350"><rect width="1080" height="1350" fill="#e1dfd2"/><text x="70" y="600" font-size="64" fill="#42463b">SYNTHETIC UI TEST</text><text x="70" y="700" font-size="40" fill="#42463b">No archival photograph</text></svg>' }));
   await page.goto(origin);
-  await page.getByRole('heading',{name:'What should we work on next?',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Discover',exact:true}).waitFor();await page.locator('[data-discovery-setup]').waitFor();
   assert.ok((await page.locator('.source-bar').textContent()).includes('Test fixture'));
   checks.push('frontend loads from actual local API with explicitly labeled test fixtures');
 
@@ -98,17 +98,17 @@ try {
   await page.goto(`${origin}/#/discovery`);assert.equal(await page.locator('[data-photo-hunt]').count(),0);checks.push('Discover omits the removed photographic research desk; backend source records remain available');
 
   const id = snapshot.records.stories[0].concept_id;
-  await page.goto(`${origin}/#/story/${id}/publishing`);await page.getByRole('heading',{name:'Review the story.',exact:true}).waitFor();
+  await page.goto(`${origin}/#/story/${id}/publishing`);await page.getByRole('heading',{name:'One final look.',exact:true}).waitFor();
   const packet=await (await page.request.get(origin+'/api/stories/'+id+'/production-packet')).json();assert.equal(packet.productionApplied,false);assert.equal(packet.publicationApproved,false);assert.equal(packet.bufferCreateEnabled,false);assert.equal(packet.nativeImportCheck.accepted,false);checks.push('post review shows the selected sequence while the existing backend packet keeps native handoff blocked');
   await page.goto(`${origin}/#/pipeline`);
-  await page.getByRole('searchbox', { name: 'Find a story', exact: true }).fill('nothing-matches-this');
+  await page.getByRole('searchbox', { name: 'Find a post', exact: true }).fill('nothing-matches-this');
   await page.waitForFunction(() => document.querySelectorAll('.pipeline-row').length === 0);
-  assert.ok((await page.locator('#main-content').textContent()).includes('No stories in this view'));
-  await page.getByRole('searchbox', { name: 'Find a story', exact: true }).fill('');
+  assert.ok((await page.locator('#main-content').textContent()).includes('No posts in this view'));
+  await page.getByRole('searchbox', { name: 'Find a post', exact: true }).fill('');
   await page.waitForFunction(() => document.querySelectorAll('.pipeline-row').length === 1);
   checks.push('global search filters existing story rows and has an honest empty state');
 
-  await page.goto(`${origin}/#/story/${id}/overview`);
+  await page.goto(`${origin}/#/story/${id}/refine`);
   await page.getByText('Story direction & private notes',{exact:true}).click();await page.getByRole('heading', { name: 'Source notes', exact: true }).waitFor();
   assert.ok((await page.locator('.existing-source-notes').textContent()).includes('synthetic test fixture'));
   checks.push('existing n8n editorial notes stay visible and separate from local edits');
@@ -123,28 +123,28 @@ try {
   checks.push('caption autosave survives browser reload without modifying source');
 
   await page.goto(`${origin}/#/story/${id}/carousel`);
-  await page.getByRole('button', { name: 'Move slide 1 later', exact: true }).click();
+  await page.getByRole('button', { name: 'Move photograph 1 later', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));
   assert.deepEqual(drafts.get(id).selectedAssetIds, ['asset-2', 'asset-1']);
   checks.push('accessible carousel move controls persist ordered local sequence');
   const beforeRehearsal=JSON.stringify(drafts.get(id));
-  await page.getByRole('button',{name:'Rehearse carousel',exact:true}).click();
+  await page.goto(`${origin}/#/story/${id}/approve`);await page.getByRole('button',{name:'Preview post',exact:true}).click();
   await page.getByText('Slide 1 of 2',{exact:true}).waitFor();
-  assert.ok(await page.getByRole('button',{name:'Previous carousel image'}).isDisabled());
+  assert.ok(await page.locator('[data-rehearsal] [data-action="rehearse-step"][data-step="-1"]').isDisabled());
   await page.keyboard.press('ArrowRight');
   await page.getByText('Slide 2 of 2',{exact:true}).waitFor();
-  assert.ok(await page.getByRole('button',{name:'Next carousel image'}).isDisabled());
-  await page.getByLabel('Framing',{exact:true}).selectOption('original');
+  assert.ok(await page.locator('[data-rehearsal] [data-action="rehearse-step"][data-step="1"]').isDisabled());
+  await page.getByText('Slide details & framing',{exact:true}).click();await page.getByLabel('Framing',{exact:true}).selectOption('original');
   await page.locator('[data-rehearsal][data-fit="original"]').waitFor();
-  await page.getByRole('button',{name:'Previous carousel image'}).click();
+  await page.locator('[data-rehearsal] [data-action="rehearse-step"][data-step="-1"]').click();
   await page.getByText('Slide 1 of 2',{exact:true}).waitFor();
   await page.keyboard.press('Escape');
   assert.equal(JSON.stringify(drafts.get(id)),beforeRehearsal);
   checks.push('large carousel rehearsal supports keyboard navigation and full-image framing without editing saved sequence');
 
   await page.goto(`${origin}/#/story/${id}/images`);
-  await page.locator('.selected-sequence-panel [data-action="compare-asset"][data-asset="asset-1"]').click();
-  await page.locator('.selected-sequence-panel [data-action="compare-asset"][data-asset="asset-2"]').click();
+  await page.locator('.photo-gallery-grid [data-action="compare-asset"][data-asset="asset-1"]').click();
+  await page.locator('.photo-gallery-grid [data-action="compare-asset"][data-asset="asset-2"]').click();
   await page.getByRole('button', { name: 'Compare images →', exact: true }).click();
   assert.ok((await page.getByRole('dialog').textContent()).includes('Compare the evidence.'));
   await page.getByRole('button', { name: 'Close image comparison' }).click();
@@ -179,23 +179,21 @@ try {
   assert.equal(await page.getByLabel('Editorial decision').inputValue(),'reject');
   await page.getByRole('button',{name:'Close image details'}).click();
   checks.push('image taste feedback persists with explicit rejection warning while source rights and selected slides remain unchanged');
-  await page.getByLabel('Editorial view',{exact:true}).selectOption('reject');
-  assert.equal(await page.locator('.selected-sequence-list>li').count(),2);
-  assert.equal(await page.locator('.photo-collection .asset-card').count(),0);
+  await page.goto(`${origin}/#/library`);await page.getByLabel('Editorial view',{exact:true}).selectOption('reject');
+  assert.equal(await page.locator('.photo-tile').count(),1);assert.deepEqual(drafts.get(id).selectedAssetIds,['asset-2','asset-1']);
   await page.getByLabel('Editorial view',{exact:true}).selectOption('shortlist');
-  assert.equal(await page.locator('.selected-sequence-list>li').count(),2);
-  assert.equal(await page.locator('.photo-collection .asset-card').count(),0);
+  assert.equal(await page.locator('.photo-tile').count(),0);assert.deepEqual(drafts.get(id).selectedAssetIds,['asset-2','asset-1']);
   await page.getByLabel('Editorial view',{exact:true}).selectOption('all');
-  assert.equal(await page.locator('.asset-card').count()+await page.locator('.selected-sequence-list>li').count(),3);
+  assert.equal(await page.locator('.photo-tile').count(),3);
   checks.push('editorial image filters surface saved decisions without changing source rights or selection');
 
 
   await page.route('https://example.org/thumb/**', route => route.abort());
-  await page.reload();
-  await page.locator('.preview-retry:visible').first().waitFor();
-  await page.locator('.preview-retry:visible').first().click();
-  await page.locator('.preview-retry:visible').first().waitFor();
-  await page.unroute('https://example.org/thumb/**');
+  await page.reload();const thumbnailRetry=page.locator('[data-photo-card="asset-2"] .preview-retry:visible');await thumbnailRetry.waitFor();await thumbnailRetry.click();await thumbnailRetry.waitFor();await page.locator('[data-action="inspect"][data-asset="asset-3"]').first().click();
+  await page.getByRole('dialog').locator('.preview-retry:visible').first().waitFor();
+  await page.getByRole('dialog').locator('.preview-retry:visible').first().click();
+  await page.getByRole('dialog').locator('.preview-retry:visible').first().waitFor();
+  await page.unroute('https://example.org/thumb/**');await page.getByRole('button',{name:'Close image details',exact:true}).click();
   checks.push('failed external previews expose an explicit retry without inferring global source failure');
 
 
@@ -262,9 +260,9 @@ try {
   assert.equal(JSON.stringify({title:snapshot.records.stories[0].title,format:snapshot.records.stories[0].format,target:snapshot.records.packages[0].target_slide_count}),sourceIdentity);
   checks.push('working title/hook/format survive reload and export while source identity and selected assets remain intact');
 
-  await page.getByText('Story details',{exact:true}).click();
+  await page.getByText('Sources & story tools',{exact:true}).click();
   const downloadEvent = page.waitForEvent('download');
-  await page.locator('.story-header-actions a').click();
+  await page.getByRole('link',{name:'Download working copy',exact:true}).click();
   const download = await downloadEvent;
   const downloaded = path.join(root, 'proposal.json');
   await download.saveAs(downloaded);
@@ -283,7 +281,7 @@ try {
   assert.ok(!drafts.proposal(originalView().stories[0]).stale);
   assert.ok(drafts.history(id).length >= 4);
   checks.push('stale source comparison and explicit local rebase preserve history');
-  await page.getByText('Story details',{exact:true}).click();await page.getByRole('button', { name: 'Version history', exact: true }).click();
+  await page.getByText('Sources & story tools',{exact:true}).click();await page.getByRole('button', { name: 'Version history', exact: true }).click();
   assert.ok((await page.getByRole('dialog').textContent()).includes('Local version history.'));
   await page.getByRole('button', { name: 'Close local version history' }).click();
   checks.push('saved local version history is inspectable');
@@ -306,7 +304,7 @@ try {
 
   const failurePage = await browser.newPage();
   failurePage.on('pageerror', error => errors.push(error.message));
-  await failurePage.route('**/api/workspace', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'TEST_SOURCE_UNAVAILABLE', message: 'Synthetic read-only source outage' } }) }));
+  await failurePage.route(url=>url.pathname==='/api/workspace', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'TEST_SOURCE_UNAVAILABLE', message: 'Synthetic read-only source outage' } }) }));
   await failurePage.goto(origin);
   await failurePage.getByRole('heading', { name: 'The desk could not be loaded.', exact: true }).waitFor();
   assert.equal(await failurePage.locator('.story-card').count(), 0);
@@ -347,8 +345,7 @@ try {
   engineFixture.candidates.push({job_id:queued.job_id,candidate_id:fixtureCandidate.id,status:'ready_to_review',candidate_json:JSON.stringify(fixtureCandidate)});
   await page.getByRole('button',{name:'Check for results',exact:true}).first().click();await page.getByText('Research results checked.',{exact:true}).waitFor();
   await page.locator('[data-review-card] h3 a').first().click();
-  await page.getByText('Story details',{exact:true}).click();await page.getByText('Research proposal',{exact:true}).waitFor();
-  const devStoryId='CON-DEV-'+queued.job_id;
+  const devStoryId='CON-DEV-'+queued.job_id;await page.goto(`${origin}/#/story/${devStoryId}/refine`);await page.getByText('Draft origin & AI usage',{exact:true}).click();await page.getByText('About this AI draft',{exact:true}).click();await page.getByText('Original AI caption saved.',{exact:false}).waitFor();assert.ok((await page.locator('.generation-receipt').innerText()).includes('Execution 2500'));
   await page.goto(`${origin}/#/story/${devStoryId}/research`);
   await page.getByText('Read the recorded source excerpt',{exact:true}).click();
   await page.getByText('A labeled source-text fixture, not real editorial research.',{exact:true}).waitFor();
@@ -371,8 +368,8 @@ try {
   const requestsBeforePhotoResearch=research.all().length,jobsBeforePhotoResearch=engineFixture.jobs.length;
   await page.getByText('Explore this photograph further',{exact:true}).click();
   await page.getByRole('button',{name:'Investigate this photograph',exact:true}).click();
-  await page.getByText('Ready to search',{exact:true}).waitFor();
-  assert.ok(page.url().endsWith('/'+devStoryId+'/images'));await page.getByText('Ready to search',{exact:true}).waitFor();const photoRequest=research.all().find(r=>r.continuation);assert.ok(photoRequest);assert.equal(photoRequest.continuation.origin.assetId,'dev-photo-1');assert.equal(photoRequest.continuation.origin.storyId,devStoryId);assert.equal(photoRequest.continuation.routes[0].url,'https://example.org/project');assert.equal(photoRequest.handoffUrl,null);
+  await page.locator('.photo-search-strip > p[role="status"]').filter({hasText:'Ready to search'}).waitFor();
+  assert.ok(page.url().endsWith('/'+devStoryId+'/images'));await page.locator('.photo-search-strip > p[role="status"]').filter({hasText:'Ready to search'}).waitFor();const photoRequest=research.all().find(r=>r.continuation);assert.ok(photoRequest);assert.equal(photoRequest.continuation.origin.assetId,'dev-photo-1');assert.equal(photoRequest.continuation.origin.storyId,devStoryId);assert.equal(photoRequest.continuation.routes[0].url,'https://example.org/project');assert.equal(photoRequest.handoffUrl,null);
   assert.equal(research.all().length,requestsBeforePhotoResearch+1);assert.equal(engineFixture.jobs.length,jobsBeforePhotoResearch);
   await page.reload();assert.equal(research.get(photoRequest.id).continuation.routes[0].url,'https://example.org/project');assert.equal(await page.locator('[data-research-handoff]').count(),0);
   checks.push('exact-image research preparation retains series directions across reload without a model, queue or legacy-form transfer');
@@ -393,18 +390,20 @@ try {
   await page.reload();assert.equal(await page.getByLabel('Local caption draft').inputValue(),'Edited fixture development caption using the normal Studio editor.');
   assert.equal(snapshot.records.stories.length,1);
   await page.goto(`${origin}/#/story/${devStoryId}/carousel`);
-  await page.getByText('A sequence from these source references · 3 frames',{exact:true}).click();
-  await page.getByRole('button',{name:'Use 3-frame source plan',exact:true}).click();
-  await page.waitForFunction(()=>document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));
-  assert.equal(drafts.get(devStoryId).format,'carousel');assert.equal(drafts.get(devStoryId).targetSlideCount,3);
-  assert.deepEqual(drafts.get(devStoryId).selectedAssetIds,['dev-photo-1','dev-drawing','dev-trench']);
-  assert.equal(drafts.get(devStoryId).creativeBrief.sequenceRoles.length,3);
-  await page.reload();await page.locator('.carousel-slide').first().waitFor();assert.equal(await page.locator('.carousel-slide').count(),3);
+  await page.getByRole('button',{name:'Suggest cover & slides',exact:true}).click();await page.locator('#curation-dialog').waitFor();
+  assert.ok((await page.locator('#curation-dialog').innerText()).includes('AI has not judged these photographs.'));
+  const offered=page.locator('#curation-dialog [data-action="apply-source-sequence"]'),offeredId=await offered.getAttribute('data-option-id');
+  const currentStory=await (await page.request.get(origin+'/api/stories/'+devStoryId)).json(),expectedPlan=currentStory.sourceSequencePlan.options.find(o=>o.id===offeredId);assert.ok(expectedPlan);
+  const priorVersion=drafts.get(devStoryId).version;await offered.click();await page.waitForFunction(()=>document.querySelector('#announcement')?.textContent.includes('Sequence applied to your working copy'));await page.locator('[data-curation-close]').click();
+  assert.equal(drafts.get(devStoryId).format,expectedPlan.format);assert.equal(drafts.get(devStoryId).targetSlideCount,expectedPlan.targetSlideCount);
+  assert.deepEqual(drafts.get(devStoryId).selectedAssetIds,expectedPlan.slides.map(s=>s.assetId));
+  assert.ok(expectedPlan.slides.every(s=>drafts.get(devStoryId).creativeBrief.sequenceRoles.some(r=>r.assetId===s.assetId)));assert.ok(drafts.get(devStoryId).version>priorVersion);
+  await page.reload();await page.locator('.post-sequence-list>li').first().waitFor();assert.equal(await page.locator('.post-sequence-list>li').count(),expectedPlan.slides.length);
   assert.equal(JSON.parse(engineFixture.candidates[0].candidate_json).story.format,'single_image');
-  checks.push('source-caption sequence proposal applies dated real-reference metadata locally with roles/history and no native candidate overwrite');
+  checks.push('the offered source-based cover/sequence applies exact asset IDs locally with roles/history and no native candidate overwrite');
 
   await page.goto(`${origin}/#/discovery`);
-  await page.locator('[data-review-card]').getByRole('button',{name:'Review draft',exact:true}).click();await page.waitForURL('**/overview');checks.push('one founder decision opens the same editable story without a separate research approval form');
+  await page.locator('[data-review-card]').getByRole('button',{name:'Review draft',exact:true}).click();await page.waitForURL('**/overview');await page.locator('.story-workspace[data-stage="build"]').waitFor();checks.push('one founder decision opens the same editable story without a separate research approval form');
   await page.goto(`${origin}/#/story/${devStoryId}/images`);
   await page.locator('[data-story-task="images"]').waitFor();
   for(const collection of await page.locator('details.photo-collection').all())if(!await collection.evaluate(d=>d.open))await collection.locator('summary').click();

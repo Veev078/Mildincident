@@ -64,7 +64,8 @@ export class StudioBufferDrafts {
   const c=this.connection;
   // The existing core rechecks native identity, file bytes, rights and the
   // all-status handoff audit, then commits intent before one external create.
-  await prepareAndSend({...data,ledger:this.ledger,adapter:c.adapter,readExistingHandoffs:scope=>c.readExistingHandoffs(scope),
+  const adapter=c.confirmedDraftAdapter?c.confirmedDraftAdapter({story,approval,manifest:data.manifest,reviewDigest:input.reviewDigest,readApproval:()=>{const saved=this.approvals.get(approval.id);return saved&&this.approvals.public(saved,story).unchanged?saved:null;}}):c.adapter;
+  await prepareAndSend({...data,ledger:this.ledger,adapter,readExistingHandoffs:scope=>c.readExistingHandoffs(scope),
    readCurrentPackage:async id=>{const latest=await readStory();this.assertContent(latest,input);requireThat(this.approvals.public(approval,latest).unchanged&&this.status(latest).blockers.length===0,'EDIT_CONFLICT','Approval evidence changed while preparing this post.');return c.readCurrentPackage(id);}});
   return this.status(await readStory());
  }

@@ -106,3 +106,22 @@ test('simultaneous default saves across separate processes produce one request a
  const ids=await Promise.all(children.map(c=>c.done));assert.equal(ids[0],ids[1]);assert.equal(store.all().length,1);
  for(const child of children)assert.equal(store.create(child.input,[],reuse).id,ids[0]);
 });
+
+
+test('prepared story plans stop default reuse while exact identities and aliases remain recoverable after restart',async t=>{
+ const {store,filename}=await setup(t),options={reuseDefault:true,editorialDiscovery:true},baseline=[{id:'same-story',revision:'r1'}];
+ // The real pilot creates this table separately from the research store.
+ store.db.exec('CREATE TABLE studio_generation_actions(id TEXT PRIMARY KEY,idempotency_key TEXT UNIQUE NOT NULL,story_id TEXT NOT NULL,created_at TEXT NOT NULL,confirmed_at TEXT,day_key TEXT,data_json TEXT NOT NULL)');
+ for(const [index,state] of ['prepared','expired','failed','uncertain'].entries()){
+  const firstInput={kind:'brief',prompt:DEFAULT_DISCOVERY_PROMPT,idempotencyKey:randomUUID()},aliasInput={...firstInput,idempotencyKey:randomUUID()},context=[...baseline,{id:'scenario-'+index,revision:'r1'}];
+  const first=store.create(firstInput,context,options);assert.equal(store.create(aliasInput,context,options).id,first.id);
+  store.db.prepare('INSERT INTO studio_generation_actions VALUES(?,?,?,?,?,?,?)').run(first.id,'story:'+first.id,'request:'+first.id,new Date().toISOString(),state==='uncertain'?new Date().toISOString():null,null,JSON.stringify({operation:'story',state}));
+  assert.equal(store.get(first.id).engineJob,null);
+  const next=store.create({...firstInput,idempotencyKey:randomUUID()},context,options);assert.notEqual(next.id,first.id,state+' plans cannot capture the next discovery');
+  const reopened=new LocalResearchStore(filename);try{
+   assert.equal(reopened.create(firstInput,context,options).id,first.id);assert.equal(reopened.create(aliasInput,context,options).id,first.id);
+   assert.equal(reopened.create({...firstInput,idempotencyKey:randomUUID()},context,options).id,next.id,'the fresh unpaid direction remains reusable');
+  }finally{reopened.close();}
+ }
+ assert.equal(store.all().length,8);assert.equal(store.db.prepare('SELECT COUNT(*) AS n FROM studio_generation_actions').get().n,4);
+});

@@ -12,7 +12,7 @@ export async function startWorkspace({createServer,env=process.env,installSignal
  let engine=null,delivery=null;
  const loadClient=async()=>{try{return await researchConnection({env,config,createClient:createEngineClient});}catch{if(!env.N8N_API_KEY)return null;return createEngineClient({apiKey:env.N8N_API_KEY,connection:{...OBSERVED_RESEARCH_CONNECTION,connectionIssue:true}});}};
  try{const client=await loadClient();
- if(client){engine=new EditorialEngineService({research,client,...(config.hosted?{reloadClient:loadClient}:{}),imageFeedback:()=>previews.tasteFeedback(),sourceLeads:()=>feeds.context(),prepareSources:()=>feeds.refresh()});delivery=new ResearchDelivery(engine,{intervalMs:config.intervalMs});}
+ if(client){engine=new EditorialEngineService({research,client,...(config.hosted?{reloadClient:loadClient}:{}),imageFeedback:()=>previews.tasteFeedback(),performanceFeedback:()=>{if(!source.snapshot)return [];const current=source.view(drafts.all());return current.source.stale?[]:current.analytics.editorialFeedback;},sourceLeads:()=>feeds.context(),prepareSources:()=>feeds.refresh()});delivery=new ResearchDelivery(engine,{intervalMs:config.intervalMs});}
  }catch(error){console.error('Research connection unavailable: '+(error.code||'CONFIGURATION_ERROR'));}
  const captionPilot=engine?new CaptionPilot({research,engine,loadConfig:()=>readCaptionPilotConfig({env,config}),createClient:options=>createEngineClient({...options,apiKey:env.N8N_API_KEY})}):null;if(captionPilot){engine.captionPilot=captionPilot;await captionPilot.inspect();}
  const backups=config.hosted?await new HostedBackups({workspace:config.workspace,destinationRoot:config.backups,stateFile:path.join(config.dataRoot,'backup-state.json')}).initialize():null;

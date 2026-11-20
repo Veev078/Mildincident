@@ -12,7 +12,7 @@ import {readPublicSource} from './public-source-transport.js';
 // already present in this story's retained research may be fetched.
 export const PROJECT_PAGE_HOSTS=Object.freeze(['www.dazeddigital.com','www.life.com','life.com','thephotographersgallery.org.uk','www.thephotographersgallery.org.uk','www.booooooom.com','josharonson.us','www.josharonson.us','sophyrickett.com','www.sophyrickett.com','www.cobgallery.com','www.cheeriopublishing.com','www.climaxbooks.com','www.theguardian.com','www.artsy.net','www.windowseat.ph','windowseat.ph','www.gelitin.net','gelitin.net','www.itsnicethat.com']);
 const digest=value=>createHash('sha256').update(value).digest('hex');
-export const PROJECT_IMAGE_PARSER_VERSION='project-images-v4';
+export const PROJECT_IMAGE_PARSER_VERSION='project-images-v5';
 export const PUBLIC_SOURCE_CONNECTION_POLICY='evidence_bound_public_v1';
 const restrictedHost=host=>/(?:^|\.)(?:linkedin\.com|instagram\.com|facebook\.com|fb\.com|tiktok\.com|pinterest\.com|twitter\.com|x\.com|accounts\.google\.com)$/.test(host);
 const archiveHost=host=>/^(?:(?:www\.)?loc\.gov|(?:www\.|api\.)?artic\.edu|commons\.wikimedia\.org)$/.test(host);
@@ -66,7 +66,8 @@ export function automaticPhotoPlan(story,{direction='best',custom=''}={}){
  // Prefer a named maker/project and image-led publisher before general factual
  // coverage or a marketplace record. Previously checked sources are still
  // removed by the existing progression ledger.
- const priority=u=>{const kind=(story.recordedProjectLinks||[]).find(l=>sourcePageKey(l.url)===sourcePageKey(u))?.sourceKind||sourceKind(u);if(kind==='artist')return 0;if(kind==='gallery')return 1;if(/windowseat\.ph|itsnicethat\.com/.test(new URL(u).hostname))return 2;if(/theguardian\.com/.test(new URL(u).hostname))return 5;if(/artsy\.net/.test(new URL(u).hostname))return 6;return 3;};pages.sort((a,b)=>priority(a)-priority(b));
+ const selected=story.localDraft?.selectedAssetIds??story.selectedAssetIds??[],pendingSelectedSources=new Set((story.media||[]).filter(a=>selected.includes(a.id)&&!a.localPreview).map(a=>sourcePageKey(a.sourceUrl)));
+ const priority=u=>{if(pendingSelectedSources.has(sourcePageKey(u)))return -1;const kind=(story.recordedProjectLinks||[]).find(l=>sourcePageKey(l.url)===sourcePageKey(u))?.sourceKind||sourceKind(u);if(kind==='artist')return 0;if(kind==='gallery')return 1;if(/windowseat\.ph|itsnicethat\.com/.test(new URL(u).hostname))return 2;if(/theguardian\.com/.test(new URL(u).hostname))return 5;if(/artsy\.net/.test(new URL(u).hostname))return 6;return 3;};pages.sort((a,b)=>priority(a)-priority(b));
  // A project-labelled link precedes a multi-project roundup. Directions alter
  // query and metadata ranking; they cannot invent an unrecorded source URL.
  const sourceUrl=pages[0]||originals[0]||null;

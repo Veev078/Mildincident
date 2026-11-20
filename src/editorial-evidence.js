@@ -48,8 +48,9 @@ export function photoEvidenceTools(publicReference) {
       }
     }
     const referencedCaptions=new Map();for(const m of [...body.matchAll(/<(figcaption|p|span)\b([^>]*)>([\s\S]*?)<\/\1>/gi)].slice(0,500)){const a=attrs(m[2]);if(a.id)referencedCaptions.set(a.id,captionText(m[3]));}
-    const add=(url,caption,isCover,width,height,captionBasis='image_alt',researchLinks=[],imageMetadata={})=>{url=resolve(url,page);if(!url||/\/(?:logo|favicon|avatar|icon|sprite|pixel|spinner|placeholder|no-image|image-not-found|default-image)[._/-]/i.test(url)||/\.svg(?:[?#]|$)/i.test(url))return;
-      const key=fileKey(url);const previous=candidates.get(key);const referenceVariants=[...new Set([...(previous?.referenceVariants||[]),url])];if(previous&&!previous.isCover){if(!previous.caption&&caption){previous.caption=String(caption).slice(0,2000);previous.captionBasis=captionBasis;previous.researchLinks=researchLinks;}if(imageMetadata.basis&&!previous.imageMetadata?.basis)previous.imageMetadata=imageMetadata;previous.referenceVariants=referenceVariants;previous.duplicateBasis=referenceVariants.length>1?'source_file_reference_variant':'none';return;}
+    const imageReference=value=>{const url=resolve(value,page);return url&&!/\/(?:logo|favicon|avatar|icon|sprite|pixel|spinner|placeholder|no-image|image-not-found|default-image|blank|transparent|spacer|loading)[._/-]/i.test(url)&&!/\.svg(?:[?#]|$)/i.test(url)?url:'';};
+    const add=(url,caption,isCover,width,height,captionBasis='image_alt',researchLinks=[],imageMetadata={},variants=[])=>{url=imageReference(url);if(!url)return;
+      const key=fileKey(url);const previous=candidates.get(key);const referenceVariants=[...new Set([...(previous?.referenceVariants||[]),url,...variants.map(imageReference).filter(Boolean)])].slice(0,24);if(previous&&!previous.isCover){if(!previous.caption&&caption){previous.caption=String(caption).slice(0,2000);previous.captionBasis=captionBasis;previous.researchLinks=researchLinks;}if(imageMetadata.basis&&!previous.imageMetadata?.basis)previous.imageMetadata=imageMetadata;previous.referenceVariants=referenceVariants;previous.duplicateBasis=referenceVariants.length>1?'source_file_reference_variant':'none';return;}
       candidates.set(key,{url,referenceVariants,duplicateBasis:referenceVariants.length>1?'source_file_reference_variant':'none',sameImageVerified:false,caption:String(caption||'').trim().slice(0,2000),captionBasis,researchLinks,isCover,reportedWidth:width||null,reportedHeight:height||null,imageMetadata});};
     // Structured captions must belong to an individual ImageObject, never an article headline/byline.
     const visit=(value,depth=0)=>{if(!value||typeof value!=='object'||depth>6)return;if(Array.isArray(value)){for(const x of value.slice(0,80))visit(x,depth+1);return;}
@@ -58,7 +59,11 @@ export function photoEvidenceTools(publicReference) {
     };
     for(const script of html.slice(0,300000).matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){if(!/application\/ld\+json/i.test(attrs(script[1]).type||''))continue;try{visit(JSON.parse(script[2]));}catch{/* Malformed structured metadata is not source evidence. */}}
     for(const tag of [...body.matchAll(/<meta\b[^>]*>/gi)].slice(0,250)){const a=attrs(tag[0]);if(['og:image','og:image:secure_url','twitter:image','twitter:image:src'].includes((a.property||a.name||'').toLowerCase()))add(a.content,'Page cover / social preview',true);}
-    const bestResponsive=value=>String(value||'').split(',').map(part=>{const [url,size]=part.trim().split(/\s+/);return {url,width:/^\d+w$/.test(size||'')?parseInt(size,10):/^\d+(?:\.\d+)?x$/.test(size||'')?Number.parseFloat(size)*100:0};}).filter(x=>resolve(x.url,page)).sort((a,b)=>b.width-a.width)[0]?.url;
+    // A comma inside a CDN URL (for example auto=format,compress) is not a
+    // srcset separator. Prefer declared widths while retaining the exact
+    // variants on the same img element for later native-reference matching.
+    const responsiveSources=value=>{const raw=String(value||'').trim(),items=[...raw.matchAll(/(?:^|,\s*)(\S+)\s+(\d+(?:\.\d+)?)(w|x)(?=\s*(?:,|$))/g)].map(m=>({url:m[1],width:Number(m[2])*(m[3]==='x'?100:1)}));if(!items.length&&raw&&!/\s/.test(raw))items.push({url:raw,width:0});return items.filter(x=>resolve(x.url,page)).sort((a,b)=>b.width-a.width);};
+    const bestResponsive=value=>responsiveSources(value)[0]?.url;
     const pictures=[...body.matchAll(/<picture\b[^>]*>[\s\S]*?<\/picture>/gi)].slice(0,260).map(m=>({start:m.index,end:m.index+m[0].length,html:m[0]}));
     const imageTags=[...body.matchAll(/<img\b[^>]*>/gi)];
     for(const tag of imageTags.slice(0,260)){
@@ -81,7 +86,7 @@ export function photoEvidenceTools(publicReference) {
         const kind=/(?:photograph(?:y|s)?|photos?|images?)\s*(?:by|:)\s*$/i.test(before)?'photographer':/(?:from|in|of)\s+(?:the\s+)?(?:series|project|book)\s*[:—-]?\s*$/i.test(before)?'series':null;
         const target=resolve(attrs(link[1]).href,page);if(kind&&target&&label&&researchLinks.length<6)researchLinks.push({kind,label,url:target,basis:'single_figure_caption_link',verified:false});
       }
-      add(url,caption,false,width,height,basis,researchLinks);
+      add(url,caption,false,width,height,basis,researchLinks,{},[a.src,lazy,...responsiveSources(a.srcset||a['data-srcset']||a['data-lazy-srcset']).map(s=>s.url)].filter(Boolean));
       if(picture&&resolve(url,page)&&fileKey(resolve(picture,page))===fileKey(resolve(url,page)))add(picture,caption,false,width,height,basis,researchLinks);
     }
     const images=[...candidates.values()];const subject=tokens(story.subject||story.title||'').filter(t=>!stop.has(t));

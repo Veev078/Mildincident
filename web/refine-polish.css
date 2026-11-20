@@ -1,0 +1,40 @@
+/* Refine connects existing creative choices without adding another workflow. */
+.refine-assistance { margin:24px 0 8px; padding:24px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+.refine-assistance>.section-heading { margin-bottom:20px; }
+.refine-assistance h3 { font:27px/1.2 var(--serif); margin:5px 0 0; }
+.refine-assistance-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; }
+.refine-assistance-grid>section { min-width:0; }
+.refine-mini-heading { margin-bottom:16px; }
+.refine-mini-heading h4 { font:21px/1.3 var(--serif); margin:0 0 7px; }
+.refine-basis { color:var(--quiet); font-size:11px; line-height:1.5; }
+.refine-angle-copy { font:18px/1.6 var(--serif); overflow-wrap:anywhere; margin:0 0 14px; }
+.refine-angle-action { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.refine-angle-action>span { font-size:12px; overflow-wrap:anywhere; }
+.refine-angle-card { border-top:1px solid var(--soft-line); padding:14px 0; }
+.refine-angle-card:first-of-type { border-top:0; padding-top:0; }
+.refine-other-angles { margin:18px 0; }
+.refine-other-angles>summary,.refine-manual-track>summary { cursor:pointer; font-size:13px; }
+.refine-writing-reference { margin:20px 0; padding:14px; background:var(--surface); border-left:2px solid var(--line); }
+.refine-writing-reference .eyebrow { font-size:10px; margin:0 0 10px; }
+.refine-writing-reference blockquote { margin:0; font:16px/1.65 var(--serif); overflow-wrap:anywhere; }
+.refine-writing-reference .small { margin:10px 0; font-size:12px; }
+.refine-improve-actions { display:grid; gap:12px; justify-items:start; }
+.refine-improve-actions .text-button { font-size:13px; text-align:left; }
+.refine-sound { border-left:1px solid var(--line); padding-left:24px; }
+.refine-current-track { display:grid; gap:5px; padding:12px; margin-bottom:18px; background:var(--surface); border:1px solid var(--soft-line); }
+.refine-current-track>strong,.refine-track-suggestions strong { font-size:14px; line-height:1.5; }
+.refine-current-track>span,.refine-track-suggestions span { display:block; font-size:13px; color:var(--quiet); line-height:1.5; }
+.refine-current-track>.text-button { justify-self:start; font-size:12px; padding:8px 0; }
+.refine-sound-brief { display:grid; gap:12px; margin-bottom:18px; }
+.refine-sound :is(label,select,input) { font-size:13px; }
+.refine-sound label { display:grid; gap:6px; }
+.refine-sound-brief .small-button { justify-self:start; }
+.refine-track-suggestions article { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; padding:14px 0; border-top:1px solid var(--soft-line); }
+.refine-track-suggestions article>div { min-width:0; }
+.refine-track-suggestions p { color:var(--quiet); font-size:12px; line-height:1.55; margin:7px 0 0; }
+.refine-track-suggestions .small-button { white-space:nowrap; padding:8px 10px; }
+.refine-manual-track { margin-top:16px; }
+.refine-manual-track form { display:grid; gap:12px; padding-top:14px; }
+.refine-manual-track .small-button { justify-self:start; }
+@media(max-width:1100px){.refine-assistance-grid{grid-template-columns:minmax(0,1fr)}.refine-sound{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:22px}}
+@media(max-width:600px){.refine-assistance{padding:20px 0}.refine-assistance h3{font-size:25px}.refine-track-suggestions .small-button,.refine-angle-action .small-button{min-height:40px}.refine-improve-actions .text-button{min-height:36px}}

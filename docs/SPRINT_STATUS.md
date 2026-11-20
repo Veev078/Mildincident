@@ -1,3 +1,11 @@
+# November 20 — Complete Studio build (local; not deployed)
+
+Recovered the interrupted implementation and integrated publisher-file recovery, selected-reference/private-copy matching, progressive photo results, accessible source-based cover/sequence suggestions, inline angles/music, accurate Insights and the existing guarded approval path. Initial native package preparation and an optional recurring draft policy are prepared locally and remain disabled. No live workflow, policy, credential, AI or publishing changes occurred.
+
+Real desktop/mobile replay uses retained canonical records and six genuine small Jack image inputs; hosted-only private files and new acquisition are not claimed. [Implementation, evidence boundaries and one coordinated release](release/COMPLETE_STUDIO_BUILD.md).
+
+---
+
 ## November 17–18 — coordinated Buffer handoff (local, awaiting approvals)
 
 The accepted V19 layout is preserved. Exact saved captions/order now transfer into the existing native production/review flow behind a disabled private connection. Both native writers share canonical package claims; finished JPEG bytes, rights/facts/final approval, public staging and independent Buffer reads are bound to the current version. Pending/uncertain deliveries survive restart and never resubmit automatically.

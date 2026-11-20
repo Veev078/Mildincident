@@ -8,6 +8,13 @@ import {photoFileKeys} from './story-intelligence.js';
 import {readPublicSource} from './public-source-transport.js';
 import {inspectPhotoSourceWindow} from '../editorial-evidence.js';
 
+/** Discovery providers retain their original-image lead separately from their
+ * search thumbnail. This is a matching hint only: acquisition still requires
+ * the exact image in a captured publisher page, never a search-engine proxy. */
+export function recordedSourceImageUrl(row={}){
+ return safePhotoReference(row.file_url)||safePhotoReference(String(row.notes||'').match(/Image original reference: (https:\/\/\S+?)\. Original page:/)?.[1])||'';
+}
+
 // Explicit publisher/CDN relationships, not an arbitrary image proxy. A mapping
 // never authorizes a URL by itself: the exact URL must be in the retained page.
 const CDN_HOSTS={

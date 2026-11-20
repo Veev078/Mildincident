@@ -7,6 +7,7 @@ import { readAllPages } from '../production-audit.js';
 import { WORKSPACE_TABLES, buildWorkspace } from './model.js';
 import { HandoffError, requireThat } from '../errors.js';
 import {EDITORIAL_PRESET_TABLES} from './editorial-presets.js';
+import {isInternalAnalyticsPost} from '../analytics.js';
 
 export const PRODUCTION_CONTEXT_TABLES=Object.freeze({exports:'dbyxu6uxL2Tpiaxd',proofs:'NEO7s23dFiIdUb1u',guardedHandoffs:'lBncgD93WV9a8oMu',staging:'lLXVATP5mOBIoogV',files:'HOjGxJlmAiJZHYsR',finalReviews:'Jiows2tODEIIOFa3'});
 
@@ -114,16 +115,18 @@ export async function fetchWorkspaceSnapshot({ read = n8nReader(process.env.N8N_
   const buffer = await bufferReader.posts({ organizationId: channel.organizationId, channelId: channel.id });
   const warnings = [...contextWarnings];
   let metricsFailures = 0;
-  const sent = buffer.posts.filter(p => p.status === 'sent');
+  const sent = buffer.posts.filter(p => p.status === 'sent' && !isInternalAnalyticsPost(p));
   for (let offset = 0; offset < sent.length; offset += 2) {
     await Promise.all(sent.slice(offset, offset + 2).map(async post => {
       try {
         const evidence = await bufferReader.metrics(post.id);
         post.metrics = evidence.metrics;
         post.metricsUpdatedAt = evidence.metricsUpdatedAt || null;
-      } catch { metricsFailures++; }
+        post.metricsRead = {state: evidence.metrics?.some(metric => typeof metric.value === 'number' && Number.isFinite(metric.value)) ? 'measured' : 'not_supplied', fetchedAt: new Date().toISOString()};
+      } catch { metricsFailures++; post.metricsRead = {state: 'unavailable', fetchedAt: new Date().toISOString()}; }
     }));
   }
   if (metricsFailures) warnings.push(`Performance metrics were unavailable for ${metricsFailures} sent records. Missing measurements are not reported as zero.`);
+  buffer.accountIdentity = {channelId:channel.id,organizationId:channel.organizationId,name:channel.name,service:channel.service,basis:'unique_provider_channel_name_and_service'};
   return { records, buffer, observedAt: new Date().toISOString(), warnings };
 }

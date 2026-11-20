@@ -104,6 +104,23 @@ test('founder taste feedback freezes into future requests without relabeling res
  service.review(seed.id,{candidateId:candidate.id,expectedVersion:research.engineJob(seed.id).version,decision:'needs_research',basis:'source_accuracy',reviewer:'editor',reason:'An independent later source review, not the founder taste decision.'});assert.equal(service.editorialContext().feedback[0].reviewer,'founder');await service.queue(next.id);assert.deepEqual(research.engineJob(next.id).editorialContext,frozen);assert.equal(state.posts,2);assert.deepEqual(research.engineJob(seed.id).candidates,[candidate]);
 });
 
+test('measured publication observations supplement human feedback without changing its attribution or the bounded frozen request',async t=>{
+ const {research,service,state}=await setup(t);
+ const human={storyId:'human-story',reviewer:'founder',basis:'editorial_taste',reason:'Keep unexpected visual detail central.',createdAt:'2026-11-20T12:00:00Z'};
+ service.imageFeedback=()=>[human];
+ const observation={kind:'publication_observation',reviewer:'provider',storyId:'measured-story',sourceRevision:'r1',createdAt:'2026-11-19T12:00:00Z',publication:{bufferPostIds:['exact-post']},observations:[{name:'shares',value:2,unit:'count',measuredAt:'2026-11-19T12:00:00Z'}],reason:'Descriptive provider observation, not a causal claim.'};
+ service.performanceFeedback=()=>[{...observation,sourceRevision:null},observation,{...observation,storyId:'second'},{...observation,storyId:'third'}];
+ const request=research.create({kind:'discovery',prompt:'Find a strong source-grounded next editorial idea'},[]);
+ await service.queue(request.id);
+ const context=JSON.parse(state.jobs[0].editorial_context_json);
+ assert.equal(context.feedback[0].reviewer,'founder');assert.equal(context.feedback[0].reason,human.reason);
+ assert.deepEqual(context.feedback.filter(note=>note.reviewer==='provider').map(note=>note.storyId),['measured-story','second']);
+ assert.match(context.interpretation,/not founder opinions, causal findings/);
+ const frozen=research.engineJob(request.id).editorialContext;service.performanceFeedback=()=>[];await service.queue(request.id);assert.deepEqual(research.engineJob(request.id).editorialContext,frozen);assert.equal(state.posts,1);assert.equal(state.dispatches,0);
+ service.performanceFeedback=()=>[{...observation,reason:'large observation '.repeat(800)}];
+ const bounded=service.editorialContext();assert.ok(JSON.stringify(bounded).length<=9500);assert.equal(bounded.feedback[0].reviewer,'founder');assert.ok(!bounded.feedback.some(note=>note.reviewer==='provider'));
+});
+
 test('finished execution without a result gets a bounded read-only recovery period and can still import late results',async t=>{
  const {research,service,state}=await setup(t);const request=research.create({kind:'brief',prompt:'Inspect a specific photographed cultural moment'},[]);await service.queue(request.id);state.jobs[0].status='generating';state.jobs[0].execution_id='1000';
  await service.refresh();assert.equal(research.engineJob(request.id).state,'generating');assert.ok(research.engineJob(request.id).resultMissingSince);

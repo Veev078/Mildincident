@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {photoRequestPanel} from '../photo-requests.js';
-import {selectedSequencePanel,assetCard} from '../photo-desk.js';
+import {selectedSequencePanel,assetCard,photoDeskWorkspace} from '../photo-desk.js';
 
 const requestPanel=(extra={})=>photoRequestPanel({
  id:'PHOTO-ONE',revision:'r1',photoRequests:[],
@@ -50,8 +50,20 @@ test('photo selection pauses on stale source with an explanation; source relevan
 test('an unavailable selected cover is reported without relabeling another photograph as the cover',()=>{
  const story={id:'CON-ui',selectedAssetIds:['missing-cover','one'],media:[{id:'one',title:'Second frame'}],revision:'r1'};
  const html=selectedSequencePanel(story);
- assert.match(html,/2 photographs/);assert.match(html,/Second frame/);assert.match(html,/<strong>02<\/strong>/);assert.match(html,/Photograph 1 is unavailable/);assert(!html.includes('<strong>Cover</strong>'));
+ assert.match(html,/2 slides/);assert.match(html,/Second frame/);assert.match(html,/<strong>02<\/strong>/);assert.match(html,/Photograph 1 is unavailable/);assert(!html.includes('<strong>Cover</strong>'));
  assert.deepEqual(story.selectedAssetIds,['missing-cover','one']);
+});
+
+test('selected source references cannot hide matching saved photographs as URL duplicates',()=>{
+ const story={id:'CON-saved',revision:'r1',selectedAssetIds:['reference'],media:[
+  {id:'reference',sourceUrl:'https://example.org/project',savedCopy:{assetId:'saved',sha256:'a'.repeat(64)}},
+  {id:'saved',photoRelevance:{category:'direct'},localPreview:{sha256:'a'.repeat(64),originalSha256:'b'.repeat(64)},previewUrl:''},
+ ],photography:{groups:{duplicates:['saved']}}};
+ const html=photoDeskWorkspace({},story);
+ assert.match(html,/data-photo-card="saved"/);assert.match(html,/data-photo-saved-copy="reference"/);
+ assert.deepEqual(story.selectedAssetIds,['reference']);
+ const noFiles={...story,media:[story.media[0]],photography:{groups:{}}};
+ assert.match(photoDeskWorkspace({},noFiles),/data-photo-card="reference"/);
 });
 
 test('photo outcomes distinguish newly saved photographs, private copies and unacquired references',()=>{

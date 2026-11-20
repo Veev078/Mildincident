@@ -1,0 +1,8 @@
+.insight-posts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin-bottom:1.5rem}
+.insight-posts .insight-post{margin:0;min-width:0}
+.insight-post h3{font-size:1.1rem;line-height:1.4;overflow-wrap:anywhere}
+.insight-measurements{display:flex;flex-wrap:wrap;gap:1rem 1.5rem;margin:1.1rem 0}
+.insight-measurements div{display:flex;flex-direction:column;gap:.2rem}
+.insight-measurements dt{font-size:.75rem;color:var(--muted,#6b6762)}
+.insight-measurements dd{margin:0;font-size:1.25rem;font-weight:600}
+@media(max-width:700px){.insight-posts{grid-template-columns:1fr}.insight-measurements{gap:1rem}}

@@ -72,8 +72,8 @@ export class LocalPreviewStore {
     return this.#public(row);
   }
 
-  all() {
-    const rows = this.db.prepare(`SELECT p.* FROM local_image_previews p WHERE p.id=(SELECT MAX(q.id) FROM local_image_previews q WHERE q.story_id=p.story_id AND q.asset_id=p.asset_id)`).all();
+  all(storyId=null) {
+    const rows = this.db.prepare(`SELECT p.* FROM local_image_previews p WHERE ${storyId?'p.story_id=? AND ':''}p.id=(SELECT MAX(q.id) FROM local_image_previews q WHERE q.story_id=p.story_id AND q.asset_id=p.asset_id)`).all(...(storyId?[storyId]:[]));
     return new Map(rows.map(row => [JSON.stringify([row.story_id, row.asset_id]), this.#public(row)]));
   }
 
@@ -206,8 +206,8 @@ export class LocalPreviewStore {
       context:JSON.parse(this.db.prepare('SELECT context_json FROM local_image_review_contexts WHERE story_id=? AND asset_id=? AND version=?').get(storyId,assetId,latest.version)?.context_json||'null'),localOnly: true, rightsGranted: false, history: rows.slice(0, 50).map(r => ({version:r.version, decision:r.decision, reason:r.reason, updatedAt:r.created_at,...(contexts.get(r.version)?.decisionBasis?{basis:contexts.get(r.version).decisionBasis}:{})})) } : null;
   }
 
-  allReviews() {
-    const scopes = this.db.prepare('SELECT DISTINCT story_id,asset_id FROM local_image_review_events').all();
+  allReviews(storyId=null) {
+    const scopes = this.db.prepare('SELECT DISTINCT story_id,asset_id FROM local_image_review_events'+(storyId?' WHERE story_id=?':'')).all(...(storyId?[storyId]:[]));
     return new Map(scopes.map(r => [JSON.stringify([r.story_id,r.asset_id]), this.review(r.story_id,r.asset_id)]));
   }
 
@@ -236,8 +236,9 @@ export class LocalPreviewStore {
 
 export function attachLocalPreviews(workspace, previews) {
   if (!previews) return workspace;
-  const attachments = previews.all();
-  const reviews = previews.allReviews();
+  const storyId=workspace.stories.length===1?workspace.stories[0].id:null;
+  const attachments = previews.all(storyId);
+  const reviews = previews.allReviews(storyId);
   for (const story of workspace.stories) for (const asset of story.media) {
     const preview = attachments.get(JSON.stringify([story.id, asset.id])) || null;
     if (!Object.hasOwn(asset, 'sourcePreviewUrl')) asset.sourcePreviewUrl = asset.previewUrl;
@@ -245,6 +246,20 @@ export function attachLocalPreviews(workspace, previews) {
     asset.localPreview = preview;
     asset.localReview = reviews.get(JSON.stringify([story.id, asset.id])) || null;
     if (preview) asset.previewUrl = `/api/stories/${encodeURIComponent(story.id)}/assets/${encodeURIComponent(asset.id)}/preview?hash=${preview.sha256}`;
+  }
+  // Older selections may still name a search reference while a later search
+  // saved its publisher image under another asset ID. Display the exact saved
+  // copy without rewriting the selection, attaching files, or transferring any
+  // review/rights decision. A deliberate founder edit can use the saved asset.
+  for(const story of workspace.stories)for(const asset of story.media){
+    if(asset.localPreview)continue;
+    const page=safePhotoReference(asset.sourceUrl),image=safePhotoReference(asset.sourceImageUrl||asset.fileUrl);
+    if(!page||!image)continue;
+    const matches=story.media.filter(m=>m.id!==asset.id&&m.localPreview&&safePhotoReference(m.localPreview.sourceInspection?.sourceUrl)===page&&safePhotoReference(m.localPreview.sourceInspection?.imageUrl)===image);
+    if(!matches.length||new Set(matches.map(m=>m.localPreview.originalSha256)).size!==1)continue;
+    const match=matches[0];
+    asset.savedCopy={assetId:match.id,sha256:match.localPreview.sha256,width:match.localPreview.width,height:match.localPreview.height,basis:'exact_recorded_source_and_image_url',rightsGranted:false};
+    asset.previewUrl=match.previewUrl;
   }
   return workspace;
 }

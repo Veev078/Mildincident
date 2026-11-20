@@ -8,6 +8,7 @@ import { analyzeStory, findDuplicateStories } from '../editorial-intelligence.js
 import { calculateAnalytics } from '../analytics.js';
 import { buildDiscoveryDesk } from '../editorial-discovery.js';
 import { buildEditorialDirection } from '../editorial-direction.js';
+import { recordedSourceImageUrl } from '../photography/source-images.js';
 
 export const WORKSPACE_TABLES = Object.freeze({
   stories: '5AxSMHqi15TNwBZl', packages: 'cCFwaHyKVVTZvr5s', media: 'ARiuqg92GgVSpZMr',
@@ -86,7 +87,13 @@ export function buildWorkspace(snapshot, drafts = new Map(),{storyId=null}={}) {
       availableMedia: [...media].map(({fileUrl,attribution,licenseUrl,nativeRightsReview,...original})=>original).sort((a, b) => a.id.localeCompare(b.id)),
     })).digest('hex');
     story.production=projectProduction({row,records,buffer,observedAt:snapshot.observedAt,safeUrl:browserUrl});
-    for (const asset of media) { asset.sourcePreviewUrl = asset.previewUrl; asset.previewOrigin = 'source'; asset.localPreview = null; }
+    for (const asset of media) {
+      // Enrichment is deliberately outside the source revision: recovering an
+      // already-recorded publisher URL must not invalidate saved founder edits.
+      const original = records.media.find(m=>m.concept_id===row.concept_id&&m.asset_id===asset.id);
+      asset.sourceImageUrl = browserUrl(recordedSourceImageUrl(original));
+      asset.sourcePreviewUrl = asset.previewUrl; asset.previewOrigin = 'source'; asset.localPreview = null;
+    }
     const draft = drafts.get(story.id);
     story.localDraft = draft ? { ...draft, stale: draft.baseRevision !== story.revision } : null;
     const effective = draft && !story.localDraft.stale ? { ...story, ...draft } : story;

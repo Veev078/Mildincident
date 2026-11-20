@@ -1,4 +1,5 @@
 import {renderStudio} from './studio-render.js';
+import {savedCopySelection,coverSelection} from './selection-actions.js';
 import {bufferConfirmDialog,nativeReviewDialog} from './buffer-draft.js';
 import {updateStoryGenerationReview,reconcileStoryProgress,updateAiUsagePanel,storyProposal} from './ai-operations.js';
 import {previewFailureMessage} from './preview-state.js';
@@ -567,7 +568,7 @@ document.addEventListener('click', async event => {
       editDraft(story.id, { selectedAssetIds: selected,...(selected.length?{format:adjusted,targetSlideCount:selected.length}: {}) }, { rerender: true, immediate: true });
       announce(`Slide ${index + 1} moved to position ${destination + 1}.`); break;
     }
-    case 'clear-track': editDraft(story.id,{musicSelection:null},{rerender:true,immediate:true});flushDraft(story.id).then(saved=>{if(saved&&route().id===story.id&&route().tab==='music')render();});break;
+    case 'clear-track': editDraft(story.id,{musicSelection:null},{rerender:true,immediate:true});flushDraft(story.id).then(saved=>{if(saved&&route().id===story.id&&['music','refine'].includes(route().tab))render();});break;
     case 'choose-track': {
       const track = (story?.musicRecommendations || story?.intelligence?.musicRecommendations || [])[Number(button.dataset.index)];
       if (track) editDraft(story.id, { musicSelection: { track: track.track || track.title, artist: track.artist } }, { rerender: true, immediate: true });
@@ -678,7 +679,7 @@ document.addEventListener('submit',async event=>{
  const story=storyById(form.dataset.story);if(!story)return;const intent=readMusicIntentForm(form);
  if(state.musicIntentDrafts)delete state.musicIntentDrafts[story.id];
  editCreativeBrief(story.id,brief=>{brief.musicIntent=intent;},{immediate:true});
- if(await flushDraft(story.id)&&route().id===story.id&&route().tab==='music')render();
+ if(await flushDraft(story.id)&&route().id===story.id&&['music','refine'].includes(route().tab))render();
 });
 document.addEventListener('submit', event => {
   const form = event.target.closest('[data-form="editorial-setup"]');
@@ -1042,7 +1043,16 @@ document.addEventListener('change',event=>{const select=event.target.closest('[d
 function watchPhotoProgress(id){
  let stopped=false,reading=false;
  const tick=async()=>{if(stopped||reading||!state.photoSearchBusy?.[id])return;reading=true;
-  try{const story=await api('/api/stories/'+encodeURIComponent(id)),p=story.photoRequests?.[0],status=document.getElementById('photo-action-status-'+id);if(stopped||!status||!state.photoSearchBusy?.[id])return;const pages=p?.sourceAttempts?.filter(a=>a.status==='captured').length||0,files=p?.imageAttempts?.filter(a=>['decoded','cached_existing','exact_duplicate'].includes(a.status)).length||0;status.textContent=pages||files?`${pages} source page(s) read · ${files} image file(s) checked. Your selection stays in place.`:'Checking project sources. Your selection stays in place.';}catch{}finally{reading=false;}
+  try{
+   const detail=await api('/api/stories/'+encodeURIComponent(id));if(stopped||!state.photoSearchBusy?.[id])return;
+   const current=storyById(id),fingerprint=s=>(s?.media||[]).map(a=>[a.id,a.localPreview?.sha256,a.savedCopy?.sha256].join(':')).join('|'),changed=fingerprint(current)!==fingerprint(detail);
+   mergeStoryDetail(id,detail);
+   // Show newly saved photographs while the bounded source scan continues.
+   // Reuse decoded image elements and never disturb writing on another tab.
+   if(changed&&route().id===id&&route().tab==='build')render();
+   const p=detail.photoRequests?.[0],status=document.getElementById('photo-action-status-'+id),pages=p?.sourceAttempts?.filter(a=>a.status==='captured').length||0,files=p?.imageAttempts?.filter(a=>['decoded','cached_existing','exact_duplicate'].includes(a.status)).length||0;
+   if(status)status.textContent=pages||files?`${pages} source page(s) read · ${files} image file(s) checked. Saved photographs appear as they arrive.`:'Checking project sources. Your selection stays in place.';
+  }catch{/* Preserve the last visible result; the final receipt reports errors. */}finally{reading=false;}
  };
  const timer=setInterval(tick,1500);return()=>{stopped=true;clearInterval(timer);};
 }
@@ -1155,14 +1165,22 @@ setInterval(async()=>{
  try{await api('/api/stories/'+encodeURIComponent(story.id)+'/vision/refresh',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({proposalId:proposal.id})});await loadWorkspace({quiet:true,renderView:current.tab==='build'||current.tab==='images'||current.tab==='carousel'});}catch{/* The recorded operation is never resent. Manual check remains available. */}finally{visionLocks.delete(story.id);}
 },5000);
 
+function mergeStoryDetail(id,detail){
+ const current=storyById(id);if(!current)return detail;
+ const changes={...(inFlight.get(id)||{}),...(pending.get(id)||{})},prior=current.localDraft;
+ Object.assign(current,detail);
+ // A gallery progress read may have started before the latest autosave finished.
+ // Never roll the editor/version counter back to that older read response.
+ const savedAfterRead=prior?.baseRevision===detail.revision&&(prior.version||0)>(detail.localDraft?.version||0);
+ if(Object.keys(changes).length||savedAfterRead){const baseRevision=prior?.baseRevision||detail.revision;current.localDraft={...(detail.localDraft||{}),...(prior||{}),...changes,baseRevision,stale:baseRevision!==detail.revision};}
+ if(!saving.has(id))versions.set(id,current.localDraft?.version||0);
+ return current;
+}
 async function loadStory(id){
  if(storyReads.has(id))return storyReads.get(id);
  state.storyReadErrors ||= {};delete state.storyReadErrors[id];
- const task=(async()=>{const detail=await api('/api/stories/'+encodeURIComponent(id)),current=storyById(id);if(!current)return detail;
-  const changes={...(inFlight.get(id)||{}),...(pending.get(id)||{})},prior=current.localDraft;
-  Object.assign(current,detail);
-  if(Object.keys(changes).length){const baseRevision=prior?.baseRevision||detail.revision;current.localDraft={...(detail.localDraft||{}),...(prior||{}),...changes,baseRevision,stale:baseRevision!==detail.revision};}
-  if(!saving.has(id))versions.set(id,current.localDraft?.version||0);if(route().id===id)render();return current;
+ const task=(async()=>{const detail=await api('/api/stories/'+encodeURIComponent(id)),current=mergeStoryDetail(id,detail);
+  if(route().id===id)render();return current;
  })();storyReads.set(id,task);try{return await task;}catch(error){state.storyReadErrors[id]=error.message;if(route().id===id)render();throw error;}finally{storyReads.delete(id);}
 }
 document.addEventListener('click',event=>{
@@ -1175,6 +1193,24 @@ document.addEventListener('click',event=>{
  if(event.target.closest('[data-curation-close]')){const id=state.curationStory;state.curationStory=null;render();document.querySelector('[data-curation-open="'+CSS.escape(id)+'"]')?.focus();}
 });
 document.addEventListener('cancel',event=>{if(event.target.id==='curation-dialog')state.curationStory=null;},true);
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-photo-saved-copy],[data-curation-cover]');if(!button||button.disabled)return;button.disabled=true;
+ try{
+  if(!await flushAllDrafts())throw Error('Save pending edits before changing the slides.');
+  const story=storyById(button.dataset.story);if(!story||story.localDraft?.stale)throw Error('Review the source changes before editing this post.');
+  const selectedAssetIds=button.dataset.photoSavedCopy?savedCopySelection(story,button.dataset.photoSavedCopy):coverSelection(story,button.dataset.curationCover);
+  editDraft(story.id,{selectedAssetIds},{rerender:true,immediate:true});
+  if(!await flushDraft(story.id))return;
+  announce(button.dataset.photoSavedCopy?'Saved file selected. Your caption and earlier order remain in history.':'Cover selected. Your caption and earlier order remain in history.');
+ }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
+});
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-refine-improve]');if(!button||button.disabled)return;
+ if(!['discovery_opening','alternate_angle','supported_perspective'].includes(button.dataset.refineImprove))return;
+ button.disabled=true;
+ try{if(!await flushAllDrafts())throw Error('Save your caption before reviewing an AI request.');state.captionDirections ||= {};state.captionDirections[button.dataset.story]=button.dataset.refineImprove;state.captionTools ||= {};state.captionTools[button.dataset.story]='improve';render();document.querySelector('#caption-improvement-direction')?.focus({preventScroll:true});}
+ catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
+});
 
 let previewTouch=null;
 document.addEventListener('pointerdown',event=>{if(event.pointerType==='touch'&&event.target.closest('.instagram-slide'))previewTouch={x:event.clientX,y:event.clientY};});

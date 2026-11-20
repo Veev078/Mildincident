@@ -2,11 +2,13 @@ import sharp from 'sharp';
 import {canonical,sha256} from '../package.js';
 import {requireThat,HandoffError} from '../errors.js';
 import {nativePostDigest} from './native-buffer-connection.js';
+import {nativePreparationReadiness} from './native-post-readiness.js';
 
 /** Build only from the saved approval binding, current story and private custody. */
 export async function nativePostTransferPacket({story,approval,previews}){
  const p=story.production?.package,w={...story,...(story.localDraft||{})};
- requireThat(!story.organization?.trashed&&!story.localDraft?.stale&&story.origin!=='n8n_development'&&p?.rowId&&p?.id&&p?.version,'NATIVE_POST_NOT_LINKED','This post needs its canonical record in the existing native approval process before transfer.');
+ const preparation=nativePreparationReadiness(story);
+ requireThat(preparation.available,'NATIVE_POST_NOT_LINKED',preparation.reason||'This post needs its canonical record in the existing native approval process before transfer.');
  requireThat(approval?.storyId===story.id&&approval.binding.identity.sourceRevision===story.revision&&approval.binding.identity.localVersion===(story.localDraft?.version||null),'EDIT_CONFLICT','Save and prepare this exact post before sending it for native review.');
  requireThat(approval.binding.editorial.caption===w.caption&&canonical(approval.binding.editorial.orderedMedia.map(m=>m.assetId))===canonical(w.selectedAssetIds),'EDIT_CONFLICT','The saved review does not match this caption and slide order.');
  const images=[];
@@ -22,7 +24,7 @@ export async function nativePostTransferPacket({story,approval,previews}){
   }
   images.push(image);
  }
- const packet={version:1,kind:'mildincident_studio_post_review',requestId:approval.id,expected:{storyId:story.id,storyState:{title:story.title,hook:story.hook||'',format:story.format,stage:story.stage,approval_status:story.approvalStatus},packageId:p.id,packageRowId:Number(p.rowId),packageVersion:p.version,packageDigest:p.sourceDigest},post:{caption:w.caption,selectedAssetIds:w.selectedAssetIds,format:w.format,title:w.title,hook:w.hook||'',sourceRevision:story.revision,workingVersion:story.localDraft?.version||0},images};
+ const packet={version:1,kind:'mildincident_studio_post_review',requestId:approval.id,expected:{storyId:story.id,storyState:{title:story.title,hook:story.hook||'',format:story.format,stage:story.stage,approval_status:story.approvalStatus},packageId:p?.id||null,packageRowId:p?.rowId?Number(p.rowId):null,packageVersion:p?.version||null,packageDigest:p?.sourceDigest||null},post:{caption:w.caption,selectedAssetIds:w.selectedAssetIds,format:w.format,title:w.title,hook:w.hook||'',sourceRevision:story.revision,workingVersion:story.localDraft?.version||0},images};
  return {...packet,contentDigest:sha256(canonical(packet))};
 }
 
@@ -38,6 +40,7 @@ export class NativePostTransfers {
   requireThat(input&&Object.keys(input).every(k=>['sourceRevision','workingVersion','approvalRequestId','confirm'].includes(k))&&input.confirm==='submit_exact_post_for_native_review','INVALID_NATIVE_REVIEW','Confirm sending this exact saved caption and slides to the existing native review. This does not approve or send a Buffer draft.');
   const a=this.approvals.get(input.approvalRequestId);requireThat(a?.storyId===story.id&&this.approvals.public(a,story).unchanged&&input.sourceRevision===story.revision&&input.workingVersion===(story.localDraft?.version||0),'EDIT_CONFLICT','The post changed. Review its current saved version.');
   requireThat(this.connection?.reviewAvailable===true,'NATIVE_REVIEW_DISABLED','The native review connection is not enabled.');
+  requireThat(story.production?.package||this.connection.status?.(story).preparationAvailable===true,'NATIVE_PREPARATION_DISABLED','Preparation for this approved story is not enabled. Existing content is preserved.');
   const packet=await nativePostTransferPacket({story,approval:a,previews:this.previews});
   this.db.exec('BEGIN IMMEDIATE');try{const prior=this.latest(story.id);requireThat(!prior||!['dispatching','running','uncertain'].includes(prior.state),'RECONCILIATION_REQUIRED','A native review transfer is unresolved. Check its existing request; do not submit again.');requireThat(!prior||prior.contentDigest!==packet.contentDigest,'NATIVE_REVIEW_ALREADY_SENT','This exact post was already transferred. Check its current native review.');this.event(a,story,'dispatching',{contentDigest:packet.contentDigest,sourceRevision:story.revision,workingVersion:input.workingVersion});this.db.exec('COMMIT');}catch(error){this.db.exec('ROLLBACK');throw error;}
   let receipt;try{receipt=await this.connection.submitReview(packet);if(receipt.state==='native_accepted'){requireThat(receipt.requestId===a.id&&/^\d+$/.test(String(receipt.executionId||'')),'NATIVE_REVIEW_UNCERTAIN','The native acceptance did not match this request.');const data={contentDigest:packet.contentDigest,sourceRevision:story.revision,workingVersion:input.workingVersion,executionId:String(receipt.executionId)};this.event(a,story,'dispatching',data);return {state:'dispatching',...data};}return await this.accept(story,a,packet,receipt);}
