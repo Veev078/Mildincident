@@ -21,14 +21,14 @@ test('Continue working uses actual private-save and current decision times rathe
 });
 test('Today can resume a visited stage while stale copies still lead to explicit source comparison',()=>{
  const make=extra=>({workspace:{stories:[story('saved',{localDraft:{updatedAt:'2026-10-30T11:00:00Z',...extra}})]},lastStoryTabs:{saved:'caption'}});
- assert.match(home(make({})),/#\/story\/saved\/caption/);assert.match(home(make({})),/Continue editing/);
+ assert.match(home(make({})),/#\/story\/saved\/refine/);assert.match(home(make({})),/Continue editing/);
  const stale=home(make({stale:true}));assert.ok(!stale.includes('Continue editing'));assert.match(stale,/Review source changes/);
  const unknown=make({});unknown.lastStoryTabs.saved='__proto__';assert.ok(!home(unknown).includes('[object Object]'));
 });
-test('five editorial destinations preserve all old bookmarks, exact story IDs and library secondary routes',()=>{
- assert.equal(navigation.length,5);
+test('three primary editorial destinations preserve all old bookmarks, exact story IDs and library secondary routes',()=>{
+ assert.equal(navigation.length,3);
  for(const [old,modern] of [['home','today'],['discovery','discover'],['pipeline','stories'],['publishing','production'],['library','library']])assert.equal(resolveRoute('#/'+modern).view,resolveRoute('#/'+old).view);
- assert.deepEqual(resolveRoute('#/story/CON-kept/caption'),{view:'story',id:'CON-kept',tab:'caption'});assert.equal(destination('analytics'),'library');assert.equal(destination('story'),'pipeline');assert.equal(resolveRoute('#/archive').view,'archive');
+ assert.deepEqual(resolveRoute('#/story/CON-kept/caption'),{view:'story',id:'CON-kept',tab:'refine'});assert.equal(destination('analytics'),'library');assert.equal(destination('story'),'pipeline');assert.equal(resolveRoute('#/archive').view,'archive');
 });
 test('Insights keeps measured zero and consolidates missing audience values into one honest empty state',()=>{
  const html=analytics({workspace:{analytics:{metrics:[{name:'reach',label:'Reach',available:true,value:0},{name:'shares',available:false,value:null}]}}});

@@ -1,4 +1,122 @@
-# Current checkpoint — V14 live; photographic intelligence continuation
+# November 20 — Complete Studio build (local; not deployed)
+
+Recovered the interrupted implementation and integrated publisher-file recovery, selected-reference/private-copy matching, progressive photo results, accessible source-based cover/sequence suggestions, inline angles/music, accurate Insights and the existing guarded approval path. Initial native package preparation and an optional recurring draft policy are prepared locally and remain disabled. No live workflow, policy, credential, AI or publishing changes occurred.
+
+Real desktop/mobile replay uses retained canonical records and six genuine small Jack image inputs; hosted-only private files and new acquisition are not claimed. [Implementation, evidence boundaries and one coordinated release](release/COMPLETE_STUDIO_BUILD.md).
+
+---
+
+## November 17–18 — coordinated Buffer handoff (local, awaiting approvals)
+
+The accepted V19 layout is preserved. Exact saved captions/order now transfer into the existing native production/review flow behind a disabled private connection. Both native writers share canonical package claims; finished JPEG bytes, rights/facts/final approval, public staging and independent Buffer reads are bound to the current version. Pending/uncertain deliveries survive restart and never resubmit automatically.
+
+Exposed internal-token scope was checked without printing it. Retirement and dedicated Studio JWT authentication are prepared; **the live token has not been revoked**. No deployment, native/credential mutation, paid execution or Buffer write occurred. [One coordinated release and separate one-draft approval](release/V19_BUFFER_COORDINATED_RELEASE.md) contains the current evidence, native Cloud claim proof still required, exact proposed changes and safe rollback. Actual desktop/mobile screenshots under `.local/buffer-native-browser/` show generated test JPEGs with simulated native/provider I/O, not hosted editorial success.
+
+---
+
+# November 17 — V19 final polish and guarded Buffer integration
+
+Implemented clear stage buttons, Posts/three-dot actions, confirmed recoverable Trash and an image-first 4:5 carousel Preview with caption access. Existing approval requests, JPG preparation and the durable outbox now form one local confirmation-to-draft journey. Production transport remains disabled.
+
+Actual desktop/mobile browsers verified retained Jack photographs and preservation; the full local HTTP handoff used generated JPGs and a simulated provider. Syntax checks and 602 regression tests pass. Native read-only inspection confirmed the existing staging/approval/send paths. Live sending still needs one coordinated native content/claim/read-back repair and narrow rotation of the internal handoff secret surfaced during inspection. No live writes, paid calls, deployment or publication occurred. [Details and next release](release/V19_FINAL_POLISH_BUFFER.md).
+
+---
+
+# November 16 — V19 Studio reset implemented locally
+
+The founder reports V18 acquisition working (Miami photographs/22 references, saved Hase files, Jack order preserved) and approves a substantial frontend reset. V19 replaces layered story activities with Discover → Build → Refine → Approve / Buffer, a saved-photo-first gallery, in-place cover/ordering, optional curation and quieter final review. Story-scoped rendering, compact workspace payloads, disposable private thumbnails and retained image DOM address measured loading costs without rewriting acquisition or native operations. Actual local desktop/mobile editing-to-approval and failure recovery pass with real retained Jack inputs; AI judgments remain explicitly simulated. [Implementation, measurements, evidence and next release](release/V19_STUDIO_RESET.md). No deployment, live native/policy/credential change, paid AI or publishing occurred.
+
+---
+
+# November 16 — V18 integrated editorial engine implemented locally
+
+Recovered the interrupted working tree over `3bcaa3b` and completed generalized evidence-bound public source/CDN acquisition, reusable disabled-by-default founder-confirmed photo assessment, image-bound cover/carousel packages and selected-image context for the existing caption contract. Studio retains the accepted workstation, explicit Apply, versioned edits, approval handoff and live caption/story boundaries. Actual local desktop/mobile browser journeys use six real retained Jack JPEGs and labelled simulated outcomes; native interception verifies the actual JPEG bytes through one-to-six structural inputs with zero provider requests. No new hosted photographs, real complete visual judgments, deployment, live n8n/policy/credential changes or publishing are claimed. [Implementation, evidence, exact native proposal and coordinated next approval](release/V18_INTEGRATED_EDITORIAL_ENGINE.md).
+
+---
+
+# November 16 — integrated editorial-engine checkpoint
+
+Execution 2369 is reconciled as a paid output-limit failure, not a usable visual assessment. Native full-graph verification and the founder's Render PASS confirm original worker/policy binding, grant revocation and ordinary caption/story starts restored. Local code now prepares compact opt-in visual output, preserves failed-vision usage, generalizes project-path/source-lead progression, avoids tracking-alias refetches and confines AI recommendations to assessed files. The accepted workstation is preserved. No deployment, live n8n mutation, new paid operation or publishing occurred. [Current evidence and substantial next-phase plan](release/INTEGRATED_EDITORIAL_ENGINE.md).
+
+---
+
+# Earlier checkpoint — V17.1 polish and fresh vision acceptance prepared
+
+[V17.1 findings, exact approval package and next product scope](release/V17_1_POLISH_AND_VISION.md). Sprint B `cea7c0d` is live and founder-accepted. The read-only hosted diagnostic confirms six genuine saved Hase JPEGs with matching hashes and full decoding. Missing external references are distinct from these healthy files. Lost & Found's old staging-page 401 produced no images; its exact verified public Dazed article is now supported locally without changing historical evidence. Preview errors distinguish saved files from references, the known Hase sketch stays outside photo suggestions, and Arrange presents one suggested edit with accessible alternatives and explicit Apply.
+
+Fresh vision preparation passes on deployed Studio with the same six Jack files, working version 0 and preserved recurring policy. Proposed graph `5043b436…` is derived from active `adc2ed9e…` / `b971c6f5…`; its exact expanded representation uses current execution 2367. Native normalization/evaluation proves six real inline JPEG inputs with transport blocked. Fresh job `15023fef-60a6-45fb-8b16-598e924db6f7` has no grant or dispatch. One bounded real GPT-5.4 assessment requires separate approval; the current caption/story worker remains unchanged. No deployment, live native/policy/credential mutation, paid call or publishing occurred in this sprint.
+
+---
+
+# Earlier checkpoint — V17 Sprint B implemented locally
+
+[Sprint B evidence and next release](release/V17_SPRINT_B.md): Hase project matching is independent of photographer attribution/rights, observed Windowseat → Gelitin image routes are prioritized, and useful captured evidence survives a later uncertain source. The existing reader also supports the actual Dog Pound Days publisher/CDN gallery. No fresh hosted photographic acquisition is claimed.
+
+The retained execution 2367 now reconciles into a visible, editable preliminary draft with sources, claims, gaps and recorded usage, without a new model call. Its progress and usage update without replacing unsaved writing; a failed Studio read cannot erase the completed outcome. Opening/sequence suggestions use source context, founder preferences, decoded dimensions and similarity, remain distinct from AI judgment, and apply through the existing versioned draft store with exact-plan/private-file checks.
+
+542 regressions, syntax checks, the existing desktop/mobile workstation journey and the four-case retained-evidence journey pass. Six real retained Jack model-size JPEGs support explicit sequence application and persistence; Sophy's remaining 12/52 references yield no new project photographs. Actual rendered before/after screenshots are labelled local replays. No paid calls, grants, live workflow/policy/credential mutations, publishing or deployment occurred. PR #1 stays draft/unmerged.
+
+Live Studio baseline is founder-confirmed `3a61f0d`; the completed four-node research-budget repair remains active on saved/active worker `adc2ed9e-2863-428e-b9fd-165eb7b7a2a7`, graph `b971c6f5…`, rechecked read-only. Next: separately approve this code release and inspect genuine hosted Hase file outcomes plus the existing 2367 draft. A fresh bounded AI visual acceptance remains separately gated.
+
+---
+
+# Earlier checkpoint — hosted failures repaired locally
+
+[Focused repair and next release](release/V17_LIVE_FAILURE_REPAIR.md): execution 2365 stopped before either model because its rendered research input was 36,608 characters. Shared context budgeting preserves essential instructions and founder direction within the unchanged 30,000 limit; captured brief and Surprise Me replays render at 29,999 / 29,985. Failure receipts now remain terminal and report their actual safe cause, even when the webhook reports success. The exact four-node native proposal requires separate installation approval; the live recurring worker remains unchanged and active on `673685e5-71af-4b24-a50d-ae06d5799841` / `0e1777e5…`.
+
+The Rabbit receipt proves missing reader support, not a recorded HTTP failure: no source was attempted. Recorded Guardian/Artsy/Windowseat paths and Windowseat’s observed original Gelitin Hase project trail are now supported with exact page/image binding and honest failure labels. Source-specific project captions can recover relevant Hase images without treating unrelated work or drawings as photographs. Positive file acquisition tests use generated bytes; **no new hosted Rabbit photograph or paid AI result is claimed**. The founder's read-only Render source-access check remains pending.
+
+530 regressions, syntax checks and the isolated writing/photo browser journey pass. Actual before/after rendered desktop/mobile screenshots show clearer failures, one generation receipt and the repaired empty-selection layout. Existing accepted design, writing, selections and authorization safeguards remain. No deployment, live workflow/policy/credential mutation, paid call or publishing occurred. The founder reports `608911b` is live; this repair is local pending release approval.
+
+---
+
+# Earlier checkpoint — V17 Sprint A implemented locally
+
+[Sprint A implementation and real evidence boundaries](release/V17_SPRINT_A.md): source progression now re-derives legitimate legacy project leads, continues hash-bound 40-reference windows, prioritizes saved material/pending files and preserves incomplete work across restarts/days. Image-specific documentation stays outside direct project-photo suggestions; maker credit alone cannot establish an unrelated project. Receipts and inspector distinguish new decoded project files, copies of existing references, pending references and supporting material. Captions, ordered selections, evidence, permissions and earlier receipts are preserved.
+
+Retained Sophy HTML completes 40→52 without a page read (two repeats, ten excluded, no useful additions). The labelled simulated artist/book route saves two generated files and excludes a cover. Jack's existing pending-seventh mechanism remains functional and is counted as a copy, not a new photograph; the actual seventh hosted URL is unavailable locally. Marcie has no retained alternative lead and returns an honest zero. **No new hosted photograph, paid call or live mutation occurred.**
+
+Final verification: 519 unit/regression tests, syntax checks, 40 existing browser groups and the retained three-story desktop/mobile journey pass. Six before/eight after actual rendered screenshots carry a visible simulation banner; refresh/storage-reopen checks preserve edits/order. No UI redesign or deployment. The V16 repair at `6645579` is preserved; live worker, policy, credentials and grants were not modified. Next: separately authorize a controlled code release, then genuine source acceptance and the separately approved bounded AI vision test.
+
+---
+
+# Earlier checkpoint — V16 native compatibility repaired locally
+
+[Actual vision attempt 2363](release/V16_LIVE_VISION_ACCEPTANCE.md) failed before any model node. Its grant was revoked and the original caption/story worker and policy pin restored; the founder's guarded reconciliation confirmed ordinary starts available. Read-only inspection still verifies active saved/version `673685e5-71af-4b24-a50d-ae06d5799841`, graph `0e1777e5…`. Hosted Studio remains V16 `92e404a`; no new deployment occurred.
+
+[Local compatibility repair and real-byte proof](release/V16_NATIVE_COMPATIBILITY_REPAIR.md): replace blocked prototype access, keep native message collection rows structural, route malformed photo context away from research, and retain separate exact saved/execution graph fingerprints plus the native execution version. The proof reproduces the full 59-empty-message Cloud photo parameters, then runs six retained real Jack JPEGs through actual n8n normalization/evaluation and native OpenAI request construction with transport blocked. Hashes/order/dimensions match, output remains 1,200 tokens, and zero model calls, grants or live mutations occur. All 502 regressions and syntax checks pass. This proves compatibility at the request boundary, not AI photographic quality or live delivery.
+
+[V17 plan](release/V17_PHOTO_INTELLIGENCE_PLAN.md) prioritizes useful project-source progression, actual visual judgments and deliberate carousel selection. Source/extraction/provenance/curation work can proceed independently of live vision. No V17 product implementation, paid acceptance or live worker repair is authorized by this checkpoint. PR #1 remains draft/unmerged.
+
+---
+
+# Earlier checkpoint — V16 local photo intelligence; V15 remains live
+
+[V16 implementation, actual evidence and separate native approval package](release/V16_PHOTO_INTELLIGENCE.md). The founder supplied the completed hosted receipts read-only: six Jack decoded JPEGs and six source copies for existing Sophy references; all 24 original/preview file hashes and three page hashes match. Sophy still has zero useful additions; its roundup retained 40/52 references. No searches were repeated and no new real photograph was obtained during V16.
+
+Implementation checkpoint `93250483d546b8518c9925555067f8c76cdbb623` adds scoped source memory/progression, exact artist/publisher trails, cached-page acquisition of remaining files, and small understandable status changes. The accepted UI remains intact. Retained Sophy markup exposed a cross-project “here” link which is now excluded. Six hash-bound decoded-image inputs and a separate photo-only native branch are verified offline through the existing client, queue, durable claims and delivery contract. Results stay advisory; actual model vision remains gated.
+
+Validation: 502 unit/regression tests, 40 browser groups, 11 isolated HTTPS hosted checks, nine workstation screens at six widths, retained Jack/Sophy/Marcie desktop/mobile before/after journeys and the real message formatter with six generated image inputs. These simulations do not establish new photographic quality. Screenshots are actual rendered local UI, visibly labelled as generated/replayed evidence.
+
+The live recurring worker was rechecked read-only: active saved/version `d12b183b-a511-4f58-9726-5a565db61f6d`, unchanged graph `0e1777e5…`. Proposed photo graph `c0110405…` is not installed; no photo policy/permit exists. Live Studio remains V15 `2d47c21`; no deployment, live mutation, credential change, paid call or publishing. Separate release and one-photo-assessment authorization are required. PR #1 remains draft and unmerged.
+
+---
+
+# Earlier checkpoint — V15 live; real photographic acceptance recorded
+
+Live Studio is `2d47c21b4f3b648d2193721321c473255cc1a2a2`, Render deployment `dep-dbp4iqbbc2fs7394fs30`. [Hosted founder acceptance](release/V15_HOSTED_PHOTO_ACCEPTANCE.md): Jack Nicholson produced 7 new project references, 0 repeats and 20 exclusions; the founder reports highly relevant photographs and a compelling collection. Sophy Rickett produced 0 new, 34 repeated and 6 excluded references, with no useful additions. The UI works well and should be preserved. Browser-visible photographs are founder-confirmed; private decoding/path evidence was pending at this checkpoint and is now recorded in the V16 follow-up above. Do not count references as newly decoded originals or repeat acceptance just to reproduce these counts.
+
+[Next Photo Intelligence work](release/PHOTO_INTELLIGENCE_NEXT.md) focuses on read-only receipt evidence, source exhaustion, intelligent multi-source discovery and later separately authorized hash-bound image assessment. The existing worker, policy, UI and publishing safeguards remain unchanged. No paid calls, live mutations or new deployment in this acceptance-recording update.
+
+---
+
+# Earlier checkpoint — V15 local implementation
+
+Verified live baseline is `5f9ebca` (manual Render release); new V15 work remains local/draft review. [V15 findings, safe acquisition, rendered evidence and release/access gates](release/V15_PHOTOGRAPHIC_OPERATIONS.md). The existing photo ledger now binds exact captured pages to bounded private decoded-image acquisition, supports recorded-source fallback, preserves uncertain claims and founder previews, and keeps technical import secondary. Actual new useful photographs remain unproven: Cloud denies photographic hosts before connection, retained Sophy yields zero new project images, and positive pixel tests use labelled generated images. Recurring worker remains active at `d12b183b`; no paid execution, workflow/policy mutation or deployment in this sprint.
+
+---
+
+# Earlier checkpoint — V14 live; photographic intelligence continuation
 
 V14 `108a7e88ce3f61844f4a3c45ec3530c604738448` is live. The founder completed hosted acceptance: interface/previews work, but nine new references and ten repeats were not relevant/compelling enough; no AI visual research occurred. Do not repeat acceptance or redeploy that commit. [Focused source/image diagnosis and implementation plan](release/PHOTO_INTELLIGENCE_NEXT.md) records the next work. Local development now filters unrelated references from **new** project-first requests, follows one exact project link within a two-page claim, retains private source captures/exclusions and deduplicates responsive encodings. Existing selections/history and live recurring AI are untouched. This is not yet intelligent image discovery: source acquisition/CDN binding, decoded-image visual review and a separately approved native photo-operation branch remain necessary. No deployment or paid operation is authorized by this continuation.
 

@@ -8,12 +8,16 @@ export function proposalReviewState(story,reviews={}){
  const stale=Boolean(review&&(review.sourceRevision!==story.revision||review.workingVersion!==(story.localDraft?.version||0)));
  return {review,stale,decision:stale?'reset':review?.decision||'reset'};
 }
-export function founderQueue(state){
- const stories=state.workspace.stories||[],reviews=state.workspace.founderReviews||{},filter=state.reviewFilter||'new';
- const candidates=stories.filter(s=>s.origin==='n8n_development'&&!s.organization?.archived);
+export function reviewQueueSelection(state){
+ const stories=(state.workspace.stories||[]).filter(s=>!s.organization?.trashed&&!s.organization?.archived),reviews=state.workspace.founderReviews||{},filter=state.reviewFilter||'new';
+ const candidates=stories.filter(s=>s.origin==='n8n_development'&&!s.organization?.trashed&&!s.organization?.archived);
  const eligible=['saved','research','passed'].includes(filter)?stories:filter==='existing'?stories.filter(s=>s.origin!=='n8n_development'&&!['buffer_sent','buffer_sent_observed','instagram_posted_verified'].includes(s.publishing?.observed)):candidates.filter(s=>filter==='history'?s.recoveredHistory||s.recoveryOfStoryId:!s.recoveredHistory&&(!s.recoveryOfStoryId||s.localDraft||reviews[s.id]||s.organization?.pinned));
  const shown=eligible.filter(s=>{const {decision}=proposalReviewState(s,reviews);return filter==='saved'?['develop','save'].includes(decision):filter==='research'?['explore','alternatives'].includes(decision):filter==='passed'?decision==='pass':filter==='history'||filter==='existing'?true:decision==='reset';});
  if(filter==='new')shown.sort((a,b)=>(Date.parse(b.engineProvenance?.generatedAt)||0)-(Date.parse(a.engineProvenance?.generatedAt)||0));
+ return {filter,shown};
+}
+export function founderQueue(state){
+ const {filter,shown}=reviewQueueSelection(state),reviews=state.workspace.founderReviews||{};
  const controls=[['new','New ideas'],['saved','Saved / developing'],['research','Explore further'],['passed','Passed'],['existing','Existing stories'],['history','Recovered history']];
  return `<section class="founder-inbox"><div class="section-heading"><div><p class="eyebrow">Your editorial edit</p><h2>Proposals to review</h2></div><button class="small-button" data-engine-action="refresh" ${state.workspace.engine?.configured?'':'disabled'}>Check for results</button></div><div class="filter-chips" aria-label="Editorial review queue">${controls.map(([v,l])=>`<button class="filter-chip ${filter===v?'active':''}" data-review-filter="${v}" aria-pressed="${filter===v}">${l}</button>`).join('')}</div>
  ${shown.length?`<div class="proposal-grid">${shown.map(s=>proposalCard(s,reviews)).join('')}</div>`:`<div class="empty-state compact-empty"><h3>${filter==='new'?'No new ideas yet.':'Nothing here yet.'}</h3><p>${filter==='new'?'New generated proposals will appear here.':'Your decisions are saved. Use another view to revisit the work.'}</p>${filter==='new'?'<a class="text-link" href="#/pipeline">Browse stories →</a>':''}</div>`}

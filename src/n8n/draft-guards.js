@@ -1,7 +1,7 @@
 // Pure JavaScript functions can be embedded into existing n8n Code nodes.
 // No filesystem, native package, secret, or database dependency is introduced in n8n.
 export function unwrapBufferCreate(raw) {
-  let result = raw?.content?.find(item => item.type === 'text')?.text ?? raw;
+  let result = raw?.structuredContent ?? raw?.content?.find(item => item.type === 'text')?.text ?? raw;
   if (typeof result === 'string') {
     try { result = JSON.parse(result); } catch { return {}; }
   }
@@ -12,6 +12,20 @@ export function unwrapBufferCreate(raw) {
     result = nested;
   }
   return result || {};
+}
+
+export function verifyMcpDraftReadback(expected,response){
+ const post=unwrapBufferCreate(response);
+ return verifyDraftReadback(expected,{data:{post},...(response?.isError?{errors:[{code:'BUFFER_READ_FAILED'}]}:{})});
+}
+
+/** Preserve the separately guarded legacy queue path. Studio never requests it. */
+export function verifyNativeBufferReadback(expected,response){
+ const proof=verifyMcpDraftReadback(expected,response);
+ if(expected.action!=='queue')return {...proof,shared_confirmation_state:'confirmed_draft',native_result_state:'draft_created'};
+ const post=unwrapBufferCreate(response),issues=proof.issues.filter(c=>c!=='BUFFER_NOT_UNSCHEDULED_DRAFT');
+ if(post.status!=='scheduled'||typeof post.dueAt!=='string'||!Number.isFinite(Date.parse(post.dueAt))||!Object.hasOwn(post,'sentAt')||post.sentAt!==null)issues.push('BUFFER_QUEUE_NOT_VERIFIED');
+ return {...proof,verified:issues.length===0,issues,shared_confirmation_state:'confirmed_queue',native_result_state:'queued_for_auto_publish'};
 }
 
 export function candidateBufferId(raw) {

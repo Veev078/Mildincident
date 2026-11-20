@@ -1,14 +1,22 @@
-import {storyProposal} from './ai-operations.js';
+import {renderStudio} from './studio-render.js';
+import {savedCopySelection,coverSelection} from './selection-actions.js';
+import {bufferConfirmDialog,nativeReviewDialog} from './buffer-draft.js';
+import {updateStoryGenerationReview,reconcileStoryProgress,updateAiUsagePanel,storyProposal} from './ai-operations.js';
+import {previewFailureMessage} from './preview-state.js';
 import {researchAccess} from './discovery-flow.js';
 import {CAPTION_IMPROVEMENTS,captionRequestProposal,canConfirmCaption} from './caption-request-flow.js';
 import {launchSavedResearch} from './research-launch.js';
 import {editorialDiscoveryRequest} from './discovery-request.js';
+import {photoOutcome} from './photo-requests.js';
+import {visionProposal,visionPending} from './photo-vision.js';
 import { esc, date, human, storyUrl, effective, mediaFor, proposalContent } from './components.js';
 import * as views from './views.js';
 import {navigation,resolveRoute,destination,libraryNavigation} from './navigation.js';
 import { creativeBriefFor, emptyCreativeBrief, directionReviewSummary, directionSequenceObservations } from './direction.js';
 
-const state = { workspace: null, search: '', pipelineGroup: 'all', librarySearch: '', libraryRights: 'all', compared: [], loading: true, error: null };
+function retainedComparison(){try{const value=JSON.parse(sessionStorage.getItem('mildincident-image-comparison')||'[]');return Array.isArray(value)?value.filter(c=>c&&typeof c.storyId==='string'&&c.storyId.length<=200&&typeof c.assetId==='string'&&c.assetId.length<=300).slice(0,3):[];}catch{return [];}}
+function retainComparison(){try{sessionStorage.setItem('mildincident-image-comparison',JSON.stringify(state.compared));}catch{/* Keep the current in-memory comparison when browser storage is unavailable. */}}
+const state = { workspace: null, search: '', pipelineGroup: 'all', librarySearch: '', libraryRights: 'all', compared: retainedComparison(), loading: true, error: null };
 const pending = new Map();
 const imageReviewDrafts=new Map(),imageReviewSaving=new Set();
 const imageReviewKey=(story,asset)=>JSON.stringify([story,asset]);
@@ -18,6 +26,8 @@ const saving = new Set();
 const inFlight = new Map();
 const savePromises = new Map();
 const captionRequestLocks=new Set();
+const visionLocks=new Set();
+const storyReads=new Map();
 const history = new Map();
 const timers = new Map();
 const versions = new Map();
@@ -28,6 +38,7 @@ let toastTimer;
 let keyboardPrefix = false;
 let drag = null;
 let rehearsal = null;
+let dialogReturnFocus=null,dialogReturnRoute=null;
 state.lastStoryTabs={};
 state.pendingRouteFocus=true;
 
@@ -51,13 +62,40 @@ async function api(url, options) {
   let data;
   try { data = await response.json(); } catch { throw new Error('The workspace returned an unreadable response.'); }
   if(response.status===401&&data.error?.code==='LOGIN_REQUIRED'){if(!state.workspace)location.assign('/login');else{document.querySelector('#session-reauth')?.remove();const link=document.createElement('a');link.id='session-reauth';link.href='/login';link.target='_blank';link.rel='noopener';link.textContent='Session expired — sign in in a new tab. Pending edits remain here.';link.className='notice warning';document.querySelector('#app').prepend(link);}}
-  if (!response.ok) throw Object.assign(new Error(data.error?.message || 'The operation did not complete.'), { code: data.error?.code || `HTTP_${response.status}` });
+  if (!response.ok) throw Object.assign(new Error(data.error?.message || 'The operation did not complete.'), { code: data.error?.code || `HTTP_${response.status}`,delivery:data.delivery });
   return data;
 }
 
 function rememberFocus() {
   const active = document.activeElement;
-  return active?.id ? { id: active.id, start: active.selectionStart, end: active.selectionEnd } : null;
+  if(active?.id)return {id:active.id,start:active.selectionStart,end:active.selectionEnd};
+  const keys=['action','story','asset','index','direction','photoShortlist','photoCover'];
+  const attrs=keys.filter(k=>active?.dataset?.[k]!==undefined).map(k=>`[data-${k.replace(/[A-Z]/g,c=>'-'+c.toLowerCase())}="${CSS.escape(active.dataset[k])}"]`).join('');
+  return attrs?{selector:attrs}:null;
+}
+
+function syncDialogControls(){
+ const dialog=document.querySelector('#asset-dialog');if(!dialog?.open)return;
+ const inspector=dialog.querySelector('[data-inspector]');if(inspector){const s=storyById(inspector.dataset.story);const status=inspector.querySelector('[data-inspector-selection]');if(s&&status)status.textContent=effective(s).selectedAssetIds.includes(inspector.dataset.asset)?'In your sequence':'Not selected';}
+ for(const button of dialog.querySelectorAll('[data-action="toggle-asset"],[data-action="compare-asset"]')){
+  const story=storyById(button.dataset.story);if(!story)continue;
+  const selected=effective(story).selectedAssetIds.includes(button.dataset.asset),compare=button.dataset.action==='compare-asset';
+  const pressed=compare?state.compared.some(c=>c.storyId===story.id&&c.assetId===button.dataset.asset):selected;
+  button.setAttribute('aria-pressed',String(pressed));button.textContent=compare?(pressed?'✓ Compare':'Compare'):(selected?'Remove from sequence':'+ Add to sequence');
+  if(!compare)button.disabled=Boolean(story.localDraft?.stale);
+ }
+ const form=dialog.querySelector('[data-image-review]');if(!form?._initialReview)return;
+ if(imageReviewSaving.has(imageReviewKey(form.dataset.story,form.dataset.asset)))return;
+ const story=storyById(form.dataset.story),asset=story?.media.find(a=>a.id===form.dataset.asset);if(!asset)return;
+ const current={version:String(asset.localReview?.version||0),revision:story.revision,working:String(story.localDraft?.version||0),previewHash:asset.localPreview?.sha256||''};
+ if(JSON.stringify(current)===JSON.stringify(form._currentContext))return;
+ form._currentContext=current;
+ const changed=Object.keys(current).filter(k=>form.dataset[k]!==current[k]);
+ if(!changed.length)return;
+ const dirty=JSON.stringify(reviewValues(form))!==JSON.stringify(form._initialReview);
+ if(!dirty&&changed.every(k=>k==='working')){form.dataset.working=current.working;return;}
+ const status=form.querySelector('[data-review-status]');status.textContent='The working context changed. Your note is preserved; confirm this version before saving it. ';
+ const use=document.createElement('button');use.type='button';use.className='text-button';use.dataset.action='review-current-frame';use.textContent='Use note with this version';status.append(use);form.querySelector('button[type=submit]').disabled=true;rememberImageReview(form);
 }
 
 function render({ focusMain = false } = {}) {
@@ -65,43 +103,47 @@ function render({ focusMain = false } = {}) {
   for(const node of document.querySelectorAll('[data-remember-disclosure]')) state.openDisclosures[node.dataset.rememberDisclosure]=node.open;
   const focus = rememberFocus();
   const current = route();
-  if(current.view==='story'&&storyById(current.id))state.lastStoryTabs[current.id]=['overview','research','images','direction','caption','carousel','music','publishing'].includes(current.tab)?current.tab:'overview';
+  const comparisonVisible=state.compared.length&&(current.view==='library'||current.view==='story'&&current.tab==='build');
+  if(current.view==='story'&&storyById(current.id))state.lastStoryTabs[current.id]=['build','refine','approve','overview','research','images','direction','caption','carousel','music','publishing'].includes(current.tab)?current.tab:'overview';
   const source = state.workspace?.source || {};
   const active = destination(current.view);
-  const viewTitle = current.view === 'story' ? 'Stories' : ({archive:'Published archive',analytics:'Insights'}[current.view] || nav.find(n => n[0] === current.view)?.[2]);
-  const count = state.workspace?.stories?.length || 0;
+  const viewTitle = current.view === 'story' ? 'Posts' : ({home:'Editorial desk',library:'Photographs & sources',archive:'Published archive',analytics:'Insights'}[current.view] || nav.find(n => n[0] === current.view)?.[2]);
+  const count = state.workspace?.stories?.filter(s=>!s.organization?.trashed).length || 0;
   let body;
   if (state.loading) body = `<div class="loading-state"><p class="eyebrow">Retrieving the existing source records</p><h1>Opening the editorial desk.</h1><p>Stories, selected photographs and publishing evidence are loading.</p><div class="loading-line" aria-hidden="true"></div></div>`;
   else if (state.error) body = `<div class="empty-state error-state"><p class="eyebrow">Connection needs attention</p><h1>The desk could not be loaded.</h1><p>${esc(state.error)}</p><button class="button button-dark" data-action="reload">Try again</button><p class="small muted">No example stories or invented publishing results are substituted.</p></div>`;
   else if (current.view === 'story') {
     const story = storyById(current.id);
-    body = story ? views.storyWorkspace(state, story, current.tab) : `<div class="empty-state"><h1>Story not found in this snapshot.</h1><p>The existing ID may be unavailable or the source may have changed.</p><a class="button button-dark" href="#/pipeline">Back to Stories</a></div>`;
+    body = story&&!story.detailsLoaded ? `<div class="story-loading" role="status"><p class="eyebrow">Build your post</p><h1>${esc(story.title)}</h1>${state.storyReadErrors?.[story.id]?`<p role="alert">${esc(state.storyReadErrors[story.id])}</p><p>Your saved work is preserved.</p><button class="button button-light" data-load-story="${esc(story.id)}">Try again</button>`:'<p>Opening photographs and saved writing…</p><div class="loading-line"></div>'}</div>` : story ? views.storyWorkspace(state, story, current.tab) : `<div class="empty-state"><h1>Story not found in this snapshot.</h1><p>The existing ID may be unavailable or the source may have changed.</p><a class="button button-dark" href="#/pipeline">Back to Posts</a></div>`;
   } else body = views[current.view](state);
   const warnings = source.warnings || [];
   const connection = `<details class="connection-details"><summary><i class="status-dot ${source.stale||warnings.length?'stale':''}" aria-hidden="true"></i>Connection status${source.stale?' · cached':''}</summary><div class="connection-panel"><div class="source-bar"><span>${source.kind==='live_snapshot'?'Connected':source.kind?human(source.kind):'Connecting'}${source.observedAt?`<small>Updated ${esc(date(source.observedAt))} ET</small>`:''}</span><button class="text-button" data-action="refresh" ${source.refreshing?'disabled':''}>${source.refreshing?'Checking…':'Check for updates ↻'}</button></div>${warnings.length?`<ul class="source-warnings">${warnings.map(w=>`<li>${esc(typeof w==='string'?w:w.message||w.code)}</li>`).join('')}</ul>`:''}</div></details>`;
-  document.querySelector('#app').innerHTML = `<div class="app-shell"><aside class="sidebar"><a class="masthead" href="#/today" aria-label="MILDINCIDENT Today">MILDINCIDENT<span>Independent visual culture</span></a><div class="sidebar-label">Your publication</div><nav class="primary-nav" aria-label="Main navigation">${nav.map(([id,url,label,num])=>`<a href="#/${url}" ${active===id?'aria-current="page"':''}><span>${num}</span>${label}${id==='pipeline'?`<small>${count}</small>`:''}</a>`).join('')}</nav><div class="sidebar-foot"><details class="sidebar-tools"><summary>Studio tools</summary>${state.workspace?.hosted?`<button class="text-button" data-hosted-backup>Download private backup</button><p class="small">${state.workspace.backupStatus?.lastSuccess?'Backup verified '+esc(date(state.workspace.backupStatus.lastSuccess))+' ET':'First backup pending'}${state.workspace.backupStatus?.state==='failed'?' · backup needs attention':''}<br>Keep an offsite copy.</p>${state.workspace.backupStatus?.id?'<a class="text-link" href="/api/backups/latest/archive">Download last verified copy</a>':''}`:''}<div class="keyboard-hints"><kbd>/</kbd> Find a story<br><kbd>G</kbd> <kbd>H</kbd> Today</div><a href="https://rickywelch.app.n8n.cloud/webhook/founder-command-center" target="_blank" rel="noopener noreferrer">Original Founder Studio ↗</a></details>${state.workspace?.backupStatus?.state==='failed'?'<p class="error-text" role="status">Backup needs attention — open Studio tools.</p>':''}<span class="edition-mark">M / I</span></div></aside><div class="workspace-shell"><header class="topbar"><div class="breadcrumb"><span>MILDINCIDENT</span><span aria-hidden="true">/</span><strong>${esc(viewTitle)}</strong></div><label class="global-search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" placeholder="Find a story…" value="${esc(state.search)}" aria-label="Find a story"><kbd>/</kbd></label>${connection}${state.workspace?.hosted?'<form method="post" action="/auth/logout" data-hosted-logout><button class="text-button" type="submit">Sign out</button></form>':''}</header>${libraryNavigation(current.view)}<main id="main-content" tabindex="-1">${body}</main><footer class="workspace-footer"><span>MILDINCIDENT · Independent visual culture</span><span>Editorial work saves privately · publishing requires approval</span></footer></div></div>${state.compared.length?`<div class="compare-tray"><span>${state.compared.length} images to compare</span><button class="button button-dark" data-action="open-comparison" ${state.compared.length<2?'disabled':''}>Compare images →</button><button class="text-button" data-action="clear-comparison">Clear</button></div>`:''}`;
+  renderStudio(document.querySelector('#app'), `<div class="app-shell ${comparisonVisible?'has-comparison':''}"><aside class="sidebar"><a class="masthead" href="#/discover" aria-label="MILDINCIDENT Discover">MILDINCIDENT<span>Independent visual culture</span></a><div class="sidebar-label">Your publication</div><nav class="primary-nav" aria-label="Main navigation">${nav.map(([id,url,label,num])=>`<a href="#/${url}" ${active===id?'aria-current="page"':''}><span aria-hidden="true">${num}</span><span class="nav-label">${label}</span>${id==='pipeline'?`<small>${count}</small>`:''}</a>`).join('')}</nav><div class="sidebar-foot"><details class="sidebar-tools"><summary>Studio tools</summary><a href="#/today">Editorial desk</a><a href="#/library">Photographs & sources</a><a href="#/archive">Published archive</a>${state.workspace?.hosted?`<button class="text-button" data-hosted-backup>Download private backup</button><p class="small">${state.workspace.backupStatus?.lastSuccess?'Backup verified '+esc(date(state.workspace.backupStatus.lastSuccess))+' ET':'First backup pending'}${state.workspace.backupStatus?.state==='failed'?' · backup needs attention':''}<br>Keep an offsite copy.</p>${state.workspace.backupStatus?.id?'<a class="text-link" href="/api/backups/latest/archive">Download last verified copy</a>':''}`:''}<div class="keyboard-hints"><kbd>/</kbd> Find a post<br><kbd>G</kbd> <kbd>H</kbd> Today</div><a href="https://rickywelch.app.n8n.cloud/webhook/founder-command-center" target="_blank" rel="noopener noreferrer">Original Founder Studio ↗</a></details>${state.workspace?.backupStatus?.state==='failed'?'<p class="error-text" role="status">Backup needs attention — open Studio tools.</p>':''}<span class="edition-mark">M / I</span></div></aside><div class="workspace-shell"><header class="topbar"><div class="breadcrumb"><span>MILDINCIDENT</span><span aria-hidden="true">/</span><strong>${esc(viewTitle)}</strong></div><label class="global-search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" placeholder="Find a post…" value="${esc(state.search)}" aria-label="Find a post"><kbd>/</kbd></label>${connection}${state.workspace?.hosted?'<form method="post" action="/auth/logout" data-hosted-logout><button class="text-button" type="submit">Sign out</button></form>':''}</header>${libraryNavigation(current.view)}<main id="main-content" data-view="${esc(current.view)}" data-story-tab="${esc(current.tab||'')}" tabindex="-1">${body}</main><footer class="workspace-footer"><span>MILDINCIDENT · Independent visual culture</span><span>Editorial work saves privately · publishing requires approval</span></footer></div></div>${comparisonVisible?`<div class="compare-tray"><span>${state.compared.length} ${state.compared.length===1?'image · choose one more':'images to compare'}</span><button class="button button-dark" data-action="open-comparison" ${state.compared.length<2?'disabled':''}>Compare images →</button><button class="text-button" data-action="clear-comparison">Clear comparison</button></div>`:''}`);
+  const curation=document.querySelector('#curation-dialog');if(curation&&!curation.open)curation.showModal();
   resizeCaption();
+  syncDialogControls();
   if(current.view==='discovery'&&state.focusDiscoverySetup){state.focusDiscoverySetup=false;document.querySelector('#research-direction')?.scrollIntoView({block:'start'});}
   document.title = current.view === 'story' && storyById(current.id) ? `${storyById(current.id).title} — MILDINCIDENT` : `${viewTitle} — MILDINCIDENT`;
   if ((focusMain||state.pendingRouteFocus)&&!state.loading) {state.pendingRouteFocus=false;focusStoryTask();}
   else if (focus) {
-    const next = document.getElementById(focus.id);
+    const next = focus.id?document.getElementById(focus.id):document.querySelector(focus.selector);
     next?.focus({ preventScroll: true });
     if (typeof focus.start === 'number') { try { next?.setSelectionRange(focus.start, focus.end); } catch {} }
   }
 }
 
 function focusStoryTask(){
- const current=route(),task=current.tab==='caption'||current.tab==='overview'?'caption':current.tab==='publishing'?'review':current.tab==='images'||current.tab==='carousel'?'images':null;
+ const current=route(),task=current.tab==='refine'||current.tab==='caption'||current.tab==='overview'?'caption':current.tab==='approve'||current.tab==='publishing'?'review':current.tab==='build'||current.tab==='images'||current.tab==='carousel'?'images':null;
  const target=current.view==='story'&&task?document.querySelector('[data-story-task="'+task+'"]'):null;
  if(target){target.setAttribute('tabindex','-1');target.focus({preventScroll:true});const offset=(document.querySelector('.story-stages')?.getBoundingClientRect().height||0)+18;window.scrollTo({top:Math.max(0,window.scrollY+target.getBoundingClientRect().top-offset),behavior:'instant'});}
  else {document.querySelector('#main-content')?.focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});}
 }
 
-async function loadWorkspace({ quiet = false } = {}) {
+async function loadWorkspace({ quiet = false, renderView = true } = {}) {
   if (!quiet) { state.loading = true; render(); }
   try {
-    const workspace = await api('/api/workspace');
+    const workspace = await api('/api/workspace?summary=1');
+    const activeRoute=route();if(activeRoute.view==='story'){try{const full=await api('/api/stories/'+encodeURIComponent(activeRoute.id));const index=workspace.stories.findIndex(story=>story.id===full.id);if(index>=0)workspace.stories[index]=full;state.storyReadErrors ||= {};delete state.storyReadErrors[full.id];}catch(error){state.storyReadErrors ||= {};state.storyReadErrors[activeRoute.id]=error.message;}}
     if (!Array.isArray(workspace.stories)) throw new Error('The source response does not contain a story collection.');
     const previous = new Map((state.workspace?.stories || []).map(story => [story.id, { draft: story.localDraft, revision: story.revision }]));
     state.workspace = workspace;
@@ -117,6 +159,7 @@ async function loadWorkspace({ quiet = false } = {}) {
       }
     }
     for(const story of workspace.stories){
+      if(story.photoVision?.proposal){state.visionProposals ||= {};state.visionProposals[story.id]=story.photoVision.proposal;}
       const proposal=story.captionGeneration?.pilot?.proposal;
       if(proposal?.state==='completed'&&state.captionRequestedProposals?.[proposal.id]&&state.captionTools?.[story.id]==='improve'){
         state.captionTools[story.id]='compare';state.captionChoices ||= {};
@@ -124,7 +167,8 @@ async function loadWorkspace({ quiet = false } = {}) {
         if(version)state.captionChoices[story.id]=version.id;
       }
     }
-    state.loading = false; state.error = null; render();
+    const currentRoute=route(),currentStory=storyById(currentRoute.id);if(currentRoute.view==='story'&&currentStory&&!currentStory.detailsLoaded&&currentRoute.id!==activeRoute.id)await loadStory(currentRoute.id).catch(()=>{});
+    state.loading = false; state.error = null; if(renderView)render();
     return workspace;
   } catch (error) {
     state.loading = false;
@@ -141,6 +185,7 @@ function showSaveStatus(message, isError = false) {
 }
 
 function invalidatePreparedApproval(story){
+ if(story.nativePublishing)story.nativePublishing={...story.nativePublishing,preparedSlides:[],approveAvailable:false,finalFilesVerified:false};
  if(story.approvalRequest)story.approvalRequest={...story.approvalRequest,state:'changed',unchanged:false,nativePreflightAccepted:false,message:'The working copy changed. Your earlier review handoff is preserved; save and prepare the current version before handing it over.'};
 }
 
@@ -205,12 +250,15 @@ async function flushDraft(id) {
       if(pending.has(id))invalidatePreparedApproval(current);
       if (result.readiness) {const panel=document.querySelector('[data-readiness-panel]');if(panel&&route().id===id)panel.innerHTML=route().tab==='overview'?views.workingReviewSummary(current):views.readinessPanel(current);}
       if (result.sourceSequencePlan) current.sourceSequencePlan=result.sourceSequencePlan;
+      if (result.editorialPackage) current.editorialPackage=result.editorialPackage;
+      if (result.photoVision) {current.photoVision=result.photoVision;state.visionProposals ||= {};state.visionProposals[id]=result.photoVision.proposal;}
       const sequenceIssues = document.querySelector('[data-direction-sequence-issues]');
       if (sequenceIssues && route().id === id) sequenceIssues.innerHTML = directionSequenceObservations(current);
       const checks = document.querySelector('[data-caption-checks]');
       if (checks && route().id === id) checks.innerHTML = views.captionChecks(current);
     }
     showSaveStatus(`${state.workspace?.hosted?'Saved to private Studio':'Saved locally'} · ${date(draft.updatedAt)}`);
+    syncDialogControls();
     announce('Draft saved privately.');
     succeeded = true;
   } catch (error) {
@@ -264,6 +312,7 @@ async function refreshSource() {
 
 function openDialog(html) {
   const dialog = document.querySelector('#asset-dialog');
+  if(!dialog.open){dialogReturnFocus=rememberFocus();dialogReturnRoute=location.hash;}
   dialog.innerHTML = html;
   if (!dialog.open) dialog.showModal();
   dialog.querySelector('button')?.focus();
@@ -276,7 +325,7 @@ function rememberImageReview(form) {
  else imageReviewDrafts.set(key,{values,context:reviewContext(form)});
 }
 function showInspection(story,asset,{focusStep=null}={}) {
- openDialog(views.assetDialog(story,asset));
+ openDialog(views.assetDialog(story,asset,{compared:state.compared.some(c=>c.storyId===story.id&&c.assetId===asset.id)}));
  const dialog=document.querySelector('#asset-dialog'),form=dialog.querySelector('[data-image-review]');
  form._initialReview=reviewValues(form);form._currentContext=reviewContext(form);
  const key=imageReviewKey(story.id,asset.id),draft=imageReviewDrafts.get(key);
@@ -305,10 +354,11 @@ function showRehearsal(story, index = 0, fit = 'frame') {
   if (!count) return;
   const focusAction = document.activeElement?.dataset.action;
   rehearsal = { storyId: story.id, index: Math.max(0, Math.min(count - 1, index)), fit };
-  openDialog(views.carouselRehearsal(story, rehearsal.index, fit));
+  const captionOpen=Boolean(document.querySelector('#asset-dialog .rehearsal-caption[open]')),evidenceOpen=Boolean(document.querySelector('#asset-dialog .preview-evidence[open]'));
+  openDialog(views.carouselRehearsal(story, rehearsal.index, fit,{captionOpen,evidenceOpen}));
   const nextFocus = ['rehearse-step'].includes(focusAction) ? document.querySelector(`#asset-dialog [data-action="${focusAction}"]:not(:disabled)`) : null;
   nextFocus?.focus();
-  announce(`Carousel rehearsal: slide ${rehearsal.index + 1} of ${count}.`);
+  announce(`Slide ${rehearsal.index + 1} of ${count}.`);
 }
 
 async function openHistory(story) {
@@ -395,7 +445,7 @@ async function downloadProposal(story) {
   toast('Local proposal downloaded. No n8n data was changed.');
 }
 
-document.addEventListener('click', event => {
+document.addEventListener('click', async event => {
   if (event.target.closest('.skip-link')) { event.preventDefault(); document.querySelector('#main-content')?.focus(); return; }
   const proposalLink = event.target.closest('a[href]');
   if (proposalLink) {
@@ -415,16 +465,18 @@ document.addEventListener('click', event => {
       const src = img.getAttribute('src'); img.removeAttribute('src'); img.setAttribute('src', src); break;
     }
     case 'apply-source-sequence': {
-      const option=story?.sourceSequencePlan?.options[Number(button.dataset.index)];
-      if(!option||story.localDraft?.stale)break;
-      const brief=creativeBriefFor(story);
-      const roles=new Map(brief.sequenceRoles.map(role=>[role.assetId,role]));
-      for(const slide of option.slides)if(!roles.has(slide.assetId))roles.set(slide.assetId,{assetId:slide.assetId,role:slide.role,note:slide.note});
-      brief.sequenceRoles=[...roles.values()];
-      editDraft(story.id,{format:option.format,targetSlideCount:option.targetSlideCount,selectedAssetIds:option.slides.map(slide=>slide.assetId),creativeBrief:brief},{rerender:true,immediate:true});
+      if(!story||story.localDraft?.stale)break;
+      const digest=button.dataset.planDigest,optionId=button.dataset.optionId;button.disabled=true;
+      try{
+       if(!await flushAllDrafts())throw Error('Save pending writing before applying a sequence.');
+       const current=storyById(story.id);if(current.sourceSequencePlan?.digest!==digest)throw Error('The proposal changed after your edits. Review the current sequence.');
+       await api('/api/stories/'+encodeURIComponent(story.id)+'/sequence-proposals/apply',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({planDigest:digest,optionId,sourceRevision:current.revision,workingVersion:current.localDraft?.version||0})});
+       await loadWorkspace({quiet:true});announce('Sequence applied to your working copy. Earlier order and writing remain in history.');
+      }catch(error){toast(error.message+' No automatic retry was made.',{error:true});await loadWorkspace({quiet:true}).catch(()=>{});button.disabled=false;}
       break;
     }
     case 'rehearse-story': showRehearsal(story); break;
+    case 'rehearse-go': if(rehearsal)showRehearsal(storyById(rehearsal.storyId),Number(button.dataset.index),rehearsal.fit); break;
     case 'rehearse-step': if (rehearsal) showRehearsal(storyById(rehearsal.storyId), rehearsal.index + Number(button.dataset.step), rehearsal.fit); break;
     case 'prepare-discovery':
       button.disabled = true;
@@ -462,6 +514,7 @@ document.addEventListener('click', event => {
     case 'inspect-step':
     case 'inspect': {
       const asset = story?.media?.find(item => item.id === button.dataset.asset);
+      if(asset&&!story.detailsLoaded){loadStory(story.id).then(full=>showInspection(full,full.media.find(a=>a.id===asset.id))).catch(error=>toast(error.message,{error:true}));break;}
       if(asset){if(imageReviewSaving.size){toast('Your image review is saving. Try the next photograph in a moment.');break;}if(button.dataset.action==='inspect-step'&&document.querySelector('[data-preview-upload] input[type=file]')?.files.length){toast('Save or clear the selected preview file before changing photographs.',{error:true});break;}showInspection(story,asset,{focusStep:button.dataset.action==='inspect-step'?(button.textContent.includes('Next')?'Next':'Previous'):null});}
       break;
     }
@@ -470,9 +523,9 @@ document.addEventListener('click', event => {
       if (existing >= 0) state.compared.splice(existing, 1);
       else if (state.compared.length >= 3) { toast('Compare up to three photographs at a time. Clear one to add another.'); return; }
       else state.compared.push({ storyId: button.dataset.story, assetId: button.dataset.asset });
-      render(); announce(`${state.compared.length} photographs marked for comparison.`); break;
+      retainComparison();render(); announce(`${state.compared.length} photographs marked for comparison.`); break;
     }
-    case 'clear-comparison': state.compared = []; render(); break;
+    case 'clear-comparison': state.compared = [];retainComparison();render(); break;
     case 'open-comparison': if (state.compared.length >= 2) openDialog(views.compareDialog(state)); break;
     case 'toggle-asset': {
       if (!story) break;
@@ -503,7 +556,7 @@ document.addEventListener('click', event => {
       if(index<=0)break;
       selected.unshift(...selected.splice(index,1));
       editDraft(story.id,{selectedAssetIds:selected},{rerender:true,immediate:true});
-      announce('Opening photograph changed. Image order saves privately.');break;
+      announce('Cover changed. Image order saves privately.');break;
     }
     case 'move-slide': {
       if (!story) break;
@@ -515,7 +568,7 @@ document.addEventListener('click', event => {
       editDraft(story.id, { selectedAssetIds: selected,...(selected.length?{format:adjusted,targetSlideCount:selected.length}: {}) }, { rerender: true, immediate: true });
       announce(`Slide ${index + 1} moved to position ${destination + 1}.`); break;
     }
-    case 'clear-track': editDraft(story.id,{musicSelection:null},{rerender:true,immediate:true});flushDraft(story.id).then(saved=>{if(saved&&route().id===story.id&&route().tab==='music')render();});break;
+    case 'clear-track': editDraft(story.id,{musicSelection:null},{rerender:true,immediate:true});flushDraft(story.id).then(saved=>{if(saved&&route().id===story.id&&['music','refine'].includes(route().tab))render();});break;
     case 'choose-track': {
       const track = (story?.musicRecommendations || story?.intelligence?.musicRecommendations || [])[Number(button.dataset.index)];
       if (track) editDraft(story.id, { musicSelection: { track: track.track || track.title, artist: track.artist } }, { rerender: true, immediate: true });
@@ -626,7 +679,7 @@ document.addEventListener('submit',async event=>{
  const story=storyById(form.dataset.story);if(!story)return;const intent=readMusicIntentForm(form);
  if(state.musicIntentDrafts)delete state.musicIntentDrafts[story.id];
  editCreativeBrief(story.id,brief=>{brief.musicIntent=intent;},{immediate:true});
- if(await flushDraft(story.id)&&route().id===story.id&&route().tab==='music')render();
+ if(await flushDraft(story.id)&&route().id===story.id&&['music','refine'].includes(route().tab))render();
 });
 document.addEventListener('submit', event => {
   const form = event.target.closest('[data-form="editorial-setup"]');
@@ -680,7 +733,7 @@ document.addEventListener('error', event => {
   if (!photo) return;
   photo.classList.add('preview-failed');
   const status = photo.querySelector('.preview-status');
-  if (status) status.textContent = photo.classList.contains('compact-preview')?'Preview unavailable':'This browser could not load the preview. Open the source record or attach a private file.';
+  if (status) status.textContent = previewFailureMessage(photo.dataset.previewKind,{compact:photo.classList.contains('compact-preview')});
   const retry = photo.querySelector('.preview-retry'); if (retry) retry.hidden = false;
 }, true);
 
@@ -786,7 +839,11 @@ document.addEventListener('keydown', event => {
 document.querySelector('#asset-dialog').addEventListener('click', event => {
   if (event.target === event.currentTarget) { const rect = event.currentTarget.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) event.currentTarget.close(); }
 });
-window.addEventListener('hashchange', () => { document.querySelector('#asset-dialog').close(); const next=route();if(next.view==='story'&&['overview','caption'].includes(next.tab)){state.captionTools ||= {};state.captionTools[next.id]='edit';} state.pendingRouteFocus=true;render({ focusMain: true }); });
+document.querySelector('#asset-dialog').addEventListener('close',()=>{
+ if(dialogReturnRoute===location.hash&&dialogReturnFocus){const target=dialogReturnFocus.id?document.getElementById(dialogReturnFocus.id):document.querySelector(dialogReturnFocus.selector);target?.focus({preventScroll:true});}
+ dialogReturnFocus=null;dialogReturnRoute=null;
+});
+window.addEventListener('hashchange', async () => { document.querySelector('#asset-dialog').close();state.curationStory=null;const next=route();if(next.view==='story'&&next.tab==='refine'){state.captionTools ||= {};state.captionTools[next.id]='edit';}state.pendingRouteFocus=true;render({focusMain:true});if(next.view==='story'){await flushAllDrafts();await loadStory(next.id).catch(error=>toast(error.message,{error:true}));} });
 window.addEventListener('beforeunload', event => { if (pending.size || saving.size || imageReviewDrafts.size || Object.keys(state.editorialSetupDrafts||{}).length || Object.keys(state.musicIntentDrafts||{}).length || state.researchDraft?.prompt?.trim()) { event.preventDefault(); event.returnValue = ''; } });
 
 render();
@@ -813,6 +870,18 @@ document.addEventListener('click',async event=>{
 // Background UI reads never flush or replace pending editorial edits/forms.
 let backgroundRead=false;
 async function receiveResearchUpdates(){
+ const active=storyProposal(state);
+ if(!backgroundRead&&!document.hidden&&active&&(['dispatching','queued','running','uncertain'].includes(active.state)||state.storyResultPending===active.id)){
+  backgroundRead=true;try{
+   const result=await api('/api/research/requests/'+encodeURIComponent(active.id)+'/generation/status');
+   result.proposal=reconcileStoryProgress(active,result.proposal);
+   state.storyGenerationProposal=result.proposal;const request=state.workspace.researchRequests?.find(r=>r.id===active.id);if(request)request.generationProposal=result.proposal;
+   const terminal=['completed','failed'].includes(result.proposal.state);
+   if(terminal){state.storyResultPending=active.id;result.proposal.deliveryPending=true;updateStoryGenerationReview(document,result.proposal);try{await loadWorkspace({quiet:true,renderView:false});updateAiUsagePanel(document,state);state.storyResultPending=null;result.proposal.deliveryPending=false;}catch{/* Keep the recorded outcome and retry only its read-only Studio handoff. */}}
+   updateStoryGenerationReview(document,{...result.proposal,deliveryPending:state.storyResultPending===active.id,readUnavailable:result.delivery?.state==='unavailable'||state.storyResultPending===active.id});
+  }catch{updateStoryGenerationReview(document,{...active,deliveryPending:state.storyResultPending===active.id,readUnavailable:true});}finally{backgroundRead=false;}
+  return;
+ }
  if(state.discoverySubmitting||backgroundRead||document.hidden||!state.workspace?.engine?.delivery||pending.size||saving.size||document.querySelector('#asset-dialog')?.open||!['home','discovery','story'].includes(route().view)||document.activeElement?.matches('input,textarea,select')||document.querySelector('details[open]:not(.research-activity-row):not(.caption-request)')||[...document.querySelectorAll('form input:not([type=hidden]),form textarea')].some(el=>el.type==='checkbox'?el.checked!==el.defaultChecked:el.value!==el.defaultValue))return;
  backgroundRead=true;try{await loadWorkspace({quiet:true});}catch{}finally{backgroundRead=false;}
 }
@@ -850,7 +919,19 @@ document.addEventListener('click',async event=>{
 });
 
 // Library organization changes no caption, media, native approval or production record.
-document.addEventListener('click',async event=>{const button=event.target.closest('[data-organize-story]');if(!button)return;button.disabled=true;try{if(!await flushAllDrafts())throw new Error('Save pending edits first.');const story=storyById(button.dataset.organizeStory),field=button.dataset.field;const result=await api('/api/stories/'+encodeURIComponent(story.id)+'/organization',{method:'PATCH',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({baseRevision:story.revision,expectedVersion:story.organization?.version||0,[field]:!story.organization?.[field]})});story.organization=result.organization;render();toast(field==='archived'?(result.organization.archived?'Story archived. Restore it from Archived stories.':'Story restored.'):(result.organization.pinned?'Story pinned.':'Story unpinned.'));}catch(error){toast(error.message,{error:true});button.disabled=false;}});
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-organize-story]');if(!button||button.disabled)return;
+ const story=storyById(button.dataset.organizeStory),field=button.dataset.field;if(!story||!['pinned','archived','trashed'].includes(field))return;
+ if(field==='trashed'&&!story.organization?.trashed&&!button.dataset.trashConfirmed){
+  openDialog(`<div class="dialog-heading"><h2>Move this post to Trash?</h2><button class="icon-button" data-action="close-dialog" aria-label="Cancel">×</button></div><p>${esc(story.title)}</p><p>Your caption, photographs, sources, approvals and delivery history stay safe. You can restore this post from Posts → Trash.</p><div class="dialog-actions"><button class="button button-light" data-action="close-dialog">Keep post</button><button class="button button-dark" data-organize-story="${esc(story.id)}" data-field="trashed" data-trash-confirmed="true">Move to Trash</button></div>`);return;
+ }
+ const lock='organize:'+story.id;if(captionRequestLocks.has(lock))return;captionRequestLocks.add(lock);button.disabled=true;
+ try{if(!await flushAllDrafts())throw new Error('Save pending edits first.');const value=!story.organization?.[field];
+  const result=await api('/api/stories/'+encodeURIComponent(story.id)+'/organization',{method:'PATCH',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({baseRevision:story.revision,expectedVersion:story.organization?.version||0,[field]:value,...(field==='trashed'&&value?{confirm:'move_to_trash'}:{})})});
+  story.organization=result.organization;if(button.dataset.trashConfirmed)document.querySelector('#asset-dialog')?.close();render();
+  toast(field==='trashed'?(value?'Moved to Trash. Restore it from Posts → Trash.':result.organization.archived?'Post restored to Archived posts.':'Post restored.') :field==='archived'?(value?'Post archived.':'Post returned to drafts.'):(value?'Post pinned.':'Post unpinned.'));
+ }catch(error){toast(error.message,{error:true});}finally{captionRequestLocks.delete(lock);button.disabled=false;}
+});
 document.addEventListener('change',event=>{if(event.target.id==='story-status'){state.pipelineGroup=event.target.value;render();}if(event.target.id==='story-sort'){state.storySort=event.target.value;render();}if(event.target.id==='story-archive'){state.storyArchive=event.target.value;render();}});
 
 // Plans are unpaid; confirmation consumes one server-owned policy authorization.
@@ -955,20 +1036,36 @@ document.addEventListener('click',async event=>{
   if(result.proposal)state.storyGenerationProposal=result.proposal;
   await loadWorkspace({quiet:true});toast(disable?'Future AI starts disabled. Accepted work may still finish.':'Story request confirmed once. Check its recorded progress.');
  }catch(error){toast(error.message+(confirm?' Check results; no automatic resubmission was made.':''),{error:true});}
- finally{state.storyConfirmBusy=false;render();}
+ finally{state.storyConfirmBusy=false;render();receiveResearchUpdates();}
 });
 
 document.addEventListener('change',event=>{const select=event.target.closest('[data-photo-source]');if(!select)return;state.photoSources ||= {};state.photoSources[select.dataset.photoSource]=select.value;});
+function watchPhotoProgress(id){
+ let stopped=false,reading=false;
+ const tick=async()=>{if(stopped||reading||!state.photoSearchBusy?.[id])return;reading=true;
+  try{
+   const detail=await api('/api/stories/'+encodeURIComponent(id));if(stopped||!state.photoSearchBusy?.[id])return;
+   const current=storyById(id),fingerprint=s=>(s?.media||[]).map(a=>[a.id,a.localPreview?.sha256,a.savedCopy?.sha256].join(':')).join('|'),changed=fingerprint(current)!==fingerprint(detail);
+   mergeStoryDetail(id,detail);
+   // Show newly saved photographs while the bounded source scan continues.
+   // Reuse decoded image elements and never disturb writing on another tab.
+   if(changed&&route().id===id&&route().tab==='build')render();
+   const p=detail.photoRequests?.[0],status=document.getElementById('photo-action-status-'+id),pages=p?.sourceAttempts?.filter(a=>a.status==='captured').length||0,files=p?.imageAttempts?.filter(a=>['decoded','cached_existing','exact_duplicate'].includes(a.status)).length||0;
+   if(status)status.textContent=pages||files?`${pages} source page(s) read · ${files} image file(s) checked. Saved photographs appear as they arrive.`:'Checking project sources. Your selection stays in place.';
+  }catch{/* Preserve the last visible result; the final receipt reports errors. */}finally{reading=false;}
+ };
+ const timer=setInterval(tick,1500);return()=>{stopped=true;clearInterval(timer);};
+}
 async function discoverStoryPhotos(id,button,sourcePage=null){
  state.photoSearchBusy ||= {};if(state.photoSearchBusy[id])return;state.photoSearchBusy[id]=true;button.disabled=true;
- button.dataset.requestKey ||= crypto.randomUUID();button.textContent=sourcePage?'Importing references…':'Finding photographs…';
+ button.dataset.requestKey ||= crypto.randomUUID();button.textContent=sourcePage?'Importing references…':'Finding photographs…';const stopProgress=watchPhotoProgress(id);
  try{
   if(!await flushAllDrafts())throw Error('Save pending edits before finding photographs.');
-  const story=storyById(id),input={sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:button.dataset.requestKey,direction:state.photoDirections?.[id]||'best',custom:state.photoCustom?.[id]||'',...(sourcePage||{})};
+  const story=storyById(id),input={sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:button.dataset.requestKey,direction:state.photoDirections?.[id]||'best',custom:state.photoCustom?.[id]||'',...(state.photoRefresh?.[id]&&!sourcePage?{refreshSources:true}:{}),...(sourcePage||{})};
   const result=await api('/api/stories/'+encodeURIComponent(id)+'/photo-discovery',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(input)});
-  await loadWorkspace({quiet:true});toast(result.photoRequest.message,{error:result.photoRequest.state!=='complete'});
+  await loadWorkspace({quiet:true});announce(photoOutcome(result.photoRequest));
  }catch(error){toast(error.message+' Check the recorded result before another request. No automatic repeat was made.',{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}
- finally{state.photoSearchBusy[id]=false;render();}
+ finally{stopProgress();state.photoSearchBusy[id]=false;render();}
 }
 document.addEventListener('click',event=>{const button=event.target.closest('[data-photo-discover]');if(button&&!button.disabled)discoverStoryPhotos(button.dataset.photoDiscover,button);});
 document.addEventListener('click',async event=>{
@@ -1000,6 +1097,7 @@ document.addEventListener('click',async event=>{
 });
 
 document.addEventListener('change',event=>{const select=event.target.closest('[data-photo-direction]');if(!select)return;state.photoDirections ||= {};state.photoDirections[select.dataset.photoDirection]=select.value;render();});
+document.addEventListener('change',event=>{const input=event.target.closest('[data-photo-refresh]');if(!input)return;state.photoRefresh ||= {};state.photoRefresh[input.dataset.photoRefresh]=input.checked;});
 document.addEventListener('input',event=>{const input=event.target.closest('[data-photo-custom]');if(!input)return;state.photoCustom ||= {};state.photoCustom[input.dataset.photoCustom]=input.value;});
 document.addEventListener('click',async event=>{
  const button=event.target.closest('[data-photo-more]');if(!button||button.disabled)return;button.disabled=true;
@@ -1013,4 +1111,166 @@ document.addEventListener('click',async event=>{
  if(button.dataset.photoCover){const ids=effective(story).selectedAssetIds;if(!ids.includes(asset.id))throw Error('Add the photograph before making it the cover.');editDraft(story.id,{selectedAssetIds:[asset.id,...ids.filter(id=>id!==asset.id)]},{rerender:true,immediate:true});await flushDraft(story.id);announce('Cover changed. The previous sequence remains in history.');}
  else{await api('/api/stories/'+encodeURIComponent(story.id)+'/assets/'+encodeURIComponent(asset.id)+'/review',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({expectedVersion:asset.localReview?.version||0,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,previewSha256:asset.localPreview?.sha256||'',decision:'shortlist',reason:'Shortlisted for closer photographic inspection.',basis:'story_potential'})});await loadWorkspace({quiet:true});announce('Shortlisted for this story. Source identity and rights remain separate.');}
  }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
+});
+
+// Paid photo assessment has a separate private policy. Preparation is unpaid;
+// refresh observes one existing operation and never dispatches or retries it.
+document.addEventListener('change',event=>{
+ const batch=event.target.closest('[data-vision-batch]');
+ if(batch){const id=batch.dataset.visionBatch,story=storyById(id),next=story?.photoVision?.eligibleBatches?.find(b=>b.photoRequestId===batch.value);state.visionBatches ||= {};state.visionBatches[id]=batch.value;state.visionAssets ||= {};state.visionAssets[id]=next?.assetIds.slice(0,6)||[];render();return;}
+ const checkbox=event.target.closest('[data-vision-asset]');if(!checkbox)return;
+ const id=checkbox.dataset.story,story=storyById(id),batches=story?.photoVision?.eligibleBatches||[],selectedBatch=batches.find(b=>b.photoRequestId===state.visionBatches?.[id])||batches[0];
+ const previous=state.visionAssets?.[id]||selectedBatch?.assetIds.slice(0,6)||[],chosen=new Set(previous);
+ if(checkbox.checked)chosen.add(checkbox.dataset.visionAsset);else chosen.delete(checkbox.dataset.visionAsset);
+ if(chosen.size>6){checkbox.checked=false;announce('Choose up to six photographs for one assessment.');return;}
+ state.visionAssets ||= {};state.visionAssets[id]=[...chosen];render();
+});
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-vision-action]');if(!button||button.disabled)return;
+ const id=button.dataset.story,action=button.dataset.visionAction;if(visionLocks.has(id))return;
+ visionLocks.add(id);button.disabled=true;state.visionBusy ||= {};state.visionBusy[id]=true;state.visionErrors ||= {};delete state.visionErrors[id];
+ const post=body=>({method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(body)});
+ try{
+  if(action!=='disable'&&!await flushAllDrafts())throw Error('Save pending edits first.');
+  // Refresh after saving: exact caption version and pixel bindings are checked
+  // again server-side; an old browser plan cannot authorize changed inputs.
+  await loadWorkspace({quiet:true,renderView:false});const story=storyById(id);if(!story)throw Error('Reload this story before continuing.');
+  const path='/api/stories/'+encodeURIComponent(id)+'/vision/';
+  if(action==='disable'){await api('/api/generation/disable',post({}));await loadWorkspace({quiet:true});announce('Future AI starts disabled. Accepted operations may still finish.');}
+  else if(action==='prepare'||action==='reprepare'){
+   const batches=story.photoVision?.eligibleBatches||[],batch=batches.find(b=>b.photoRequestId===state.visionBatches?.[id])||batches[0];if(!batch)throw Error('No saved photographs are eligible yet.');
+   const chosen=state.visionAssets?.[id]||batch.assetIds.slice(0,6),assetIds=batch.assetIds.filter(a=>chosen.includes(a));if(!assetIds.length||assetIds.length>6)throw Error('Choose one to six saved photographs.');
+   const binding=JSON.stringify([id,story.revision,story.localDraft?.version||0,batch.photoRequestId,assetIds]);state.visionKeys ||= {};if(action==='reprepare')delete state.visionKeys[binding];const key=state.visionKeys[binding] ||= crypto.randomUUID();
+   const result=await api(path+'prepare',post({assetIds,photoRequestId:batch.photoRequestId,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:key}));
+   state.visionProposals ||= {};state.visionProposals[id]=result.proposal;announce('Photo review prepared. No AI has started.');
+  }else{
+   const proposal=visionProposal(story,state);if(!proposal||proposal.id!==button.dataset.proposal)throw Error('Review the current recorded operation first.');
+   if(action==='confirm'){
+    if(!proposal.canConfirm)throw Error('This photo review is not ready to confirm.');
+    state.visionProposals[id]={...proposal,state:'uncertain',canConfirm:false,message:'Confirmation sent. Waiting for its recorded outcome; do not submit again.'};render();
+    const result=await api(path+'confirm',post({proposalId:proposal.id,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,confirm:true}));state.visionProposals[id]=result.proposal;announce('One photo assessment confirmed. Your current edit is preserved.');
+   }else if(action==='refresh'){const result=await api(path+'refresh',post({proposalId:proposal.id}));state.visionProposals ||= {};state.visionProposals[id]=result.proposal;}
+   await loadWorkspace({quiet:true,renderView:false});
+  }
+ }catch(error){state.visionErrors[id]=error.message+(action==='confirm'?' Check the recorded result; this operation will not be resent automatically.':'');}
+ finally{visionLocks.delete(id);state.visionBusy[id]=false;button.disabled=false;render();}
+});
+// Poll only operations with a known queued/running state. Ambiguous operations
+// wait for an explicit check; no timer may create or confirm a request.
+setInterval(async()=>{
+ if(document.hidden)return;const current=route();if(current.view!=='story')return;
+ const story=storyById(current.id),proposal=story&&visionProposal(story,state);
+ if(!proposal||!visionPending(proposal)||proposal.state==='uncertain'||visionLocks.has(story.id))return;
+ visionLocks.add(story.id);
+ try{await api('/api/stories/'+encodeURIComponent(story.id)+'/vision/refresh',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({proposalId:proposal.id})});await loadWorkspace({quiet:true,renderView:current.tab==='build'||current.tab==='images'||current.tab==='carousel'});}catch{/* The recorded operation is never resent. Manual check remains available. */}finally{visionLocks.delete(story.id);}
+},5000);
+
+function mergeStoryDetail(id,detail){
+ const current=storyById(id);if(!current)return detail;
+ const changes={...(inFlight.get(id)||{}),...(pending.get(id)||{})},prior=current.localDraft;
+ Object.assign(current,detail);
+ // A gallery progress read may have started before the latest autosave finished.
+ // Never roll the editor/version counter back to that older read response.
+ const savedAfterRead=prior?.baseRevision===detail.revision&&(prior.version||0)>(detail.localDraft?.version||0);
+ if(Object.keys(changes).length||savedAfterRead){const baseRevision=prior?.baseRevision||detail.revision;current.localDraft={...(detail.localDraft||{}),...(prior||{}),...changes,baseRevision,stale:baseRevision!==detail.revision};}
+ if(!saving.has(id))versions.set(id,current.localDraft?.version||0);
+ return current;
+}
+async function loadStory(id){
+ if(storyReads.has(id))return storyReads.get(id);
+ state.storyReadErrors ||= {};delete state.storyReadErrors[id];
+ const task=(async()=>{const detail=await api('/api/stories/'+encodeURIComponent(id)),current=mergeStoryDetail(id,detail);
+  if(route().id===id)render();return current;
+ })();storyReads.set(id,task);try{return await task;}catch(error){state.storyReadErrors[id]=error.message;if(route().id===id)render();throw error;}finally{storyReads.delete(id);}
+}
+document.addEventListener('click',event=>{
+ if(event.target.closest('[data-show-selection]')){document.querySelector('.post-in-progress')?.scrollIntoView({block:'start',behavior:'smooth'});return;}
+ if(event.target.closest('[data-show-gallery]')){document.querySelector('.gallery-heading')?.scrollIntoView({block:'start',behavior:'smooth'});return;}
+ const retry=event.target.closest('[data-load-story]');if(retry){retry.disabled=true;loadStory(retry.dataset.loadStory).catch(error=>toast(error.message,{error:true}));return;}
+ const filter=event.target.closest('[data-gallery-filter]');if(filter){state.galleryFilters ||= {};state.galleryFilters[filter.dataset.story]=filter.dataset.galleryFilter;render();return;}
+ const more=event.target.closest('[data-gallery-more]');if(more){state.galleryLimits ||= {};state.galleryLimits[more.dataset.galleryMore]=(state.galleryLimits?.[more.dataset.galleryMore]||18)+18;render();return;}
+ const open=event.target.closest('[data-curation-open]');if(open){state.curationStory=open.dataset.curationOpen;render();return;}
+ if(event.target.closest('[data-curation-close]')){const id=state.curationStory;state.curationStory=null;render();document.querySelector('[data-curation-open="'+CSS.escape(id)+'"]')?.focus();}
+});
+document.addEventListener('cancel',event=>{if(event.target.id==='curation-dialog')state.curationStory=null;},true);
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-photo-saved-copy],[data-curation-cover]');if(!button||button.disabled)return;button.disabled=true;
+ try{
+  if(!await flushAllDrafts())throw Error('Save pending edits before changing the slides.');
+  const story=storyById(button.dataset.story);if(!story||story.localDraft?.stale)throw Error('Review the source changes before editing this post.');
+  const selectedAssetIds=button.dataset.photoSavedCopy?savedCopySelection(story,button.dataset.photoSavedCopy):coverSelection(story,button.dataset.curationCover);
+  editDraft(story.id,{selectedAssetIds},{rerender:true,immediate:true});
+  if(!await flushDraft(story.id))return;
+  announce(button.dataset.photoSavedCopy?'Saved file selected. Your caption and earlier order remain in history.':'Cover selected. Your caption and earlier order remain in history.');
+ }catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
+});
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-refine-improve]');if(!button||button.disabled)return;
+ if(!['discovery_opening','alternate_angle','supported_perspective'].includes(button.dataset.refineImprove))return;
+ button.disabled=true;
+ try{if(!await flushAllDrafts())throw Error('Save your caption before reviewing an AI request.');state.captionDirections ||= {};state.captionDirections[button.dataset.story]=button.dataset.refineImprove;state.captionTools ||= {};state.captionTools[button.dataset.story]='improve';render();document.querySelector('#caption-improvement-direction')?.focus({preventScroll:true});}
+ catch(error){toast(error.message,{error:true});}finally{button.disabled=false;}
+});
+
+let previewTouch=null;
+document.addEventListener('pointerdown',event=>{if(event.pointerType==='touch'&&event.target.closest('.instagram-slide'))previewTouch={x:event.clientX,y:event.clientY};});
+document.addEventListener('pointerup',event=>{if(!previewTouch)return;const start=previewTouch;previewTouch=null;if(!rehearsal||!event.target.closest('.instagram-slide'))return;const dx=event.clientX-start.x,dy=event.clientY-start.y;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.4)showRehearsal(storyById(rehearsal.storyId),rehearsal.index+(dx<0?1:-1),rehearsal.fit);});
+document.addEventListener('pointercancel',()=>{previewTouch=null;});
+document.addEventListener('click',event=>{if(!event.target.closest('.post-options'))for(const menu of document.querySelectorAll('.post-options[open]'))menu.open=false;});
+document.addEventListener('keydown',event=>{if(event.key==='Escape')for(const menu of document.querySelectorAll('.post-options[open]'))menu.open=false;});
+function positionPostMenus(){
+ for(const menu of document.querySelectorAll('.post-options[open]')){
+  const panel=menu.querySelector('div'),anchor=menu.querySelector('summary').getBoundingClientRect();
+  menu.classList.toggle('opens-up',anchor.bottom+panel.offsetHeight>innerHeight-16&&anchor.top>panel.offsetHeight+16);
+ }
+}
+document.addEventListener('toggle',event=>{if(event.target.matches('.post-options')&&event.target.open){for(const other of document.querySelectorAll('.post-options[open]'))if(other!==event.target)other.open=false;requestAnimationFrame(positionPostMenus);}},true);
+window.addEventListener('resize',()=>requestAnimationFrame(positionPostMenus));
+
+// Sending is an explicit founder action. No polling, create retry or timed resend.
+document.addEventListener('click',async event=>{
+ const button=event.target.closest('[data-buffer-action]');if(!button||button.disabled)return;
+ const id=button.dataset.story,action=button.dataset.bufferAction,lock='buffer:'+id;
+ if(captionRequestLocks.has(lock))return;captionRequestLocks.add(lock);button.disabled=true;
+ try{
+  if(!await flushAllDrafts())throw Error('Save your caption and slides first.');
+  const story=storyById(id);if(!story)throw Error('Open the original post.');
+  state.bufferReviews ||= {};state.bufferReviewKeys ||= {};
+  const binding=JSON.stringify([id,story.revision,story.localDraft?.version||0]);
+  const review=state.bufferReviews[id];
+  const input=action==='review'?{sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:state.bufferReviewKeys[binding] ||= crypto.randomUUID()}:action==='send'?{sourceRevision:review?.sourceRevision,workingVersion:review?.workingVersion,approvalRequestId:review?.approvalRequestId,reviewDigest:review?.reviewDigest,confirm:'send_unscheduled_buffer_draft'}:{};
+  if(action==='send'&&!review?.reviewDigest)throw Error('Review this exact post before confirming.');
+  const result=await api('/api/stories/'+encodeURIComponent(id)+'/buffer-draft/'+action,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(input)});
+  story.bufferDraft=result.delivery;if(result.approvalRequest)story.approvalRequest=result.approvalRequest;
+  if(action==='review'&&result.delivery.ready){state.bufferReviews[id]={...result.delivery,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0};openDialog(bufferConfirmDialog(story,result.delivery));}
+  else{delete state.bufferReviews[id];if(action==='send')document.querySelector('#asset-dialog')?.close();render();toast(result.delivery.message);}
+ }catch(error){
+  if(action==='send'||action==='check'){delete state.bufferReviews?.[id];if(action==='send')document.querySelector('#asset-dialog')?.close();const story=storyById(id);if(story)story.bufferDraft=error.delivery||{state:'needs_reconciliation',canSend:false,canCheck:false,message:'Delivery was not confirmed. Do not send again. Check the saved delivery and Buffer before taking another action.'};render();}
+  toast(error.message,{error:true});
+ }finally{captionRequestLocks.delete(lock);button.disabled=false;}
+});
+
+// Each button performs one explicit action; checks only observe the recorded
+// execution. Reload/restart never causes an automatic native resubmission.
+document.addEventListener('click',async event=>{
+ const b=event.target.closest('[data-native-review]');if(!b||b.disabled)return;
+ const id=b.dataset.story,action=b.dataset.nativeReview,lock='native-review:'+id;
+ if(captionRequestLocks.has(lock))return;captionRequestLocks.add(lock);b.disabled=true;
+ try{
+  if(!await flushAllDrafts())throw Error('Save your caption and slide order first.');
+  const story=storyById(id);if(!story)throw Error('Reopen the post.');
+  if(action==='review-transfer'||action==='review-approval'){openDialog(nativeReviewDialog(story,action==='review-approval'));return;}
+  const common={sourceRevision:story.revision,workingVersion:story.localDraft?.version||0};let input={};
+  if(action==='submit'){
+   const a=await api('/api/stories/'+encodeURIComponent(id)+'/approval-requests',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({...common,idempotencyKey:crypto.randomUUID(),confirm:'prepare_review_only'})});
+   input={...common,approvalRequestId:a.approvalRequest.id,confirm:'submit_exact_post_for_native_review'};
+  }else if(action==='approve'){
+   if(!document.querySelector('[data-native-facts]')?.checked||!document.querySelector('[data-native-slides]')?.checked)throw Error('Confirm both the facts and the finished slides before approving.');
+   input={...common,idempotencyKey:crypto.randomUUID(),finalPostDigest:story.nativePublishing?.finalPostDigest,confirm:'approve_exact_native_post',factsReviewed:true,slidesReviewed:true};
+  }
+  const r=await api('/api/stories/'+encodeURIComponent(id)+'/native-review/'+action,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(input)});
+  document.querySelector('#asset-dialog')?.close();await loadWorkspace({quiet:true});
+  toast(['dispatching','running'].includes(r.operation.state)?'Preparation is in progress. Use Check preparation to confirm the result.':r.operation.state==='native_post_approved'?'Post approval verified. Buffer sending remains a separate confirmation.':'Saved caption and slide order verified in the approval workflow.');
+ }catch(error){toast(error.message,{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}
+ finally{captionRequestLocks.delete(lock);b.disabled=false;}
 });

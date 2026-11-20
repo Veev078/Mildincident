@@ -6,8 +6,9 @@ export class ResearchDelivery {
   this.engine=engine;this.intervalMs=intervalMs;this.now=now;this.inflight=null;this.stopped=true;this.timer=null;
  }
  status(){return this.engine.research.deliveryState();}
- tick(){
+ tick({maxAgeMs=0}={}){
   if(this.inflight)return this.inflight;
+  const cached=this.status();if(maxAgeMs>0&&cached&&(cached.state==='connected'&&this.now()-Date.parse(cached.lastSuccess)<maxAgeMs||cached.state==='unavailable'&&Date.parse(cached.nextAttempt)>this.now()))return Promise.resolve(cached);
   this.inflight=(async()=>{const before=this.status()||{},at=new Date(this.now()).toISOString();
    try{await this.engine.refresh();const observed=this.engine.status();return this.engine.research.saveDeliveryState({mode:'read_only',state:'connected',lastAttempt:at,lastSuccess:at,failures:0,unlinkedNativeJobs:observed.unlinkedNativeJobs||0,importedThisRead:observed.observedImports||0,nextAttempt:new Date(this.now()+this.intervalMs).toISOString(),errorCode:null});}
    catch(error){const failures=(before.failures||0)+1,delay=Math.min(900000,this.intervalMs*2**Math.min(failures,4));const code=/^[A-Z][A-Z0-9_]{0,80}$/.test(error.code||'')?error.code:'RESEARCH_READ_UNAVAILABLE';return this.engine.research.saveDeliveryState({...before,mode:'read_only',state:'unavailable',lastAttempt:at,failures,nextAttempt:new Date(this.now()+delay).toISOString(),errorCode:code});}

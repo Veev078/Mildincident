@@ -60,12 +60,17 @@ export class LocalResearchStore {
       // authorization and cannot turn a saved theme into another request class.
       const defaultKey=reuseDefault?defaultDiscoveryKey({kind:input.kind,prompt,sourceUrl},{founderBrief:editorialDiscovery&&!preset}):null;
       const baselineContext=JSON.stringify(stories.map(s=>[s.id,s.revision??null,s.localDraft?.version??0]).sort((a,b)=>a[0].localeCompare(b[0])));
+      // Preparing a founder-confirmed plan freezes this request even before an
+      // engine job exists. Reusing it would reopen an expired/failed plan forever.
+      const generationActionGuard=defaultKey&&this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='studio_generation_actions'").get()
+        ? 'AND NOT EXISTS(SELECT 1 FROM studio_generation_actions a WHERE a.id=r.id)' : '';
       const equivalent=defaultKey?this.db.prepare(`SELECT r.id FROM research_requests r JOIN research_request_equivalence q ON q.request_id=r.id
         WHERE q.default_key=? AND q.baseline_context=?
         AND NOT EXISTS(SELECT 1 FROM research_request_events e WHERE e.request_id=r.id)
         AND NOT EXISTS(SELECT 1 FROM research_engine_jobs j WHERE j.request_id=r.id)
         AND NOT EXISTS(SELECT 1 FROM research_engine_events h WHERE h.request_id=r.id)
         AND NOT EXISTS(SELECT 1 FROM research_continuations c WHERE c.request_id=r.id)
+        ${generationActionGuard}
         ORDER BY r.rowid DESC LIMIT 1`).get(defaultKey,baselineContext):null;
       if(equivalent){
         if(input.idempotencyKey)this.db.prepare('INSERT INTO research_request_aliases VALUES(?,?,?,?,?)').run(id,equivalent.id,input.kind,prompt,sourceUrl);

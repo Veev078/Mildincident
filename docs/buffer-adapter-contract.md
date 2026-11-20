@@ -1,6 +1,6 @@
 # Buffer integration and reversible release
 
-**Not connected or activated.** This contract describes the interface used by the local tests. It does not assert that current Buffer endpoints accept any particular mutation flags.
+**Not connected or activated.** Current coordinated implementation/release evidence is in [V19 Buffer release](release/V19_BUFFER_COORDINATED_RELEASE.md); the historical preconditions below remain safeguards, not a claim of live readiness. This contract describes the interface used by the local tests. It does not assert that current Buffer endpoints accept any particular mutation flags.
 
 ## First: inspect, preserve, and reconcile
 
@@ -37,3 +37,10 @@ The core has **no automatic retries around creation**. A timeout, malformed crea
 4. On regression, disable the new entry point and restore only the changed workflow/version after checking intervening edits. Preserve every draft, JPG, source record, ledger row, event, and remote ID. Never delete the ledger or create a replacement draft as a rollback strategy. Reconcile ambiguous outcomes read-only.
 
 There has been no production activation in this session. Local rollback is simply to stop the read-only server and leave the original `01-Central` and production system untouched. Preserve `.local/` receipts and ledger state if any real integration is later introduced.
+
+
+## Native asynchronous acknowledgement (local implementation)
+
+A trusted `nativeCoordinator:true` adapter may return `{state:"native_accepted",executionId,requestId}` instead of a completed provider ID. The durable outbox stores this as pending. `reconcileNativeDraft` only observes that exact execution/request, links its native recorded candidate and performs independent provider read-back. A lost acknowledgement is searched read-only within bounded native history, never resubmitted. Missing schedule/publication fields, changed caption/order, incomplete history and uncertain results stay blocked.
+
+The current Buffer GraphQL schema now documents `saveToDraft:true` as preventing scheduling/publication. This supports review of the existing native operation; it does not by itself prove live execution or bypass the separate one-draft acceptance. Native file hashes come from private/public byte verification and the exact staging registry, not fabricated Buffer checksum fields.

@@ -42,7 +42,7 @@ test('unsafe references never displace a valid preview or get rendered as source
 test('proposal feedback and source attribution bind the exact displayed cover even when another frame opens the sequence',()=>{
  const value=story({selectedAssetIds:['opening','displayed'],media:[{id:'opening',creator:'Other source credit'},{id:'displayed',title:'Visible reference',creator:'Displayed source credit',sourceUrl:'https://example.org/displayed',previewUrl:local('displayed'),localPreview:{sha256:hash}}]});
  const html=proposalCard(value);
- assert.ok(html.includes(`src="${local('displayed')}"`));assert.ok(html.includes('data-asset="displayed"'));assert.ok(html.includes(`data-preview-hash="${hash}"`));
+ assert.ok(html.includes(`src="${local('displayed')}&amp;size=640"`));assert.ok(html.includes('data-asset="displayed"'));assert.ok(html.includes(`data-preview-hash="${hash}"`));
  assert.ok(html.includes('Displayed source credit'));assert.ok(!html.includes('Other source credit'));assert.ok(!html.includes('Metadata only · preview unavailable'));
  assert.deepEqual(value.selectedAssetIds,['opening','displayed']);
  const missing=proposalCard(story({media:[{id:'metadata'}]}));assert.ok(missing.includes('Metadata only · preview unavailable'));assert.ok(!missing.includes('<img '));

@@ -10,7 +10,7 @@ export function creativeProgress(story){
  return {key:'review',label:'Working draft',action:'Review this story',tab:'publishing',detail:'Review the selected photographs and caption. Facts, permissions and final approval remain separate.'};
 }
 
-export function organizeStories(stories,{archived=false,sort='updated'}={}){
+export function organizeStories(stories,{archived=false,trashed=false,sort='updated'}={}){
  const time=s=>Date.parse(sort==='updated'?(s.localDraft?.updatedAt||s.organization?.updatedAt||s.updatedAt||s.engineProvenance?.generatedAt):(s.createdAt||s.engineProvenance?.generatedAt))||0;
- return stories.filter(s=>Boolean(s.organization?.archived)===archived).sort((a,b)=>Number(Boolean(b.organization?.pinned))-Number(Boolean(a.organization?.pinned))|| (sort==='oldest'?time(a)-time(b):time(b)-time(a))||a.id.localeCompare(b.id));
+ return stories.filter(s=>Boolean(s.organization?.trashed)===trashed&&(trashed||Boolean(s.organization?.archived)===archived)).sort((a,b)=>Number(Boolean(b.organization?.pinned))-Number(Boolean(a.organization?.pinned))|| (sort==='oldest'?time(a)-time(b):time(b)-time(a))||a.id.localeCompare(b.id));
 }

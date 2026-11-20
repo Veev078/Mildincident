@@ -7,7 +7,7 @@ export function lastSavedAt(story,reviews={}) {
 }
 
 export function todaySelection(workspace = {}) {
- const stories=(workspace.stories||[]).filter(s=>!s.organization?.archived&&(!s.recoveryOfStoryId||s.localDraft||workspace.founderReviews?.[s.id]||s.organization?.pinned)).map(workingStory),reviews=workspace.founderReviews||{};
+ const stories=(workspace.stories||[]).filter(s=>!s.organization?.trashed&&!s.organization?.archived&&(!s.recoveryOfStoryId||s.localDraft||workspace.founderReviews?.[s.id]||s.organization?.pinned)).map(workingStory),reviews=workspace.founderReviews||{};
  const decision=s=>proposalReviewState(s,reviews).decision;
  const active=stories.filter(s=>stateLabel(s).group!=='archive'&&decision(s)!=='pass');
  const fresh=active.filter(s=>s.origin==='n8n_development'&&!s.recoveredHistory&&!s.continuationOf&&!s.localDraft&&decision(s)==='reset');

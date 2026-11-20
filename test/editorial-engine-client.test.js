@@ -104,6 +104,23 @@ test('founder taste feedback freezes into future requests without relabeling res
  service.review(seed.id,{candidateId:candidate.id,expectedVersion:research.engineJob(seed.id).version,decision:'needs_research',basis:'source_accuracy',reviewer:'editor',reason:'An independent later source review, not the founder taste decision.'});assert.equal(service.editorialContext().feedback[0].reviewer,'founder');await service.queue(next.id);assert.deepEqual(research.engineJob(next.id).editorialContext,frozen);assert.equal(state.posts,2);assert.deepEqual(research.engineJob(seed.id).candidates,[candidate]);
 });
 
+test('measured publication observations supplement human feedback without changing its attribution or the bounded frozen request',async t=>{
+ const {research,service,state}=await setup(t);
+ const human={storyId:'human-story',reviewer:'founder',basis:'editorial_taste',reason:'Keep unexpected visual detail central.',createdAt:'2026-11-20T12:00:00Z'};
+ service.imageFeedback=()=>[human];
+ const observation={kind:'publication_observation',reviewer:'provider',storyId:'measured-story',sourceRevision:'r1',createdAt:'2026-11-19T12:00:00Z',publication:{bufferPostIds:['exact-post']},observations:[{name:'shares',value:2,unit:'count',measuredAt:'2026-11-19T12:00:00Z'}],reason:'Descriptive provider observation, not a causal claim.'};
+ service.performanceFeedback=()=>[{...observation,sourceRevision:null},observation,{...observation,storyId:'second'},{...observation,storyId:'third'}];
+ const request=research.create({kind:'discovery',prompt:'Find a strong source-grounded next editorial idea'},[]);
+ await service.queue(request.id);
+ const context=JSON.parse(state.jobs[0].editorial_context_json);
+ assert.equal(context.feedback[0].reviewer,'founder');assert.equal(context.feedback[0].reason,human.reason);
+ assert.deepEqual(context.feedback.filter(note=>note.reviewer==='provider').map(note=>note.storyId),['measured-story','second']);
+ assert.match(context.interpretation,/not founder opinions, causal findings/);
+ const frozen=research.engineJob(request.id).editorialContext;service.performanceFeedback=()=>[];await service.queue(request.id);assert.deepEqual(research.engineJob(request.id).editorialContext,frozen);assert.equal(state.posts,1);assert.equal(state.dispatches,0);
+ service.performanceFeedback=()=>[{...observation,reason:'large observation '.repeat(800)}];
+ const bounded=service.editorialContext();assert.ok(JSON.stringify(bounded).length<=9500);assert.equal(bounded.feedback[0].reviewer,'founder');assert.ok(!bounded.feedback.some(note=>note.reviewer==='provider'));
+});
+
 test('finished execution without a result gets a bounded read-only recovery period and can still import late results',async t=>{
  const {research,service,state}=await setup(t);const request=research.create({kind:'brief',prompt:'Inspect a specific photographed cultural moment'},[]);await service.queue(request.id);state.jobs[0].status='generating';state.jobs[0].execution_id='1000';
  await service.refresh();assert.equal(research.engineJob(request.id).state,'generating');assert.ok(research.engineJob(request.id).resultMissingSince);
@@ -155,4 +172,17 @@ test('founder inspection retains a larger captured photographic set rather than 
 test('complete native history reads are not capped at five pages and repeated cursors fail closed without writes',async()=>{
  const f=fake();let page=0;f.client.verifyTables=async()=>{};f.client.api=async()=>({data:[{id:++page}],nextCursor:page<7?'cursor-'+page:null});assert.equal((await f.client.rows('devjobs')).length,7);assert.equal(f.state.posts,0);
  f.client.api=async()=>({data:[{id:1}],nextCursor:'stuck'});await assert.rejects(f.client.rows('devjobs'),{code:'ENGINE_SCAN_INCOMPLETE'});assert.equal(f.state.posts,0);
+});
+
+test('a correlated failed webhook receipt is terminal even when workflow status is success and reads lag',async t=>{
+ const f=await setup(t);f.state.workerActive=true;f.client.connection.generationEnabled=true;f.client.connection.approvedWorkerVersion='approved-v1';
+ const request=f.research.create({kind:'brief',prompt:'Inspect a realistic bounded cultural research direction'},[]);await f.service.queue(request.id);
+ f.state.dispatchReceipt={accepted:true,scope:'development_only',productionApplied:false,jobId:request.id,executionId:'2365',status:'failed',failureCode:'RESEARCH_INPUT_BUDGET_EXCEEDED',privateHeader:'MUST_NOT_SURVIVE'};
+ await f.service.start(request.id,f.research.engineJob(request.id).version);await new Promise(r=>setImmediate(r));
+ let job=f.research.engineJob(request.id);assert.equal(job.state,'failed');assert.equal(job.resultPending,false);assert.equal(job.executionId,'2365');assert.equal(job.lastError,'RESEARCH_INPUT_BUDGET_EXCEEDED');assert(!JSON.stringify(job).includes('MUST_NOT_SURVIVE'));
+ f.state.jobs[0].status='failed';f.state.jobs[0].error='DEVELOPMENT_EXECUTION_FAILED';f.state.jobs[0].execution_id='2365';
+ let detailReads=0;f.client.executionDetails=async()=>{detailReads++;return ({id:'2365',status:'success',data:{resultData:{runData:{'Verify Development Claim':[{data:{main:[[{json:{job_id:request.id,request_hash:job.requestHash}}]]}}],'Build Research Prompt':[{data:{main:[[],[{json:{error:'RESEARCH_INPUT_BUDGET_EXCEEDED [line 367]',privateData:'NEVER_IMPORT'}}]]}}],'Prepare Development Failure':[{data:{main:[[{json:{error:'DEVELOPMENT_EXECUTION_FAILED'}}]]}}]}}}});};
+ await f.service.refresh();job=f.research.engineJob(request.id);assert.deepEqual(job.failure,{code:'RESEARCH_INPUT_BUDGET_EXCEEDED',stage:'research_preparation',executionId:'2365',stoppedBeforeModels:true});assert.equal(job.candidates.length,0);assert(!JSON.stringify(job).includes('NEVER_IMPORT'));await f.service.refresh();assert.equal(detailReads,1);
+ const reopened=new LocalResearchStore(path.join(f.root,'research.sqlite'));try{assert.equal(reopened.engineJob(request.id).state,'failed');assert(reopened.engineJob(request.id).failure.stoppedBeforeModels);}finally{reopened.close();}
+ await assert.rejects(f.service.start(request.id,job.version));assert.equal(f.state.dispatches,1);
 });
