@@ -22,7 +22,7 @@ export async function nativeBufferFixture(root){
  const fetchImpl=async(url,options)=>{
   if(url!=='https://rickywelch.app.n8n.cloud/webhook/mildincident-studio-post-handoff')throw Error('Fixture denied unexpected transport');
   const r=JSON.parse(options.body),token=options.headers.Authorization.slice(7),[h,payload,s]=token.split('.'),claims=JSON.parse(Buffer.from(payload,'base64url'));if(s!==createHmac('sha256',policy.jwtSecret).update(h+'.'+payload).digest('base64url')||claims.bodySha256!==sha256(canonical(r))||claims.exp*1000<=Date.now())throw Error('Fixture authentication failed');
-  calls.push(r.action);if(r.action==='file'){const bytes=files.get(r.assetId);return Response.json({state:'verified_private_file',storyId:id,assetId:r.assetId,packageVersion:p.production_version,data:bytes.toString('base64')});}
+  calls.push(r.action);if(r.action==='connection')return Response.json({verified:true,channelId:BUFFER_CHANNEL_ID,isDisconnected:false,isLocked:false});if(r.action==='file'){const bytes=files.get(r.assetId);return Response.json({state:'verified_private_file',storyId:id,assetId:r.assetId,packageVersion:p.production_version,data:bytes.toString('base64')});}
   const executionId=String(++seq),result={storyId:id,requestId:r.requestId,contentDigest:r.contentDigest||r.packet?.contentDigest,packageVersion:p.production_version,executionId};
   if(r.action==='review'){
    p.caption_draft=r.packet.post.caption;p.production_version++;p.editorial_handoff_version=p.production_version;p.slide_sequence_asset_ids=JSON.stringify(r.packet.post.selectedAssetIds);p.render_batch_id='BATCH-'+p.production_version;p.final_assets_verified=true;p.final_approval_status='pending';p.source_claims_reviewed=false;p.final_caption='';p.rights_review_status='reviewed';p.production_status='assets_rendered_pending_claim_review';p.format='carousel';p.asset_count=3;p.target_slide_count=3;
@@ -36,5 +36,5 @@ export async function nativeBufferFixture(root){
   return Response.json({state:'native_accepted',requestId:r.requestId,executionId},{status:202});
  };
  const connect=()=>new NativeBufferConnection({loadPolicy:async()=>structuredClone(policy),read,bufferReader:reader,source,drafts,previews,workspace:root,fetchImpl});const connection=connect();await connection.inspect();
- return{snapshot,source,drafts,research,previews,connection,connect,policy,id,calls,posts,files,get creates(){return creates;},get checks(){return checks;},authorizeOneDraft(){const s=source.view(drafts.all()).stories[0];policy.acceptance={storyId:id,packageVersion:p.production_version,contentDigest:nativePostDigest(s),expiresAt:new Date(Date.now()+20*60000).toISOString()};},close(){previews.close();research.close();drafts.close();}};
+ return{snapshot,source,drafts,research,previews,connection,connect,policy,id,calls,posts,files,graphs,get creates(){return creates;},get checks(){return checks;},authorizeOneDraft(){const s=source.view(drafts.all()).stories[0];policy.acceptance={storyId:id,packageVersion:p.production_version,contentDigest:nativePostDigest(s),expiresAt:new Date(Date.now()+20*60000).toISOString()};},close(){previews.close();research.close();drafts.close();}};
 }
