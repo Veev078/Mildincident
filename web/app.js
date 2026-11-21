@@ -1,3 +1,4 @@
+import {postInspector} from './post-review.js';
 import {postPreview} from './post-preview.js';
 import {renderStudio} from './studio-render.js';
 import {savedCopySelection,coverSelection} from './selection-actions.js';
@@ -1234,6 +1235,46 @@ function positionPostMenus(){
 document.addEventListener('toggle',event=>{if(event.target.matches('.post-options')&&event.target.open){for(const other of document.querySelectorAll('.post-options[open]'))if(other!==event.target)other.open=false;requestAnimationFrame(positionPostMenus);}},true);
 window.addEventListener('resize',()=>requestAnimationFrame(positionPostMenus));
 
+// Preparation is mechanical; final approval is one explicit exact-post consent.
+document.addEventListener('click',event=>{
+ const b=event.target.closest('[data-post-inspector]');if(!b)return;
+ const story=storyById(b.dataset.story);if(story)openDialog(postInspector(story,b.dataset.postInspector));
+});
+const completionCalls=new Set();
+async function advanceCompletion(id){
+ // Only invoked after a founder-confirmed intent, or its explicit Continue action.
+ for(let i=0;i<12;i++){
+  const r=await api('/api/stories/'+encodeURIComponent(id)+'/post-completion/advance',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:'{}'});
+  if(!r.pending){await loadWorkspace({quiet:true});toast(r.delivery?.message||'Check the recorded Buffer delivery.');return;}
+  if(i<11)await new Promise(resolve=>setTimeout(resolve,1800));
+ }
+ await loadWorkspace({quiet:true});toast('The existing operation is still running. Its confirmation is saved.');
+}
+document.addEventListener('click',async event=>{
+ const b=event.target.closest('[data-post-completion]');if(!b||b.disabled)return;
+ const id=b.dataset.story,action=b.dataset.postCompletion;if(completionCalls.has(id))return;completionCalls.add(id);b.disabled=true;
+ try{
+  if(!await flushAllDrafts())throw Error('Save your caption and slides first.');
+  const story=storyById(id);state.completionReviews ||= {};
+  if(action==='advance'){await advanceCompletion(id);return;}
+  if(action==='review'){
+   const r=await api('/api/stories/'+encodeURIComponent(id)+'/post-completion/review',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:crypto.randomUUID()})});
+   if(!r.delivery.ready){toast(r.delivery.message,{error:true});return;}
+   if(!r.delivery.completion){state.bufferReviews ||= {};state.bufferReviews[id]={...r.delivery,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0};}
+   else state.completionReviews[id]={...r.delivery,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:crypto.randomUUID()};
+   openDialog(bufferConfirmDialog(story,r.delivery));return;
+  }
+  if(action==='confirm'){
+   if(!document.querySelector('[data-final-post-reviewed]')?.checked)throw Error('Confirm that you reviewed the facts, credits and finished post.');
+   const r=state.completionReviews[id];if(!r)throw Error('Open the final post review first.');
+   const input={sourceRevision:r.sourceRevision,workingVersion:r.workingVersion,idempotencyKey:r.idempotencyKey,completionDigest:r.completionDigest,finalPostDigest:r.finalPostDigest,confirm:'approve_and_send_unscheduled_draft'};
+   await api('/api/stories/'+encodeURIComponent(id)+'/post-completion/confirm',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(input)});
+   document.querySelector('#asset-dialog')?.close();delete state.completionReviews[id];toast('Your final confirmation is saved. Preparing one Buffer draft.');await advanceCompletion(id);
+  }
+ }catch(error){toast(error.message,{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}
+ finally{completionCalls.delete(id);b.disabled=false;}
+});
+
 // Sending is an explicit founder action. No polling, create retry or timed resend.
 document.addEventListener('click',async event=>{
  const button=event.target.closest('[data-buffer-action]');if(!button||button.disabled)return;
@@ -1277,7 +1318,11 @@ document.addEventListener('click',async event=>{
   }
   const r=await api('/api/stories/'+encodeURIComponent(id)+'/native-review/'+action,{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(input)});
   document.querySelector('#asset-dialog')?.close();await loadWorkspace({quiet:true});
-  toast(['dispatching','running'].includes(r.operation.state)?'Preparation is in progress. Use Check preparation to confirm the result.':r.operation.state==='native_post_approved'?'Post approval verified. Buffer sending remains a separate confirmation.':'Saved caption and slide order verified in the approval workflow.');
+  if(action==='submit'&&['dispatching','running'].includes(r.operation.state)){
+   for(let i=0;i<8;i++){await new Promise(resolve=>setTimeout(resolve,1800));const checked=await api('/api/stories/'+encodeURIComponent(id)+'/native-review/check',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:'{}'});if(!['dispatching','running'].includes(checked.operation.state))break;}
+   await loadWorkspace({quiet:true});
+  }
+  toast(['dispatching','running'].includes(storyById(id)?.nativeReviewTransfer?.state)?'Preparation is still running. Your request is saved.':'Finished post checked.');
  }catch(error){toast(error.message,{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}
  finally{captionRequestLocks.delete(lock);b.disabled=false;}
 });

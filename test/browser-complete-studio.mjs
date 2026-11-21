@@ -94,6 +94,7 @@ try{
  for(const width of curationOnly?[]:[1440,390]){
   for(const [name,id]of stories){await opened('story/'+id+'/build',width);await capture(name+'-build-'+width);checks.push(name+' Build renders at '+width);}
   for(const tab of ['refine','approve']){await opened('story/'+packet.manifest.storyId+'/'+tab,width);await capture('jack-'+tab+'-'+width);checks.push('Jack '+tab+' renders at '+width);}
+  for(const tab of ['refine','approve']){await opened('story/CON-261026qkpn-2/'+tab,width);await capture('duo-'+tab+'-'+width);checks.push('Duo '+tab+' renders at '+width);}
   for(const route of ['discover','analytics']){await opened(route,width);if(feedFixture&&route==='discover')await page.getByRole('button',{name:'Saved / developing',exact:true}).click();await capture(route+'-'+width);checks.push(route+' renders at '+width);}
  }
  if(curationOnly){
@@ -179,7 +180,7 @@ try{
    checks.push('Improve the opening opens the existing separate review flow without starting AI');
   }
   await opened('story/'+packet.manifest.storyId+'/approve',1440);
-  await page.locator('[data-post-preview]').waitFor();assert.equal(await page.locator('[data-post-preview] .photo-expand').count(),0);await page.locator('[data-post-preview]').press('ArrowRight');assert.match(await page.locator('[data-post-preview] .slide-counter').innerText(),/2.*3/);await capture('jack-inline-preview-'+1440);await page.setViewportSize({width:390,height:844});await capture('jack-inline-preview-390');await page.setViewportSize({width:1440,height:1000});await page.locator('[data-action="rehearse-story"]').click();await page.locator('[data-rehearsal]').waitFor();
+  await page.locator('[data-post-preview]').waitFor();assert.equal(await page.locator('[data-post-preview] .photo-expand').count(),0);await page.locator('[data-post-preview]').press('ArrowRight');assert.match(await page.locator('[data-post-preview] .slide-counter').innerText(),/2.*3/);await capture('jack-inline-preview-'+1440);await page.setViewportSize({width:390,height:844});await capture('jack-inline-preview-390');await page.setViewportSize({width:1440,height:1000});if(!await page.locator('[data-action="rehearse-story"]').count())await page.getByRole('button',{name:'Post details',exact:true}).click();await page.locator('[data-action="rehearse-story"]').click();await page.locator('[data-rehearsal]').waitFor();
   assert.equal(await page.locator('[data-rehearsal] .rehearsal-stage img').evaluate(i=>i.complete&&i.naturalWidth>0),true,'Real photo renders in preview');
   await page.locator('#asset-dialog').getByRole('button',{name:'Next slide',exact:true}).click();
   assert.match(await page.locator('[data-rehearsal]').innerText(),/2\s*\/\s*3/);

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {postInspector} from '../post-review.js';
 import {storyWorkspace} from '../views.js';
 import {nextAction} from '../components.js';
 import {buildWorkspace} from '../../src/workspace/model.js';
@@ -9,7 +10,7 @@ const story=()=>buildWorkspace(workspaceSnapshot()).stories[0];
 
 test('three story stages retain all legacy tools and deep links',()=>{
  const original=story(),before=JSON.stringify(original);
- for(const [tab,stage] of [['overview','Build'],['research','Approve / Buffer'],['images','Build'],['direction','Refine'],['caption','Refine'],['carousel','Build'],['music','Refine'],['publishing','Approve / Buffer']]){
+ for(const [tab,stage] of [['overview','Build'],['research','Preview'],['images','Build'],['direction','Refine'],['caption','Refine'],['carousel','Build'],['music','Refine'],['publishing','Preview']]){
   const html=storyWorkspace(state,original,tab),primary=html.match(/<nav class="story-stages"[^>]*>([\s\S]*?)<\/nav>/)[1];
   assert.equal((primary.match(/<a /g)||[]).length,3);
   assert.match(primary,new RegExp('aria-current="page"><span>[123]</span>'+stage));
@@ -24,8 +25,8 @@ test('story overview leads with actual references and preserves private notes, w
  assert.ok(html.includes('class="writing-hero"'));assert.ok(html.includes('caption-workbench'));
  assert.ok(html.includes('aria-label="Local caption draft"'));assert.ok(html.includes('aria-label="Your direction"'));
  assert.match(html,/An unfinished angle/);assert.match(html,/Working caption stays preserved/);
- assert.match(html,/<summary>Sources & story tools<\/summary>/);
- assert.match(html,/data-action="draft-history"/);assert.match(html,/data-proposal-for=/);
+ assert.match(html,/data-post-inspector="sources"/);
+ const inspector=postInspector(original);assert.match(inspector,/data-action="draft-history"/);assert.match(inspector,/data-proposal-for=/);
  assert.match(html,/No preview available|https:\/\/example.org\/thumb/);
  assert.ok(!html.includes('Image verified'));
  original.media=[];original.selectedAssetIds=[];
@@ -37,7 +38,7 @@ test('clearer story journey retains stale-edit, permission and existing-provider
  const stale=storyWorkspace(state,original,'caption');assert.match(stale,/Compare source and local draft/);assert.match(stale,/id="caption-editor"[^>]*disabled/);
  original.localDraft=null;original.publishing.requiresReview=true;
  const action=nextAction(original);assert.equal(action.tab,'publishing');assert.equal(action.label,'Review existing activity');
- const production=storyWorkspace(state,original,'publishing');assert.match(production,/Your post/);assert.match(production,/Buffer|publishing record/);assert.match(production,/Sending from Studio is not enabled/);
+ const production=storyWorkspace(state,original,'publishing');assert.match(production,/Your post/);assert.match(production,/Buffer|publishing record/);assert.match(production,/View delivery/);
 });
 
 test('Develop keeps the explicitly selected cover even when another reference has an available preview',()=>{

@@ -98,7 +98,7 @@ try {
   await page.goto(`${origin}/#/discovery`);assert.equal(await page.locator('[data-photo-hunt]').count(),0);checks.push('Discover omits the removed photographic research desk; backend source records remain available');
 
   const id = snapshot.records.stories[0].concept_id;
-  await page.goto(`${origin}/#/story/${id}/publishing`);await page.getByRole('heading',{name:'One final look.',exact:true}).waitFor();
+  await page.goto(`${origin}/#/story/${id}/publishing`);await page.getByRole('heading',{name:'Your post.',exact:true}).waitFor();
   const packet=await (await page.request.get(origin+'/api/stories/'+id+'/production-packet')).json();assert.equal(packet.productionApplied,false);assert.equal(packet.publicationApproved,false);assert.equal(packet.bufferCreateEnabled,false);assert.equal(packet.nativeImportCheck.accepted,false);checks.push('post review shows the selected sequence while the existing backend packet keeps native handoff blocked');
   await page.goto(`${origin}/#/pipeline`);
   await page.getByRole('searchbox', { name: 'Find a post', exact: true }).fill('nothing-matches-this');
@@ -128,7 +128,7 @@ try {
   assert.deepEqual(drafts.get(id).selectedAssetIds, ['asset-2', 'asset-1']);
   checks.push('accessible carousel move controls persist ordered local sequence');
   const beforeRehearsal=JSON.stringify(drafts.get(id));
-  await page.goto(`${origin}/#/story/${id}/approve`);await page.getByRole('button',{name:'Preview post',exact:true}).click();
+  await page.goto(`${origin}/#/story/${id}/approve`);await page.getByRole('button',{name:'Post details',exact:true}).click();await page.getByRole('button',{name:'Full-screen preview',exact:true}).click();
   await page.locator('#asset-dialog').getByText('Slide 1 of 2',{exact:true}).waitFor();
   assert.ok(await page.locator('[data-rehearsal] [data-action="rehearse-step"][data-step="-1"]').isDisabled());
   await page.keyboard.press('ArrowRight');
@@ -200,8 +200,9 @@ try {
   await page.goto(`${origin}/#/story/${id}/music`);
   await page.getByRole('textbox', { name: 'Track', exact: true }).fill('Fixture track');
   await page.getByRole('textbox', { name: 'Artist', exact: true }).fill('Fixture artist');
+  await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await page.waitForTimeout(300);assert.equal(await page.getByRole('textbox',{name:'Track',exact:true}).inputValue(),'Fixture track');assert.equal(await page.getByRole('textbox',{name:'Artist',exact:true}).inputValue(),'Fixture artist');
   await page.getByRole('button', { name: 'Save sound direction', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));
+  await page.waitForFunction(() => document.querySelector('.selected-track h2')?.textContent==='Fixture track'&&document.querySelector('[data-save-status]')?.textContent.includes('Saved locally'));
   assert.equal(drafts.get(id).musicSelection.track, 'Fixture track');
   checks.push('manual soundtrack direction saves locally without availability claims');
   await page.getByLabel('Sound approach',{exact:true}).selectOption('silent');
@@ -282,7 +283,7 @@ try {
   assert.ok(drafts.history(id).length >= 4);
   checks.push('stale source comparison and explicit local rebase preserve history');
   await page.getByText('Sources & story tools',{exact:true}).click();await page.getByRole('button', { name: 'Version history', exact: true }).click();
-  assert.ok((await page.getByRole('dialog').textContent()).includes('Local version history.'));
+  await page.getByRole('heading',{name:'Local version history.',exact:true}).waitFor();assert.ok((await page.getByRole('dialog').textContent()).includes('Local version history.'));
   await page.getByRole('button', { name: 'Close local version history' }).click();
   checks.push('saved local version history is inspectable');
 

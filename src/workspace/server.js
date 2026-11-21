@@ -1,3 +1,4 @@
+import {PostCompletion} from './post-completion.js';
 import {photoDesk} from "../photography/story-intelligence.js";
 import {recordedPublisherAlternatives} from '../photography/publisher-alternatives.js';
 import {editorialDirectionV14,editorialTasteCase} from '../editorial-v14.js';
@@ -79,6 +80,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
   const draftLedger=research?new DraftLedger(research.db.location()):null;
   const bufferDrafts=new StudioBufferDrafts({approvals:approvalRequests,ledger:draftLedger,connection:bufferConnection});
   const nativeTransfers=research&&typeof bufferConnection?.submitReview==='function'?new NativePostTransfers({approvals:approvalRequests,research,drafts,previews,connection:bufferConnection,refreshSource:()=>source.refresh(),readStory:id=>view({storyId:id}).stories.find(s=>s.id===id)}):null;
+  const postCompletion=new PostCompletion({transfers:nativeTransfers,buffer:bufferDrafts,connection:bufferConnection,readStory:id=>view({storyId:id}).stories.find(s=>s.id===id)});
   const isPhotoOperation=id=>Object.hasOwn(research?.engineJob(id)?.editorialContext||{},'photoAssessment');
   const view = ({storyId=null,summary=false,mediaOnly=false}={}) => {
     const workspace = source.snapshot?source.view(drafts.all(),{storyId}):buildWorkspace({records:Object.fromEntries(Object.keys(WORKSPACE_TABLES).map(k=>[k,[]])),buffer:{posts:[],complete:false,observedAt:null},observedAt:new Date().toISOString(),warnings:[]});
@@ -111,7 +113,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
     for(const story of workspace.stories){if(story.draftRecovery?.sourceJobId){const original='CON-DEV-'+story.draftRecovery.sourceJobId;if(workspace.stories.some(s=>s.id===original))story.recoveryOfStoryId=original;}const result=story.captionGeneration?.result;if(result){const version=workspace.stories.find(s=>s.id===result.storyId);if(version)version.recoveryOfStoryId=story.id;}}
     attachLocalPreviews(workspace,previews);
     for(const story of workspace.stories){story.detailsLoaded=!summary&&!mediaOnly;story.organization=drafts.organization(story.id);if(summary){story.research=[];story.intelligence=null;}}
-    for (const story of (summary||mediaOnly?[]:workspace.stories)) { story.photography=photoDesk(story);story.organization=drafts.organization(story.id);story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.photoVision=photoVisionPilot?.status(story)||null;const visualReview=photography?.selectionReview?.(story)||null;story.sourceSequencePlan=buildSourceSequencePlan(story,{visualReview});story.editorialPackage=buildEditorialPackage(story,{visualReview}); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity};story.approvalRequest=approvalRequests?.status(story)||null;story.bufferDraft=bufferDrafts.status(story);story.nativePublishing=bufferConnection?.status?.(story)||null;story.nativeReviewTransfer=nativeTransfers?.latest(story.id)||null; }
+    for (const story of (summary||mediaOnly?[]:workspace.stories)) { story.photography=photoDesk(story);story.organization=drafts.organization(story.id);story.storageMode=access?'hosted':'local';story.visualVariants=possibleVariants(story.media);story.photoVision=photoVisionPilot?.status(story)||null;const visualReview=photography?.selectionReview?.(story)||null;story.sourceSequencePlan=buildSourceSequencePlan(story,{visualReview});story.editorialPackage=buildEditorialPackage(story,{visualReview}); for(const asset of story.media)asset.inspection=imageEvidenceState(asset); story.readiness=assessStudioReadiness(story);const packet=prepareProductionPacket(story);story.productionDecisions=productionDecisions(story);story.productionPreparation={nativeImportCheck:packet.nativeImportCheck,...packet.readiness,digest:packet.digest,identity:packet.identity};story.approvalRequest=approvalRequests?.status(story)||null;story.bufferDraft=bufferDrafts.status(story);story.nativePublishing=bufferConnection?.status?.(story)||null;story.nativeReviewTransfer=nativeTransfers?.latest(story.id)||null;story.postCompletion=postCompletion.status(story,story.bufferDraft); }
     workspace.photoHunts=summary||mediaOnly?[]:photography?.all()||[];
     workspace.founderReviews=founderReviews?.all()||{};
     workspace.sourceInputs={publications:feeds?.status()||[],leads:feeds?.list()||[]};
@@ -181,6 +183,13 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
       if(photoSearch&&request.method==='POST'){
         requireThat(photography,'RESEARCH_UNAVAILABLE','Photographic research is unavailable.');const id=decodeURIComponent(photoSearch[1]),readStory=()=>view().stories.find(s=>s.id===id),story=readStory();requireThat(story,'STORY_NOT_FOUND','Open the original story.');
         const photoRequest=await photography.searchStoryRequest(story,photoSearch[2],await body(request),{readStory});json(response,200,{photoRequest,productionApplied:false,paidCalls:0});return;
+      }
+      const completionRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/post-completion\/(review|confirm|advance)$/);
+      if(completionRoute&&request.method==='POST'){
+        const id=decodeURIComponent(completionRoute[1]),story=view({storyId:id}).stories.find(s=>s.id===id);requireThat(story,'STORY_NOT_FOUND','Open the original post.');const input=await body(request),action=completionRoute[2];
+        if(action==='advance')requireThat(Object.keys(input).length===0,'INVALID_BUFFER_REQUEST','Continue only the recorded final confirmation.');
+        const result=action==='review'?await postCompletion.review(story,input):action==='confirm'?await postCompletion.confirm(story,input):await postCompletion.advance(story);
+        json(response,200,result);return;
       }
       const nativeReviewRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/native-review\/(submit|approve|check)$/);
       if(nativeReviewRoute&&request.method==='POST'){

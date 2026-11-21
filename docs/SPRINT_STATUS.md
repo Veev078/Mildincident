@@ -1,3 +1,11 @@
+# November 21 — final publishing completion (local, not deployed)
+
+Built on verified live `798c0c3`: one Preview, one contextual inspector and one final exact-post consent over existing native approval/Buffer paths. No new publisher or queue; consent uses existing transfer events and every recorded send remains protected by the original outbox and independent read-back. Edited-post approval revisions and legacy manual music input now reconcile without losing founder work.
+
+[Implementation, activation scope and evidence limits](release/FINAL_PUBLISHING_COMPLETION.md). Read-only native/channel checks preserve the active recurring worker. Artemis has a two-slide source-grounded private proposal, but original-file access is blocked and no image rights/final production readiness is claimed. A legacy Artemis concept-review token surfaced during inspection; its narrow retirement remains separately gated. No deployment, live native/policy/credential change, paid AI, public staging or Buffer write occurred.
+
+---
+
 # November 21 — Studio experience refinement completed locally
 
 Continued the interrupted work over deployed `3e25682`: compact image-led Discover, consolidated historical failures, inline carousel approval review, truthful save state and preserved music input. Missing historical executions no longer block unrelated read-only delivery. The local research assembler reserves 3,000 characters; its exact single-node native patch remains uninstalled and separately gated. Existing approval, rights, duplicate and delivery safeguards remain unchanged.
