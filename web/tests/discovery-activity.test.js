@@ -11,16 +11,24 @@ test('activity distinguishes saved, uncertain, queued, running, received, review
 });
 test('Discover keeps only bounded current progress, never the historical ledger or photo/source desks',()=>{
  const saved={id:'saved',kind:'brief',prompt:'A saved direction',version:0},requests=[saved,...Array.from({length:20},(_,i)=>({...saved,id:'history'+i,engineJob:{recoveredHistory:true,state:'ready_to_review'}})),...Array.from({length:6},(_,i)=>({...saved,id:'active'+i,engineJob:{state:'generating'}}))];
- const before=JSON.stringify(requests),html=discovery({workspace:{stories:[],researchRequests:requests,engine:{readOnly:true}}});assert.equal((html.match(/data-request-id=/g)||[]).length,3);for(const removed of ['Research activity','Follow the photograph.','Publication leads','data-research-link','data-engine-review'])assert.ok(!html.includes(removed));assert.equal(JSON.stringify(requests),before);assert.ok(html.includes('Generate Stories'));
+ const before=JSON.stringify(requests),html=discovery({workspace:{stories:[],researchRequests:requests,engine:{readOnly:true}}});assert.equal((html.match(/data-request-id=/g)||[]).length,6);for(const removed of ['Research activity','Follow the photograph.','Publication leads','data-research-link','data-engine-review'])assert.ok(!html.includes(removed));assert.equal(JSON.stringify(requests),before);assert.ok(html.includes('Generate Stories'));
 });
 test('a failed founder story has one clear receipt, its actual cause and no second confirmation',()=>{
  const proposal={id:'failed-action',operation:'story',state:'failed',executionId:'2365',sourceLabel:DEFAULT_DISCOVERY_PROMPT,message:'The research context exceeded its limit. No AI model was reached.',canConfirm:false};
  const request={id:proposal.id,prompt:DEFAULT_DISCOVERY_PROMPT,engineJob:{state:'failed',lastError:'RESEARCH_INPUT_BUDGET_EXCEEDED',failure:{code:'RESEARCH_INPUT_BUDGET_EXCEEDED',stoppedBeforeModels:true}},generationProposal:proposal};
- const html=discovery({workspace:{stories:[],researchRequests:[request],engine:{configured:false}}});assert(html.includes('Story generation stopped.'));assert(html.includes('No AI model was reached.'));assert(!html.includes('data-story-generation-confirm'));assert.equal((html.match(/class="ai-operation-review"/g)||[]).length,1);assert.equal((html.match(/data-request-id=/g)||[]).length,0);
+ const html=discovery({workspace:{stories:[],researchRequests:[request],engine:{configured:false}}});assert(html.includes('Story generation stopped.'));assert(html.includes('No AI model was reached.'));assert(!html.includes('data-story-generation-confirm'));assert.equal((html.match(/class="ai-operation-review"/g)||[]).length,1);assert.equal((html.match(/data-request-id=/g)||[]).length,1);
 });
 test('preliminary results expose the caption and human checks; uncertain confirmation can never regress to a start button',()=>{
  const local={id:'same',state:'uncertain',canConfirm:false},prepared={id:'same',state:'prepared',canConfirm:true};assert.equal(reconcileStoryProgress(local,prepared).state,'uncertain');assert.equal(reconcileStoryProgress(local,prepared).canConfirm,false);assert.throws(()=>reconcileStoryProgress(local,{id:'different',state:'completed'}));
  const p={id:'same',state:'completed',editorialStatus:'preliminary',sourceLabel:DEFAULT_DISCOVERY_PROMPT,resultStoryId:'CON-generated',preview:{title:'A retained project',caption:'Actual captured <draft> & source text.',sources:[{url:'https://example.org/project',label:'Original publisher'}],claims:[{text:'A source-reported fact.'}],gaps:['Image identity and permission remain open.']}};
  const html=storyGenerationReview({workspace:{researchRequests:[{id:p.id,generationProposal:p}]}});assert(html.includes('Open preliminary story'));assert(html.includes('Actual captured &lt;draft&gt; &amp; source text.'));assert(html.includes('A source-reported fact.'));assert(html.includes('Image identity and permission remain open.'));assert(!html.includes('data-story-generation-confirm'));assert(!html.includes('publication-ready'));
  const interrupted=storyGenerationOutcome({...p,deliveryPending:true,readUnavailable:true});assert(interrupted.includes('Actual captured &lt;draft&gt;'));assert(interrupted.includes('The draft is recorded.'));assert(!interrupted.includes('Open preliminary story'));assert(!interrupted.includes('data-story-generation-confirm'));
+});
+
+test('an old failed receipt cannot displace a current confirmed operation; ambiguity remains protected',async()=>{
+ const {storyProposal}=await import('../ai-operations.js');
+ const failed={id:'historical',state:'failed'},pending={id:'new',state:'running',createdAt:'2026-11-20T12:00:00Z'};
+ assert.equal(storyProposal({workspace:{researchRequests:[{generationProposal:failed},{generationProposal:pending}]}}).id,'new');
+ assert.equal(storyProposal({storyGenerationProposal:{id:'same',state:'uncertain'},workspace:{researchRequests:[{generationProposal:{id:'same',state:'prepared'}}]}}).state,'uncertain');
+ assert.equal(storyProposal({storyGenerationProposal:{id:'same',state:'uncertain'},workspace:{researchRequests:[{generationProposal:{id:'same',state:'completed'}}]}}).state,'completed');
 });

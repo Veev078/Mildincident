@@ -45,3 +45,22 @@ test('offline native patch changes only preparation/failure reporting and retain
  const rows=vm.runInNewContext('(function(){'+script+'})()',{$:()=>({first:()=>({json:{editorial_context_json:JSON.stringify({captionImprovement:{research:{userPrompt:'unchanged retained evidence'}}})}})})});assert.equal(rows[0].json.userPrompt,'unchanged retained evidence');
  assert.throws(()=>prepareResearchBudgetPatch({...worker,activeVersionId:'drift'},{expectedVersion:'captured',expectedSha256:editorialGraphSha(worker)}),{code:'WORKFLOW_DRIFT'});
 });
+
+test('representative requests reserve 3000 characters while keeping directions, instructions and whole evidence',()=>{
+ for(const kind of ['brief','discovery'])for(const size of [20,150,600]){
+  const f=fixture();f.history=Array.from({length:size},(_,i)=>({...f.history[i%f.history.length],story:{subject:'Different retained subject '+i+' 文脈 '.repeat(i%20)}}));
+  const out=planned(f,kind),measured=out.userPrompt.length+out.instructions.length;
+  assert(measured<=27000);assert(out.researchContextBudget.headroomCharacters>=3000);assert(out.userPrompt.includes(f.direction));assert(out.instructions.startsWith(f.original.instructions));assert(out.userPrompt.includes(f.original.brandText));assert(out.researchContextBudget.sections.find(s=>s.key==='history').included>0);
+ }
+ const mandatory={instructions:'Non-negotiable',researchContextParts:{corePrompt:'x'.repeat(27500),sections:[]}};
+ assert.throws(()=>fitResearchContext(mandatory),/RESEARCH_INPUT_BUDGET_EXCEEDED/);
+});
+
+test('headroom proposal changes only the existing serialized helper and preserves all native settings',async()=>{
+ const {prepareResearchHeadroomPatch}=await import('../src/n8n/research-budget-patch.js');
+ const code='const fitResearchContext=function(value){return value;};const researchContextParts=function(){};for(const item of planned)if(item.json.userPrompt.length>30000)throw Error("RESEARCH_INPUT_BUDGET_EXCEEDED");';
+ const worker={id:'6CkqfYc4Pyd4k8vi',active:true,versionId:'reviewed',activeVersionId:'reviewed',name:'Worker',nodes:[{name:'Build Research Prompt',parameters:{jsCode:code}},{name:'Research Candidates',credentials:{openAiApi:{id:'existing'}},parameters:{model:'gpt-5.4',maxTokens:3500}},{name:'Draft Editorial Concept',parameters:{maxTokens:1800}}],connections:{same:true},settings:{availableInMCP:true,executionOrder:'v1'},nodeGroups:[{id:'kept',nodeIds:['a']}]};
+ const before=JSON.stringify(worker),patch=prepareResearchHeadroomPatch(worker,{expectedVersion:'reviewed',expectedSha256:editorialGraphSha(worker)});
+ assert.deepEqual(patch.workflow.nodes.slice(1),worker.nodes.slice(1));assert.deepEqual(patch.workflow.connections,worker.connections);assert.deepEqual(patch.workflow.settings,worker.settings);assert.deepEqual(patch.workflow.nodeGroups,worker.nodeGroups);assert.equal(JSON.stringify(worker),before);assert.equal(patch.review.reservedCharacters,3000);
+ assert.throws(()=>prepareResearchHeadroomPatch({...worker,versionId:'changed'},{expectedVersion:'reviewed',expectedSha256:editorialGraphSha(worker)}),{code:'WORKFLOW_DRIFT'});
+});

@@ -1,3 +1,11 @@
+# November 21 — Studio experience refinement completed locally
+
+Continued the interrupted work over deployed `3e25682`: compact image-led Discover, consolidated historical failures, inline carousel approval review, truthful save state and preserved music input. Missing historical executions no longer block unrelated read-only delivery. The local research assembler reserves 3,000 characters; its exact single-node native patch remains uninstalled and separately gated. Existing approval, rights, duplicate and delivery safeguards remain unchanged.
+
+[Results, evidence limits and coordinated release](release/STUDIO_EXPERIENCE_REFINEMENT.md). No deployment, live n8n/policy/credential change, paid operation or Buffer write occurred.
+
+---
+
 # November 20 — Complete Studio build (local; not deployed)
 
 Recovered the interrupted implementation and integrated publisher-file recovery, selected-reference/private-copy matching, progressive photo results, accessible source-based cover/sequence suggestions, inline angles/music, accurate Insights and the existing guarded approval path. Initial native package preparation and an optional recurring draft policy are prepared locally and remain disabled. No live workflow, policy, credential, AI or publishing changes occurred.

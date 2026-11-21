@@ -20,3 +20,17 @@ export function prepareResearchBudgetPatch(worker,{expectedVersion,expectedSha25
  requireThat(changes.length===4,'PATCH_SCOPE_DRIFT','Only research preparation and failure reporting may change.');
  return {workflow,review:{baselineVersion:expectedVersion,baselineSha256:expectedSha256,proposedSha256:editorialGraphSha(workflow),changes,inputLimit:30000,modelsChanged:false,credentialsChanged:false,settingsChanged:false,connectionsChanged:false,automaticNodeRetries:0,hiddenTransportRetriesVerified:false,installed:false,paidCalls:0,requiresSeparateInstallationApproval:true}};
 }
+
+/** Offline, single-node upgrade of the already repaired recurring worker.
+ * No workflow transport or activation is performed. */
+export function prepareResearchHeadroomPatch(worker,{expectedVersion,expectedSha256}){
+ requireThat(worker?.id==='6CkqfYc4Pyd4k8vi'&&worker.active&&worker.versionId===expectedVersion&&worker.activeVersionId===expectedVersion&&editorialGraphSha(worker)===expectedSha256,'WORKFLOW_DRIFT','Use the exact saved and active recurring worker.');
+ const workflow=Object.fromEntries(['name','nodes','connections','settings'].map(k=>[k,structuredClone(worker[k])]));
+ if(Object.hasOwn(worker,'nodeGroups'))workflow.nodeGroups=structuredClone(worker.nodeGroups);
+ const matches=workflow.nodes.filter(n=>n.name==='Build Research Prompt');requireThat(matches.length===1,'NODE_DRIFT','Expected the existing research builder.');
+ const node=matches[0],code=node.parameters.jsCode,prefix='const fitResearchContext=',suffix=';const researchContextParts=',start=code.indexOf(prefix),end=code.indexOf(suffix,start);
+ requireThat(start>=0&&end>start&&code.indexOf(prefix,start+1)===-1&&code.includes('RESEARCH_INPUT_BUDGET_EXCEEDED'),'PROMPT_LAYOUT_DRIFT','The installed bounded prompt layout changed.');
+ node.parameters.jsCode=code.slice(0,start)+prefix+fitResearchContext.toString()+code.slice(end);
+ requireThat(node.parameters.jsCode!==code,'PATCH_ALREADY_PRESENT','The headroom helper is already installed.');
+ return {workflow,review:{baselineVersion:expectedVersion,baselineSha256:expectedSha256,proposedSha256:editorialGraphSha(workflow),changes:['Build Research Prompt'],inputLimit:30000,assemblyLimit:27000,reservedCharacters:3000,mandatoryEvidenceClipped:false,modelsChanged:false,credentialsChanged:false,settingsChanged:false,connectionsChanged:false,installed:false,paidCalls:0,requiresSeparateInstallationApproval:true}};
+}

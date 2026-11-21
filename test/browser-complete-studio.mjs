@@ -9,7 +9,7 @@ import {chromium} from 'playwright';
 
 const phase=process.argv.includes('--before')?'before':'after';
 const curationOnly=process.argv.includes('--curation-only');
-const artifacts=path.resolve('.local/complete-studio');
+const artifacts=path.resolve(process.env.STUDIO_EVIDENCE_DIR||'.local/complete-studio');
 const moduleRoot=phase==='before'?path.join(artifacts,'baseline'):path.resolve('.');
 const load=p=>import(pathToFileURL(path.join(moduleRoot,p)));
 const [{WorkspaceSource,PRODUCTION_CONTEXT_TABLES},{WORKSPACE_TABLES},{LocalDraftStore},{LocalResearchStore},{LocalPreviewStore},{PhotographyService},{createWorkspaceServer}]=await Promise.all([
@@ -49,7 +49,18 @@ for(const i of packet.images){
  previews.db.prepare('UPDATE local_source_preview_evidence SET acquisition_json=? WHERE story_id=? AND asset_id=? AND preview_sha256=?').run(JSON.stringify({basis:'retained_model_input_derivative',executionId:'2369',inputSha256:i.inputSha256,sourcePreviewSha256:i.sourcePreviewSha256,recordedOriginalSha256:i.originalSha256,productionOriginal:false,visualInspectionPerformed:false}),packet.manifest.storyId,i.assetId,saved.sha256);
  realInputs.push({assetId:i.assetId,inputSha256:i.inputSha256,width:saved.width,height:saved.height,productionOriginal:false});
 }
-const server=createWorkspaceServer({source,drafts,research,previews,photography,webRoot:path.join(moduleRoot,'web')});
+const feedFixture=process.argv.includes('--feed-fixture');
+const {FounderReviewStore}=await load('src/workspace/founder-review.js');const founderReviews=new FounderReviewStore(research);
+if(feedFixture)for(const story of source.view().stories.filter(s=>['CON-2610285uk8-2','CON-261031DESK07','CON-261031DESK04'].includes(s.id)))founderReviews.record(story,{decision:'save',basis:'overall_selection',reason:'Isolated visual replay decision only.',expectedVersion:0,sourceRevision:story.revision,workingVersion:0});
+let engine=null;
+if(feedFixture){
+ const {EditorialEngineService}=await load('src/workspace/editorial-engine-service.js');
+ const {requestFingerprint}=await load('src/workspace/editorial-engine-client.js');
+ for(const id of ['9373705e-5106-4779-897f-7283ce71a6e0','005a5a95-bbd5-444d-9849-d326b5033a31']){const request=research.create({kind:'discovery',prompt:'REPLAY ONLY: retain the historical input-budget failure',sourceUrl:'',idempotencyKey:id},[]);research.claimEngineQueue(id,requestFingerprint(request));research.recordEngineState(id,'failed',{executionId:'2365',lastError:'RESEARCH_INPUT_BUDGET_EXCEEDED',failure:{code:'RESEARCH_INPUT_BUDGET_EXCEEDED',stoppedBeforeModels:true},candidates:[]});}
+ engine=new EditorialEngineService({research,client:null});
+ research.saveDeliveryState({state:'unavailable',errorCode:'ENGINE_HTTP_404',lastSuccess:null});
+}
+const server=createWorkspaceServer({source,drafts,research,previews,photography,founderReviews,engine,webRoot:path.join(moduleRoot,'web')});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const origin='http://127.0.0.1:'+server.address().port;
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']});
@@ -73,7 +84,7 @@ async function opened(route,width){
  if(dimensions.document>dimensions.viewport+1)layoutIssues.push({route,width,...dimensions});
 }
 async function capture(name){
- await page.evaluate(()=>{let banner=document.getElementById('replay-evidence');if(!banner){banner=document.createElement('div');banner.id='replay-evidence';document.body.append(banner);}banner.textContent='LOCAL REPLAY · RETAINED RECORDS · JACK: REAL SMALL INPUTS · OTHER PRIVATE FILES UNAVAILABLE · NO LIVE ACTIONS';banner.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#fff0bd;color:#222;padding:5px;text-align:center;font:10px sans-serif';});
+ await page.evaluate(feedFixture=>{let banner=document.getElementById('replay-evidence');if(!banner){banner=document.createElement('div');banner.id='replay-evidence';document.body.append(banner);}banner.textContent='LOCAL REPLAY · RETAINED RECORDS · JACK: REAL SMALL INPUTS · OTHER PRIVATE FILES UNAVAILABLE · NO LIVE ACTIONS';if(feedFixture)banner.textContent+=' · FAILURE/REVIEW STATES SIMULATED';banner.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#fff0bd;color:#222;padding:5px;text-align:center;font:10px sans-serif';},feedFixture);
  const filename=path.join(artifacts,phase+'-'+name+'.png');await page.screenshot({path:filename});await fs.chmod(filename,0o600);screenshots.push(filename);
 }
 const stories=[['duo','CON-261026qkpn-2'],['jack','CON-2610285uk8-2'],['hase','CON-261031DESK07'],['miami','CON-261031DESK04'],['artemis','CON-261031xgyc-2']];
@@ -83,7 +94,7 @@ try{
  for(const width of curationOnly?[]:[1440,390]){
   for(const [name,id]of stories){await opened('story/'+id+'/build',width);await capture(name+'-build-'+width);checks.push(name+' Build renders at '+width);}
   for(const tab of ['refine','approve']){await opened('story/'+packet.manifest.storyId+'/'+tab,width);await capture('jack-'+tab+'-'+width);checks.push('Jack '+tab+' renders at '+width);}
-  for(const route of ['discover','analytics']){await opened(route,width);await capture(route+'-'+width);checks.push(route+' renders at '+width);}
+  for(const route of ['discover','analytics']){await opened(route,width);if(feedFixture&&route==='discover')await page.getByRole('button',{name:'Saved / developing',exact:true}).click();await capture(route+'-'+width);checks.push(route+' renders at '+width);}
  }
  if(curationOnly){
   await opened('story/'+packet.manifest.storyId+'/build',390);
@@ -168,9 +179,9 @@ try{
    checks.push('Improve the opening opens the existing separate review flow without starting AI');
   }
   await opened('story/'+packet.manifest.storyId+'/approve',1440);
-  await page.locator('[data-action="rehearse-story"]').click();await page.locator('[data-rehearsal]').waitFor();
+  await page.locator('[data-post-preview]').waitFor();assert.equal(await page.locator('[data-post-preview] .photo-expand').count(),0);await page.locator('[data-post-preview]').press('ArrowRight');assert.match(await page.locator('[data-post-preview] .slide-counter').innerText(),/2.*3/);await capture('jack-inline-preview-'+1440);await page.setViewportSize({width:390,height:844});await capture('jack-inline-preview-390');await page.setViewportSize({width:1440,height:1000});await page.locator('[data-action="rehearse-story"]').click();await page.locator('[data-rehearsal]').waitFor();
   assert.equal(await page.locator('[data-rehearsal] .rehearsal-stage img').evaluate(i=>i.complete&&i.naturalWidth>0),true,'Real photo renders in preview');
-  await page.getByRole('button',{name:'Next slide',exact:true}).click();
+  await page.locator('#asset-dialog').getByRole('button',{name:'Next slide',exact:true}).click();
   assert.match(await page.locator('[data-rehearsal]').innerText(),/2\s*\/\s*3/);
   await page.locator('.rehearsal-caption').evaluate(e=>e.open=true);
   assert((await page.locator('.rehearsal-caption').innerText()).includes(caption));
@@ -196,5 +207,5 @@ try{
  for(const [file,beforeHash]of preservedHashes)assert.equal(hash(await fs.readFile(file)),beforeHash,'Retained source changed: '+file);
  const report={status:layoutIssues.length?'OBSERVED_ISSUES':'PASS',phase,checks,screenshots,errors,layoutIssues,realRetainedInputs:realInputs,retainedCanonicalStories:snapshot.records.stories.length,blockedExternalHosts:[...blocked],apiFailures:responses.filter(r=>r.status>=400),thumbnailPerformance:{imageMeasurements,imageResponses,cacheEnabled:true,scope:'loopback replay with six small real retained Jack model-input JPEGs; not a hosted latency benchmark'},newPhotographs:0,newAiCalls:0,liveMutations:0,limitations:['Jack inputs are genuine small photographic JPEGs from the prior six-image operation; full production originals are not present in this isolated replay.','Hase, Miami, Duo and Artemis use retained real metadata; Render private photo files are not present locally.','No hosted acceptance or new discovery is represented by these screenshots.']};
  await fs.writeFile(path.join(artifacts,phase+(curationOnly?'-mobile-curation':'')+'-browser-report.json'),JSON.stringify(report,null,2),{mode:0o600});
- console.log(JSON.stringify({status:report.status,phase,screenshots:screenshots.length,realRetainedJackInputs:realInputs.length,errors,layoutIssues,apiFailures:report.apiFailures,newPhotographs:0,newAiCalls:0,liveMutations:0}));
+ assert.equal(layoutIssues.length,0,'No horizontal overflow');console.log(JSON.stringify({status:report.status,phase,screenshots:screenshots.length,realRetainedJackInputs:realInputs.length,errors,layoutIssues,apiFailures:report.apiFailures,newPhotographs:0,newAiCalls:0,liveMutations:0}));
 }finally{await page.close();await browser.close();await new Promise(resolve=>server.close(resolve));previews.close();research.close();drafts.close();}

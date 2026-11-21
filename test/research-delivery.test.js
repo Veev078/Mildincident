@@ -19,3 +19,9 @@ test('foreground status checks reuse recent observations and respect outage back
  const {delivery,state,engine}=await setup(t);let now=Date.now();delivery.now=()=>now;await delivery.tick({maxAgeMs:10000});const initial=state.reads;await delivery.tick({maxAgeMs:10000});assert.equal(state.reads,initial);
  now+=11000;state.fail=true;await delivery.tick({maxAgeMs:10000});assert.equal(delivery.status().state,'unavailable');const failed=state.reads;await delivery.tick({maxAgeMs:10000});assert.equal(state.reads,failed);state.fail=false;now=Date.parse(delivery.status().nextAttempt)+1;await delivery.tick({maxAgeMs:10000});assert.equal(delivery.status().state,'connected');assert.equal(engine.client.readOnly,true);
 });
+
+test('one historical missing execution cannot take unrelated valid result delivery offline or erase its claim',async t=>{
+ const {research,state,row,delivery,engine}=await setup(t);row.status='generating';row.execution_id='2252';engine.client.executionStatus=async()=>{throw Object.assign(Error('retained execution is gone'),{code:'ENGINE_HTTP_404'});};
+ const id=randomUUID(),request={kind:'discovery',prompt:'A different retained direction'},other={...row,id:9,job_id:id,...request,request_hash:requestFingerprint(request),status:'ready_to_review',execution_id:'999'};state.jobs.push(other);state.candidates=[{job_id:id,candidate_id:'DEV-'+id+'-1',status:'ready_to_review',candidate_json:JSON.stringify({id:'DEV-'+id+'-1',jobId:id,story:{title:'Separate verified result'},provenance:{executionId:'999',kind:'discovery',generatedAt:'2026-11-20T12:00:00Z'}})}];
+ await delivery.tick();assert.equal(delivery.status().state,'connected');assert.deepEqual(delivery.status().reconciliationIssues,[{requestId:row.job_id,code:'ENGINE_HTTP_404'}]);assert.equal(research.engineJob(row.job_id).state,'generating');assert.equal(research.engineJob(id).candidates.length,1);assert.equal(research.engineJob(row.job_id).executionId,'2252');
+});

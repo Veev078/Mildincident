@@ -129,15 +129,15 @@ try {
   checks.push('accessible carousel move controls persist ordered local sequence');
   const beforeRehearsal=JSON.stringify(drafts.get(id));
   await page.goto(`${origin}/#/story/${id}/approve`);await page.getByRole('button',{name:'Preview post',exact:true}).click();
-  await page.getByText('Slide 1 of 2',{exact:true}).waitFor();
+  await page.locator('#asset-dialog').getByText('Slide 1 of 2',{exact:true}).waitFor();
   assert.ok(await page.locator('[data-rehearsal] [data-action="rehearse-step"][data-step="-1"]').isDisabled());
   await page.keyboard.press('ArrowRight');
-  await page.getByText('Slide 2 of 2',{exact:true}).waitFor();
+  await page.locator('#asset-dialog').getByText('Slide 2 of 2',{exact:true}).waitFor();
   assert.ok(await page.locator('[data-rehearsal] [data-action="rehearse-step"][data-step="1"]').isDisabled());
   await page.getByText('Slide details & framing',{exact:true}).click();await page.getByLabel('Framing',{exact:true}).selectOption('original');
   await page.locator('[data-rehearsal][data-fit="original"]').waitFor();
   await page.locator('[data-rehearsal] [data-action="rehearse-step"][data-step="-1"]').click();
-  await page.getByText('Slide 1 of 2',{exact:true}).waitFor();
+  await page.locator('#asset-dialog').getByText('Slide 1 of 2',{exact:true}).waitFor();
   await page.keyboard.press('Escape');
   assert.equal(JSON.stringify(drafts.get(id)),beforeRehearsal);
   checks.push('large carousel rehearsal supports keyboard navigation and full-image framing without editing saved sequence');
@@ -403,7 +403,7 @@ try {
   checks.push('the offered source-based cover/sequence applies exact asset IDs locally with roles/history and no native candidate overwrite');
 
   await page.goto(`${origin}/#/discovery`);
-  await page.locator('[data-review-card]').getByRole('button',{name:'Review draft',exact:true}).click();await page.waitForURL('**/overview');await page.locator('.story-workspace[data-stage="build"]').waitFor();checks.push('one founder decision opens the same editable story without a separate research approval form');
+  await page.locator('[data-review-card]').getByRole('button',{name:'Build post →',exact:true}).click();await page.waitForURL('**/overview');await page.locator('.story-workspace[data-stage="build"]').waitFor();checks.push('one founder decision opens the same editable story without a separate research approval form');
   await page.goto(`${origin}/#/story/${devStoryId}/images`);
   await page.locator('[data-story-task="images"]').waitFor();
   for(const collection of await page.locator('details.photo-collection').all())if(!await collection.evaluate(d=>d.open))await collection.locator('summary').click();
@@ -426,13 +426,13 @@ try {
 
   checks.push('correlated development results open and save in existing Studio tools with clear provenance and local approval, without inserting production records');
   await page.goto(`${origin}/#/discover`);const reviewBaseline=research.all().length;
-  await page.getByRole('button',{name:'Existing stories',exact:true}).click();const reviewCard=page.locator('[data-review-card]').first();const reviewId=await reviewCard.getAttribute('data-review-card');await reviewCard.getByRole('button',{name:'Save',exact:true}).click();await page.locator('[data-review-card="'+reviewId+'"] .review-receipt').filter({hasText:'Saved'}).waitFor();await page.reload();await page.getByRole('button',{name:'Existing stories',exact:true}).click();await page.locator('[data-review-card="'+reviewId+'"] .review-receipt').filter({hasText:'Saved'}).waitFor();
-  const restoredCard=page.locator('[data-review-card="'+reviewId+'"]');await restoredCard.locator('form details > summary').click();await restoredCard.getByRole('button',{name:'Find alternatives',exact:true}).click();await page.getByText('Decision and research direction saved. Research has not started.',{exact:true}).waitFor();assert.equal(research.db.prepare('SELECT COUNT(*) n FROM founder_review_events WHERE target_id=?').get(reviewId).n,2);assert.equal(research.all().length,reviewBaseline+1);
+  await page.getByRole('button',{name:'Existing stories',exact:true}).click();const reviewCard=page.locator('[data-review-card]').first();const reviewId=await reviewCard.getAttribute('data-review-card');await reviewCard.locator('.feed-details>summary').click();await reviewCard.getByRole('button',{name:'Save',exact:true}).click();await page.locator('[data-review-card="'+reviewId+'"] .review-receipt').filter({hasText:'Saved'}).waitFor();await page.reload();await page.getByRole('button',{name:'Existing stories',exact:true}).click();await page.locator('[data-review-card="'+reviewId+'"] .feed-details').evaluate(el=>el.open=true);await page.locator('[data-review-card="'+reviewId+'"] .review-receipt').filter({hasText:'Saved'}).waitFor();
+  const restoredCard=page.locator('[data-review-card="'+reviewId+'"]');await restoredCard.getByText('Add context (optional)',{exact:true}).click();await restoredCard.getByRole('button',{name:'Find alternatives',exact:true}).click();await page.getByText('Decision and research direction saved. Research has not started.',{exact:true}).waitFor();assert.equal(research.db.prepare('SELECT COUNT(*) n FROM founder_review_events WHERE target_id=?').get(reviewId).n,2);assert.equal(research.all().length,reviewBaseline+1);
   const nativeJobCount=engineFixture.jobs.length;await page.getByRole('button',{name:'Check for results',exact:true}).first().click();await page.getByText('Research results checked.',{exact:true}).waitFor();assert.equal(engineFixture.jobs.length,nativeJobCount);
   const frameCard=page.locator('[data-review-card="'+reviewId+'"]');
   const displayedAsset=await frameCard.locator('form').getAttribute('data-asset');
   assert.ok(displayedAsset);
-  await frameCard.locator('form details summary').click();
+  await frameCard.getByText('Add context (optional)',{exact:true}).click();
   await frameCard.getByLabel('What needs attention?').selectOption('individual_photograph');
   await frameCard.getByLabel('A note for future proposals').fill('Keep the subject, find a stronger photographic frame.');
   await frameCard.getByRole('button',{name:'Find alternatives',exact:true}).click();
@@ -442,7 +442,7 @@ try {
   assert.equal(frameReview.scope,'specific_photograph_selection');
   assert.equal(engineFixture.jobs.length,nativeJobCount);
   await page.reload();await page.getByRole('button',{name:'Existing stories',exact:true}).click();
-  await page.locator('[data-review-card="'+reviewId+'"] .review-receipt').filter({hasText:'photograph '+displayedAsset}).waitFor();
+  await page.locator('[data-review-card="'+reviewId+'"] .feed-details').evaluate(el=>el.open=true);await page.locator('[data-review-card="'+reviewId+'"] .review-receipt').filter({hasText:'photograph '+displayedAsset}).waitFor();
   checks.push('frame-specific founder feedback preserves exact image identity after reload and prepares alternatives without a native job');
   checks.push('review-first home persists one-click founder decisions and atomically prepares alternatives without publishing or running AI');
   assert.deepEqual(errors, []);

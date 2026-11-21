@@ -32,10 +32,11 @@ export class EditorialEngineService {
     try{const row=await this.client.queue(scoped);requireThat(REMOTE_STATES.has(row.status),'INVALID_ENGINE_RESULT','Remote job status is unknown.');return this.research.recordEngineState(id,row.status,{remoteRowId:String(row.id),executionId:String(row.execution_id||''),lastError:null});}
     catch(error){this.research.recordEngineState(id,'queue_uncertain',{lastError:error.code||'ENGINE_REQUEST_FAILED'});throw error;}
   }
-  async refresh(){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');if(this.refreshing)return this.refreshing;
+  async refresh({isolateRecordedErrors=false}={}){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');if(this.refreshing)return this.refreshing;
     this.refreshing=(async()=>{await this.inspect();const jobs=await this.client.rows(this.client.connection.jobsTableId);const candidates=await this.client.rows(this.client.connection.candidatesTableId);const {sanitizeDevelopmentCandidate}=await import('./editorial-engine-client.js');
       await this.adoptObservedResults(jobs,candidates,sanitizeDevelopmentCandidate);
-      for(const request of jobs.map(row=>this.research.get(row.job_id)).filter(Boolean)){const local=request.engineJob;if(!local)continue;const matches=jobs.filter(row=>row.job_id===request.id);requireThat(matches.length<=1,'AMBIGUOUS_ENGINE_JOB','Multiple remote rows share a request identity.');const row=matches[0];if(!row)continue;
+      const reconciliationIssues=[];
+      for(const request of jobs.map(row=>this.research.get(row.job_id)).filter(Boolean)){const local=request.engineJob;if(!local)continue;try{const matches=jobs.filter(row=>row.job_id===request.id);requireThat(matches.length<=1,'AMBIGUOUS_ENGINE_JOB','Multiple remote rows share a request identity.');const row=matches[0];if(!row)continue;
         requireThat(row.request_hash===requestFingerprint(this.requestForEngine(request))&&REMOTE_STATES.has(row.status),'INVALID_ENGINE_RESULT','Remote request identity or status does not match.');
         const photoPacket=local.editorialContext?.photoAssessment;
         if(photoPacket&&['ready_to_review','needs_research','approved','rejected'].includes(row.status)){
@@ -69,7 +70,8 @@ export class EditorialEngineService {
         if(photoFailure)failure=photoFailure.code;
         const data={nativeStatus:row.status,remoteRowId:String(row.id),executionId,candidates:result,resultPending,resultMissingSince,lastError:failure,failure:failureDetail,failureCheckedExecutionId,...(photoFailure?{photoFailure}:{})};
         if(local.state!==observedState||local.nativeStatus!==row.status||local.lastError!==data.lastError||local.failureCheckedExecutionId!==failureCheckedExecutionId||JSON.stringify(local.failure||null)!==JSON.stringify(failureDetail)||JSON.stringify(local.photoFailure||null)!==JSON.stringify(photoFailure)||JSON.stringify(local.candidates||[])!==JSON.stringify(result)||local.executionId!==data.executionId||Boolean(local.resultPending)!==resultPending||local.resultMissingSince!==resultMissingSince)this.research.recordEngineState(request.id,observedState,data);
-      }if(this.captionPilot){await this.captionPilot.inspect();await this.captionPilot.captureUsage();}return this.status();})();try{return await this.refreshing;}finally{this.refreshing=null;}
+      }catch(error){const code=error.code||'';if(!isolateRecordedErrors||!(/^(?:INVALID_ENGINE_RESULT|INVALID_VISUAL_RESULT|ENGINE_RECONCILIATION_INCOMPLETE|ENGINE_HTTP_(?:404|410|5[0-9]{2}))$/.test(code)))throw error;reconciliationIssues.push({requestId:request.id,code});}
+      }this.inspection={...this.inspection,reconciliationIssues};if(this.captionPilot){await this.captionPilot.inspect();await this.captionPilot.captureUsage();}return this.status();})();try{return await this.refreshing;}finally{this.refreshing=null;}
   }
   async adoptObservedResults(jobs,candidates,sanitize){
     let imported=0,unlinked=0;

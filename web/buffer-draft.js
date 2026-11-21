@@ -1,8 +1,8 @@
 import {esc,effective,postMediaFor,image} from './components.js';
 
-export function bufferDraftPanel(story){
+export function bufferDraftPanel(story,{compact=false}={}){
  const delivery=story.bufferDraft||{state:'blocked',message:'Sending from Studio is not enabled. Complete approval in the existing workflow.'};
- return `<section class="buffer-draft-status" data-buffer-status role="status"><h4>${delivery.state==='confirmed_draft'?'Buffer draft verified':delivery.state==='needs_reconciliation'?'Check delivery':'Send to Buffer'}</h4><p class="small">${esc(delivery.message)}</p>${delivery.postId?`<p class="small">Buffer post ID: <code>${esc(delivery.postId)}</code></p>`:''}${delivery.canSend?`<button class="button button-dark" data-buffer-action="review" data-story="${esc(story.id)}">Send to Buffer</button>`:''}${delivery.canCheck?`<button class="small-button" data-buffer-action="check" data-story="${esc(story.id)}">Check delivery status</button>`:''}</section>`;
+ return `<section class="buffer-draft-status" data-buffer-status role="status"><h4>${delivery.state==='confirmed_draft'?'Buffer draft verified':delivery.state==='needs_reconciliation'?'Check delivery':'Send to Buffer'}</h4><p class="small">${esc(delivery.message)}</p>${delivery.postId&&!compact?`<p class="small">Buffer post ID: <code>${esc(delivery.postId)}</code></p>`:''}${delivery.canSend?`<button class="button button-dark" data-buffer-action="review" data-story="${esc(story.id)}">Send to Buffer</button>`:''}${delivery.canCheck?`<button class="small-button" data-buffer-action="check" data-story="${esc(story.id)}">Check delivery status</button>`:''}</section>`;
 }
 
 export function bufferConfirmDialog(story,delivery){

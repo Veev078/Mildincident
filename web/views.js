@@ -49,7 +49,7 @@ export function workingReviewSummary(story){
  return `<section class="editorial-panel"><h2>Ready for review?</h2><p>${reviewPath(story).tasks.length} review areas still need attention. Facts, image permissions and final approval remain separate.</p></section>`;
 }
 
-export function readinessPanel(story){ return postReview(story); }
+export function readinessPanel(story,state={}){ return postReview(story,state); }
 
 function storyOverview(state, story) {
  return developWorkspace(state,story,{renderSourceNotes:existingSourceNotes,renderChecks:captionChecks});
@@ -95,7 +95,7 @@ export function nextProductionDecision(story) {
  const decisions=story.productionDecisions||[];
  return decisions.find(d=>d.key==='handoff')||decisions[0]||null;
 }
-function storyPublishing(state,story){return `<div class="workspace-full"><div data-readiness-panel>${postReview(story)}</div></div>`;}
+function storyPublishing(state,story){return `<div class="workspace-full"><div data-readiness-panel>${postReview(story,state)}</div></div>`;}
 
 export function library(state) {
   const query = (state.librarySearch || '').toLowerCase();

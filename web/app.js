@@ -1,3 +1,4 @@
+import {postPreview} from './post-preview.js';
 import {renderStudio} from './studio-render.js';
 import {savedCopySelection,coverSelection} from './selection-actions.js';
 import {bufferConfirmDialog,nativeReviewDialog} from './buffer-draft.js';
@@ -23,6 +24,7 @@ const imageReviewKey=(story,asset)=>JSON.stringify([story,asset]);
 const reviewValues=form=>({decision:form.elements.decision.value,basis:form.elements.basis?.value||'editorial_taste',reason:form.elements.reason.value});
 const reviewContext=form=>Object.fromEntries(['version','revision','working','previewHash'].map(k=>[k,form.dataset[k]]));
 const saving = new Set();
+const saveFailures=new Set();
 const inFlight = new Map();
 const savePromises = new Map();
 const captionRequestLocks=new Set();
@@ -120,8 +122,10 @@ function render({ focusMain = false } = {}) {
   const connection = `<details class="connection-details"><summary><i class="status-dot ${source.stale||warnings.length?'stale':''}" aria-hidden="true"></i>Connection status${source.stale?' · cached':''}</summary><div class="connection-panel"><div class="source-bar"><span>${source.kind==='live_snapshot'?'Connected':source.kind?human(source.kind):'Connecting'}${source.observedAt?`<small>Updated ${esc(date(source.observedAt))} ET</small>`:''}</span><button class="text-button" data-action="refresh" ${source.refreshing?'disabled':''}>${source.refreshing?'Checking…':'Check for updates ↻'}</button></div>${warnings.length?`<ul class="source-warnings">${warnings.map(w=>`<li>${esc(typeof w==='string'?w:w.message||w.code)}</li>`).join('')}</ul>`:''}</div></details>`;
   renderStudio(document.querySelector('#app'), `<div class="app-shell ${comparisonVisible?'has-comparison':''}"><aside class="sidebar"><a class="masthead" href="#/discover" aria-label="MILDINCIDENT Discover">MILDINCIDENT<span>Independent visual culture</span></a><div class="sidebar-label">Your publication</div><nav class="primary-nav" aria-label="Main navigation">${nav.map(([id,url,label,num])=>`<a href="#/${url}" ${active===id?'aria-current="page"':''}><span aria-hidden="true">${num}</span><span class="nav-label">${label}</span>${id==='pipeline'?`<small>${count}</small>`:''}</a>`).join('')}</nav><div class="sidebar-foot"><details class="sidebar-tools"><summary>Studio tools</summary><a href="#/today">Editorial desk</a><a href="#/library">Photographs & sources</a><a href="#/archive">Published archive</a>${state.workspace?.hosted?`<button class="text-button" data-hosted-backup>Download private backup</button><p class="small">${state.workspace.backupStatus?.lastSuccess?'Backup verified '+esc(date(state.workspace.backupStatus.lastSuccess))+' ET':'First backup pending'}${state.workspace.backupStatus?.state==='failed'?' · backup needs attention':''}<br>Keep an offsite copy.</p>${state.workspace.backupStatus?.id?'<a class="text-link" href="/api/backups/latest/archive">Download last verified copy</a>':''}`:''}<div class="keyboard-hints"><kbd>/</kbd> Find a post<br><kbd>G</kbd> <kbd>H</kbd> Today</div><a href="https://rickywelch.app.n8n.cloud/webhook/founder-command-center" target="_blank" rel="noopener noreferrer">Original Founder Studio ↗</a></details>${state.workspace?.backupStatus?.state==='failed'?'<p class="error-text" role="status">Backup needs attention — open Studio tools.</p>':''}<span class="edition-mark">M / I</span></div></aside><div class="workspace-shell"><header class="topbar"><div class="breadcrumb"><span>MILDINCIDENT</span><span aria-hidden="true">/</span><strong>${esc(viewTitle)}</strong></div><label class="global-search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" placeholder="Find a post…" value="${esc(state.search)}" aria-label="Find a post"><kbd>/</kbd></label>${connection}${state.workspace?.hosted?'<form method="post" action="/auth/logout" data-hosted-logout><button class="text-button" type="submit">Sign out</button></form>':''}</header>${libraryNavigation(current.view)}<main id="main-content" data-view="${esc(current.view)}" data-story-tab="${esc(current.tab||'')}" tabindex="-1">${body}</main><footer class="workspace-footer"><span>MILDINCIDENT · Independent visual culture</span><span>Editorial work saves privately · publishing requires approval</span></footer></div></div>${comparisonVisible?`<div class="compare-tray"><span>${state.compared.length} ${state.compared.length===1?'image · choose one more':'images to compare'}</span><button class="button button-dark" data-action="open-comparison" ${state.compared.length<2?'disabled':''}>Compare images →</button><button class="text-button" data-action="clear-comparison">Clear comparison</button></div>`:''}`);
   const curation=document.querySelector('#curation-dialog');if(curation&&!curation.open)curation.showModal();
+  for(const node of document.querySelectorAll('[data-remember-disclosure]'))if(Object.hasOwn(state.openDisclosures,node.dataset.rememberDisclosure))node.open=state.openDisclosures[node.dataset.rememberDisclosure];
   resizeCaption();
   syncDialogControls();
+  if(current.view==='story'){const s=storyById(current.id);if(saveFailures.has(current.id))showSaveStatus('Save failed · your changes remain in this browser',true);else if(pending.has(current.id)||saving.has(current.id)||inFlight.has(current.id))showSaveStatus('Saving…');else if(s?.localDraft?.updatedAt&&!s.localDraft.stale)showSaveStatus(`${state.workspace?.hosted?'Saved to private Studio':'Saved locally'} · ${date(s.localDraft.updatedAt)}`);}
   if(current.view==='discovery'&&state.focusDiscoverySetup){state.focusDiscoverySetup=false;document.querySelector('#research-direction')?.scrollIntoView({block:'start'});}
   document.title = current.view === 'story' && storyById(current.id) ? `${storyById(current.id).title} — MILDINCIDENT` : `${viewTitle} — MILDINCIDENT`;
   if ((focusMain||state.pendingRouteFocus)&&!state.loading) {state.pendingRouteFocus=false;focusStoryTask();}
@@ -248,7 +252,7 @@ async function flushDraft(id) {
       if(result.productionPreparation)current.productionPreparation=result.productionPreparation;
       if(Object.hasOwn(result,'approvalRequest'))current.approvalRequest=result.approvalRequest;
       if(pending.has(id))invalidatePreparedApproval(current);
-      if (result.readiness) {const panel=document.querySelector('[data-readiness-panel]');if(panel&&route().id===id)panel.innerHTML=route().tab==='overview'?views.workingReviewSummary(current):views.readinessPanel(current);}
+      if (result.readiness) {const panel=document.querySelector('[data-readiness-panel]');if(panel&&route().id===id)panel.innerHTML=route().tab==='overview'?views.workingReviewSummary(current):views.readinessPanel(current,state);}
       if (result.sourceSequencePlan) current.sourceSequencePlan=result.sourceSequencePlan;
       if (result.editorialPackage) current.editorialPackage=result.editorialPackage;
       if (result.photoVision) {current.photoVision=result.photoVision;state.visionProposals ||= {};state.visionProposals[id]=result.photoVision.proposal;}
@@ -257,13 +261,13 @@ async function flushDraft(id) {
       const checks = document.querySelector('[data-caption-checks]');
       if (checks && route().id === id) checks.innerHTML = views.captionChecks(current);
     }
-    showSaveStatus(`${state.workspace?.hosted?'Saved to private Studio':'Saved locally'} · ${date(draft.updatedAt)}`);
+    saveFailures.delete(id);showSaveStatus(`${state.workspace?.hosted?'Saved to private Studio':'Saved locally'} · ${date(draft.updatedAt)}`);
     syncDialogControls();
     announce('Draft saved privately.');
     succeeded = true;
   } catch (error) {
     pending.set(id, { ...changes, ...(pending.get(id) || {}) });
-    showSaveStatus('Save failed · your changes remain in this browser', true);
+    saveFailures.add(id);showSaveStatus('Save failed · your changes remain in this browser', true);
     toast(`${error.message} Your production records are unchanged.`, { error: true, retryStory: id });
   } finally {
     saving.delete(id);
@@ -606,6 +610,7 @@ document.addEventListener('input', event => {
     searchTimer = setTimeout(() => { if (!['pipeline', 'publishing', 'archive'].includes(route().view)) location.hash = '#/pipeline'; else render(); }, 150);
   }
   if (input.id === 'library-search') { state.librarySearch = input.value; clearTimeout(searchTimer); searchTimer = setTimeout(render, 150); }
+  const trackForm=input.closest('[data-form="music"]');if(trackForm){state.musicTrackDrafts??={};state.musicTrackDrafts[trackForm.dataset.story]={track:trackForm.elements.track.value,artist:trackForm.elements.artist.value};}
   const soundForm=input.closest('[data-form="music-intent"]');
   if(soundForm){state.musicIntentDrafts??={};state.musicIntentDrafts[soundForm.dataset.story]=readMusicIntentForm(soundForm);}
   const setup=input.closest('[data-form="editorial-setup"]');
@@ -638,6 +643,7 @@ document.addEventListener('change', event => {
     else if (Number(target.value) < Number(target.min)) target.value = target.min;
     state.editorialSetupDrafts??={};state.editorialSetupDrafts[input.form.dataset.story]={title:input.form.elements.title.value,hook:input.form.elements.hook.value,format:input.value,targetSlideCount:Number(target.value)};
   }
+  const trackForm=input.closest('[data-form="music"]');if(trackForm){state.musicTrackDrafts??={};state.musicTrackDrafts[trackForm.dataset.story]={track:trackForm.elements.track.value,artist:trackForm.elements.artist.value};}
   const soundForm=input.closest('[data-form="music-intent"]');
   if(soundForm){state.musicIntentDrafts??={};state.musicIntentDrafts[soundForm.dataset.story]=readMusicIntentForm(soundForm);}
   if (input.id === 'image-editorial-filter') { state.imageEditorialFilter = input.value; render(); }
@@ -694,6 +700,7 @@ document.addEventListener('submit', event => {
   if (!form) return;
   event.preventDefault();
   const data = new FormData(form);
+  if(state.musicTrackDrafts)delete state.musicTrackDrafts[form.dataset.story];
   editDraft(form.dataset.story, { musicSelection: { track: String(data.get('track') || '').trim(), artist: String(data.get('artist') || '').trim() } }, { immediate: true, rerender: true });
 });
 
@@ -844,7 +851,7 @@ document.querySelector('#asset-dialog').addEventListener('close',()=>{
  dialogReturnFocus=null;dialogReturnRoute=null;
 });
 window.addEventListener('hashchange', async () => { document.querySelector('#asset-dialog').close();state.curationStory=null;const next=route();if(next.view==='story'&&next.tab==='refine'){state.captionTools ||= {};state.captionTools[next.id]='edit';}state.pendingRouteFocus=true;render({focusMain:true});if(next.view==='story'){await flushAllDrafts();await loadStory(next.id).catch(error=>toast(error.message,{error:true}));} });
-window.addEventListener('beforeunload', event => { if (pending.size || saving.size || imageReviewDrafts.size || Object.keys(state.editorialSetupDrafts||{}).length || Object.keys(state.musicIntentDrafts||{}).length || state.researchDraft?.prompt?.trim()) { event.preventDefault(); event.returnValue = ''; } });
+window.addEventListener('beforeunload', event => { if (pending.size || saving.size || imageReviewDrafts.size || Object.keys(state.editorialSetupDrafts||{}).length || Object.keys(state.musicIntentDrafts||{}).length || Object.keys(state.musicTrackDrafts||{}).length || state.researchDraft?.prompt?.trim()) { event.preventDefault(); event.returnValue = ''; } });
 
 render();
 loadWorkspace().catch(() => {});
@@ -1274,3 +1281,17 @@ document.addEventListener('click',async event=>{
  }catch(error){toast(error.message,{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}
  finally{captionRequestLocks.delete(lock);b.disabled=false;}
 });
+
+function movePostPreview(id,index){
+ const story=storyById(id),slot=document.querySelector('[data-post-preview-slot]');if(!story||!slot)return;
+ const count=mediaFor(story).length;state.postSlides ||= {};state.postSlides[id]=Math.max(0,Math.min(count-1,index));
+ renderStudio(slot,postPreview(story,state.postSlides[id]));slot.querySelector('[data-post-preview]')?.focus({preventScroll:true});
+}
+document.addEventListener('click',event=>{
+ const button=event.target.closest('[data-post-step],[data-post-index]');if(button&&!button.disabled){const id=button.dataset.story;movePostPreview(id,button.dataset.postIndex===undefined?(state.postSlides?.[id]||0)+Number(button.dataset.postStep):Number(button.dataset.postIndex));}
+ if(event.target.closest('[data-open-review-checks]')){const details=document.querySelector('[data-review-checks]');if(details){details.open=true;details.scrollIntoView({block:'nearest',behavior:'smooth'});}}
+});
+document.addEventListener('keydown',event=>{const preview=event.target.closest('[data-post-preview]');if(!preview||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)||event.altKey||event.ctrlKey||event.metaKey)return;event.preventDefault();const id=preview.dataset.postPreview;movePostPreview(id,event.key==='Home'?0:event.key==='End'?mediaFor(storyById(id)).length-1:(state.postSlides?.[id]||0)+(event.key==='ArrowRight'?1:-1));});
+let inlineSwipe=null;
+document.addEventListener('pointerdown',event=>{const preview=event.target.closest('[data-post-preview] .instagram-slide');if(preview&&event.pointerType!=='mouse')inlineSwipe={id:preview.closest('[data-post-preview]').dataset.postPreview,x:event.clientX,y:event.clientY};});
+document.addEventListener('pointerup',event=>{const start=inlineSwipe;inlineSwipe=null;if(!start)return;const dx=event.clientX-start.x,dy=event.clientY-start.y;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.4)movePostPreview(start.id,(state.postSlides?.[start.id]||0)+(dx<0?1:-1));});

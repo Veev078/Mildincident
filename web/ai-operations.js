@@ -3,10 +3,12 @@ import {DEFAULT_DISCOVERY_PROMPT} from './discovery-request.js';
 import {captionRequestLabel} from './caption-request-flow.js';
 export const formatUsageCost=value=>Number.isFinite(value)?'$'+value.toFixed(4):'not yet measured';
 export function storyProposal(state){
- const local=state.storyGenerationProposal,requests=state.workspace?.researchRequests||[];
- const server=local?requests.find(r=>r.id===local.id)?.generationProposal:requests.map(r=>r.generationProposal).find(Boolean);
- if(local?.state==='uncertain'&&server?.state==='prepared')return local;
- return server||local||null;
+ const local=state.storyGenerationProposal,requests=state.workspace?.researchRequests||[],byId=new Map();
+ for(const request of requests)if(request.generationProposal)byId.set(request.generationProposal.id,request.generationProposal);
+ if(local){const server=byId.get(local.id);if(!server||local.state==='uncertain'&&server.state==='prepared')byId.set(local.id,local);}
+ const rank=p=>['uncertain','dispatching','queued','running'].includes(p.state)?3:p.state==='prepared'&&(!p.expiresAt||Date.parse(p.expiresAt)>Date.now())?2:1;
+ const time=p=>Date.parse(p.confirmedAt||p.createdAt||p.expiresAt||'')||0;
+ return [...byId.values()].sort((a,b)=>rank(b)-rank(a)||time(b)-time(a))[0]||null;
 }
 export function reconcileStoryProgress(local,remote){if(!remote||remote.id!==local?.id)throw Error('The progress response does not match this request.');return local.state==='uncertain'&&remote.state==='prepared'?{...local,canConfirm:false}:remote;}
 export const storyGenerationHeading=p=>p.state==='completed'?p.editorialStatus==='preliminary'?'A preliminary story is saved.':'A new story, ready to develop.':p.state==='failed'?'Story generation stopped.':'Research and draft one story.';
