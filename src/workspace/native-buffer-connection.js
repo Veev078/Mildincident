@@ -1,4 +1,5 @@
 import {preparationPolicyValid,preparationPinMatches} from '../n8n/preparation-only.js';
+import {PRIVATE_PREPARATION_PATH,assertPrivatePreparationBoundary} from '../n8n/private-preparation-entry.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createHmac,randomUUID} from 'node:crypto';
@@ -44,9 +45,9 @@ export class NativeBufferConnection {
  }
  async inspect({force=false}={}){
   try{const p=await this.#loadPolicy(),identity=sha256(canonical(p));if(!force&&identity===this.#checkedPolicy&&Date.now()-this.#checkedAt<15000)return;this.#checkedPolicy=identity;this.#checkedAt=Date.now();}catch{this.#checkedAt=0;}
-  this.reviewAvailable=false;this.singleWriterVerified=false;this.draftOnlyContractReviewed=false;
+  this.reviewAvailable=false;this.preparationOnly=false;this.singleWriterVerified=false;this.draftOnlyContractReviewed=false;
   try{this.#policy=await this.#loadPolicy();const p=this.#policy;if(!p.enabled||!p.approved)return;requireThat(p.graphs?.length===REQUIRED_GRAPHS.length&&REQUIRED_GRAPHS.every(id=>p.graphs.filter(g=>g.id===id&&/^[-a-f0-9]{36}$/.test(g.version||'')&&/^[a-f0-9]{64}$/.test(g.sha256||'')).length===1),'BUFFER_POLICY_INVALID','Pin all existing publishing paths before enabling the connection.');
-   if(p.scope==='preparation_only'){requireThat(preparationPolicyValid(p),'BUFFER_POLICY_INVALID','Preparation may only authorize private native review.');for(const pin of p.graphs){const w=await this.#read('/api/v1/workflows/'+pin.id);requireThat(preparationPinMatches(w,pin),'BUFFER_WORKFLOW_CHANGED','Preparation pins or activation boundaries changed.');}this.preparationOnly=true;this.reviewAvailable=true;this.issue=null;return;}
+   if(p.scope==='preparation_only'){requireThat(preparationPolicyValid(p),'BUFFER_POLICY_INVALID','Preparation may only authorize private native review.');for(const pin of p.graphs){const w=await this.#read('/api/v1/workflows/'+pin.id);requireThat(preparationPinMatches(w,pin,{standalone:Boolean(p.privatePreparation)}),'BUFFER_WORKFLOW_CHANGED','Preparation pins or activation boundaries changed.');}if(p.privatePreparation)await this.#privatePreparation(p);this.preparationOnly=true;this.reviewAvailable=true;this.issue=null;return;}
    for(const pin of p.graphs){const w=await this.#read('/api/v1/workflows/'+pin.id);requireThat(w.active&&w.versionId===pin.version&&w.activeVersionId===pin.version&&publishingGraphSha(w)===pin.sha256,'BUFFER_WORKFLOW_CHANGED','The reviewed publishing workflow differs. Future starts are blocked.');}
    const guarded=p.graphs.find(g=>g.id==='Q02tRHMtZ90Kib18');requireThat(p.claimProof?.verified===true&&p.claimProof.graphSha256===guarded?.sha256&&p.providerProof?.verified===true&&p.providerProof.channelId===BUFFER_CHANNEL_ID,'BUFFER_READINESS_UNPROVEN','Complete the approved native claim/authentication proof before enabling publishing.');
    this.singleWriterVerified=true;this.draftOnlyContractReviewed=p.draftOnlyContractReviewed===true;this.reviewAvailable=p.operations?.nativeReview===true;this.issue=null;
@@ -61,11 +62,17 @@ export class NativeBufferConnection {
   return {enabled:this.reviewAvailable,reviewAvailable,preparationRequired:preparation.required,preparationAvailable,preparationReason:preparation.reason||(preparation.required&&!preparationAvailable?'Post preparation is not enabled yet.':null),approveAvailable:Boolean(this.singleWriterVerified&&this.#policy?.operations?.finalApproval&&rights&&p?.finalApprovalStatus!=='approved'&&p?.finalAssetsVerified&&sameCaption&&complete),preparedSlides:sameCaption&&complete?slides:[],finalFilesVerified:Boolean(sameCaption&&complete),finalPostDigest:nativePostDigest(story),message:this.issue?'The native publishing connection needs verification.':preparation.reason||'Native preparation keeps rights, facts and final approval separate.'};
  }
  async #active(operation,story=null){await this.inspect({force:true});const p=this.#policy;requireThat((this.singleWriterVerified||this.preparationOnly&&operation==='nativeReview')&&p?.enabled&&p.approved,'BUFFER_POLICY_DISABLED','Native publishing is not enabled.');requireThat(p.operations?.[operation]===true,'BUFFER_POLICY_DISABLED','This publishing action is not authorised.');if(operation==='bufferDraft')requireThat(story&&this.canCreateDraft(story),'BUFFER_DRAFT_NOT_AUTHORIZED','Only the separately approved post can create one unscheduled Buffer draft.');return p;}
+ async #privatePreparation(p){
+  const pin=p.privatePreparation;requireThat(pin&&/^[A-Za-z0-9_-]{1,200}$/.test(pin.id||'')&&!REQUIRED_GRAPHS.includes(pin.id)&&/^[-a-f0-9]{36}$/.test(pin.version||'')&&/^[a-f0-9]{64}$/.test(pin.sha256||''),'BUFFER_POLICY_INVALID','Pin the independently activated private preparation entry.');
+  const w=await this.#read('/api/v1/workflows/'+pin.id);requireThat(w?.active&&w.versionId===pin.version&&w.activeVersionId===pin.version&&publishingGraphSha(w)===pin.sha256,'BUFFER_WORKFLOW_CHANGED','The private preparation entry changed.');assertPrivatePreparationBoundary(w);
+ }
  async #call(input,{readOnly=false}={}){
   const p=readOnly?await this.#loadPolicy():this.#policy;requireThat(/^[a-f0-9]{64}$/.test(p?.jwtSecret||''),'BUFFER_POLICY_DISABLED','Dedicated native publishing authentication is unavailable.');
-  if(readOnly){const ids=[COORDINATOR,input.action==='file'?'YdW8V9Qxl2qn5mC8':'Q02tRHMtZ90Kib18'];for(const id of ids){const pin=p.graphs?.find(g=>g.id===id),w=pin?await this.#read('/api/v1/workflows/'+id):null;requireThat(p.scope==='preparation_only'?preparationPolicyValid(p)&&preparationPinMatches(w,pin):w?.active&&w.activeVersionId===pin.version&&w.versionId===pin.version&&publishingGraphSha(w)===pin.sha256,'BUFFER_WORKFLOW_CHANGED','The read-only native publishing path is not the reviewed version.');}}
+  const standalone=p.scope==='preparation_only'&&p.privatePreparation;
+  if(standalone){requireThat(['review','file','connection'].includes(input.action),'BUFFER_POLICY_DISABLED','Private preparation cannot approve or publish.');if(readOnly){await this.inspect({force:true});requireThat(this.reviewAvailable&&this.#policy?.privatePreparation?.version===p.privatePreparation.version,'BUFFER_POLICY_DISABLED','Private preparation is disabled or changed.');}}
+  else if(readOnly){const ids=[COORDINATOR,input.action==='file'?'YdW8V9Qxl2qn5mC8':'Q02tRHMtZ90Kib18'];for(const id of ids){const pin=p.graphs?.find(g=>g.id===id),w=pin?await this.#read('/api/v1/workflows/'+id):null;requireThat(p.scope==='preparation_only'?preparationPolicyValid(p)&&preparationPinMatches(w,pin):w?.active&&w.activeVersionId===pin.version&&w.versionId===pin.version&&publishingGraphSha(w)===pin.sha256,'BUFFER_WORKFLOW_CHANGED','The read-only native publishing path is not the reviewed version.');}}
   const body=JSON.parse(JSON.stringify({version:1,...input,requestId:input.requestId||randomUUID()}));let response;
-  try{response=await this.#fetch(ORIGIN+'/webhook/'+STUDIO_PUBLISHING_PATH,{method:'POST',redirect:'error',headers:{'Content-Type':'application/json',Authorization:'Bearer '+publishingJwt(body,p.jwtSecret)},body:JSON.stringify(body),signal:AbortSignal.timeout(readOnly?45000:30000)});}catch{throw new HandoffError('NATIVE_PUBLISHING_UNCERTAIN','The native reply was not confirmed. Do not resubmit.');}
+  try{response=await this.#fetch(ORIGIN+'/webhook/'+(standalone?PRIVATE_PREPARATION_PATH:STUDIO_PUBLISHING_PATH),{method:'POST',redirect:'error',headers:{'Content-Type':'application/json',Authorization:'Bearer '+publishingJwt(body,p.jwtSecret)},body:JSON.stringify(body),signal:AbortSignal.timeout(readOnly?45000:30000)});}catch{throw new HandoffError('NATIVE_PUBLISHING_UNCERTAIN','The native reply was not confirmed. Do not resubmit.');}
   requireThat(response.ok,'NATIVE_PUBLISHING_UNCERTAIN','The native publishing action was not confirmed; response details are private.');
   const chunks=[];let size=0;for await(const b of response.body){size+=b.byteLength;requireThat(size<=12*1024*1024,'NATIVE_PUBLISHING_UNCERTAIN','The native reply exceeded its reviewed size.');chunks.push(b);}
   let reply;try{reply=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw new HandoffError('NATIVE_PUBLISHING_UNCERTAIN','The native reply was unreadable. Do not resubmit.');}
@@ -99,14 +106,16 @@ export class NativeBufferConnection {
  async #operation(executionId){
   const summary=await this.#read('/api/v1/executions/'+executionId+'?includeData=false');if(running(summary))return {state:'running',executionId};
   const full=await this.#read('/api/v1/executions/'+executionId+'?includeData=true'),runs=full.data?.resultData?.runData||{},result=runs['Store Studio Operation Result']?.at(-1)?.data?.main?.[0]?.[0]?.json;
-  requireThat(full.workflowId===COORDINATOR,'NATIVE_REVIEW_UNCERTAIN','The recorded execution belongs to another workflow.');
+  const p=await this.#loadPolicy(),worker=p.scope==='preparation_only'&&p.privatePreparation?p.privatePreparation.id:COORDINATOR;
+  requireThat(full.workflowId===worker,'NATIVE_REVIEW_UNCERTAIN','The recorded execution belongs to another workflow.');
   return {state:result?'complete':'unconfirmed',executionId,result,runs};
  }
  async #locate(requestId,createdAt){
-  const list=await this.#read('/api/v1/executions?workflowId='+COORDINATOR+'&limit=50'),cutoff=Date.parse(createdAt||'')-60000;
+  const p=await this.#loadPolicy(),worker=p.scope==='preparation_only'&&p.privatePreparation?p.privatePreparation.id:COORDINATOR;
+  const list=await this.#read('/api/v1/executions?workflowId='+worker+'&limit=50'),cutoff=Date.parse(createdAt||'')-60000;
   const candidates=(list.data||[]).filter(e=>!Number.isFinite(cutoff)||Date.parse(e.startedAt)>=cutoff);
   requireThat(Array.isArray(list.data)&&!list.nextCursor&&candidates.length<=25,'NATIVE_REVIEW_UNCERTAIN','The receipt search is incomplete. Inspect existing native history without resubmitting.');
-  const matches=[];for(const e of candidates){const full=await this.#read('/api/v1/executions/'+e.id+'?includeData=true'),r=full.data?.resultData?.runData?.['Read Authenticated Studio Publishing Envelope']?.[0]?.data?.main?.[0]?.[0]?.json?.studio_request;if(full.workflowId===COORDINATOR&&r?.requestId===requestId)matches.push(String(e.id));}
+  const matches=[];for(const e of candidates){const full=await this.#read('/api/v1/executions/'+e.id+'?includeData=true'),r=full.data?.resultData?.runData?.['Read Authenticated Studio Publishing Envelope']?.[0]?.data?.main?.[0]?.[0]?.json?.studio_request;if(full.workflowId===worker&&r?.requestId===requestId)matches.push(String(e.id));}
   requireThat(matches.length===1,'NATIVE_REVIEW_UNCERTAIN','No unique native execution was found. Keep the saved intent; do not resend.');return matches[0];
  }
  async readReviewReceipt({storyId,requestId,contentDigest,executionId,createdAt,approval=false}){

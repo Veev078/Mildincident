@@ -1,5 +1,7 @@
 # Narrow preparation-only activation
 
+**Superseded:** live n8n publication rejects this coordinator's unpublished child dependencies. Do not rerun its installers. The replacement is the independently activated entry in [PRIVATE_PREPARATION_ENTRY.md](PRIVATE_PREPARATION_ENTRY.md), pending separate approval.
+
 No UI change, live workflow change, policy enablement, paid call, public staging or Buffer write. Token rotation and live code `74a14fe` remain as verified.
 
 The connection correction pins all existing graphs but requires only the coordinator and unchanged final-review service active. Production, guarded Buffer writer, legacy import and public staging remain inactive. Database child-workflow invocation is used through existing Execute Workflow nodes; actual Cloud execution still requires the separately approved read-only/preparation acceptance. No writer is activated to satisfy a client status check.

@@ -1,0 +1,2346 @@
+{
+  "production": {
+    "name": "ISOLATED native source configuration",
+    "settings": {
+      "executionOrder": "v1",
+      "availableInMCP": true,
+      "callerPolicy": "workflowsFromAList",
+      "callerIds": "v5ThKs5ZYP3RhZop"
+    },
+    "nodes": [
+      {
+        "id": "mi-review-07d84f9951b16142cda1",
+        "name": "Is Studio Editorial Review?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3500
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.phase === 'studio_review' }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "mi-review-a34064980bbdf8a91c93",
+        "name": "Read Studio Review Envelope",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3520
+        ],
+        "parameters": {
+          "jsCode": "function stableNative(value){\n if(Array.isArray(value))return '['+value.map(stableNative).join(',')+']';\n if(value&&typeof value==='object')return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+stableNative(value[k]??null)).join(',')+'}';\n return JSON.stringify(value??null);\n}let trusted=false;try{trusted=$('Internal Finalize Render Request').isExecuted===true;}catch{}const raw=$input.first().json,packet=raw.studio_packet;if(!trusted||raw.request_kind!=='mildincident_finalize_v1'||raw.phase!=='studio_review'||packet?.kind!=='mildincident_studio_post_review')throw Error('STUDIO_REVIEW_INPUT_DENIED');const {contentDigest,...material}=packet;return [{json:{concept_id:packet.expected.storyId,packet,packet_material:stableNative(material)}}];"
+        }
+      },
+      {
+        "id": "mi-review-49740f50a63fa768170c",
+        "name": "Hash Studio Review Packet",
+        "type": "n8n-nodes-base.crypto",
+        "typeVersion": 1,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3540
+        ],
+        "parameters": {
+          "action": "hash",
+          "type": "SHA256",
+          "value": "={{ $json.packet_material }}",
+          "dataPropertyName": "actual_content_digest",
+          "encoding": "hex"
+        }
+      },
+      {
+        "id": "mi-review-b81803413aea2ffce827",
+        "name": "Read Studio Review Story",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "executeOnce": true,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3560
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "5AxSMHqi15TNwBZl"
+          },
+          "matchType": "allConditions",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "concept_id",
+                "condition": "eq",
+                "keyValue": "={{ $('Read Studio Review Envelope').first().json.concept_id }}"
+              }
+            ]
+          },
+          "returnAll": true
+        }
+      },
+      {
+        "id": "mi-review-d27bc9000610ba682379",
+        "name": "Read Studio Review Package",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "executeOnce": true,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3580
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "cCFwaHyKVVTZvr5s"
+          },
+          "matchType": "allConditions",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "concept_id",
+                "condition": "eq",
+                "keyValue": "={{ $('Read Studio Review Envelope').first().json.concept_id }}"
+              }
+            ]
+          },
+          "returnAll": true
+        }
+      },
+      {
+        "id": "mi-review-e31c5295e2566036892f",
+        "name": "Read Studio Review Media",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "executeOnce": true,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3600
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "ARiuqg92GgVSpZMr"
+          },
+          "matchType": "allConditions",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "concept_id",
+                "condition": "eq",
+                "keyValue": "={{ $('Read Studio Review Envelope').first().json.concept_id }}"
+              }
+            ]
+          },
+          "returnAll": true
+        }
+      },
+      {
+        "id": "mi-review-37988689e07dba871f91",
+        "name": "Read Studio Review Manual Handoffs",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "executeOnce": true,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3620
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "qQgPtQvq3V0hyZia"
+          },
+          "matchType": "allConditions",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "concept_id",
+                "condition": "eq",
+                "keyValue": "={{ $('Read Studio Review Envelope').first().json.concept_id }}"
+              }
+            ]
+          },
+          "returnAll": true
+        }
+      },
+      {
+        "id": "mi-review-df5e517934304ec4e97a",
+        "name": "Read Studio Review Guarded Handoffs",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "executeOnce": true,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3640
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "lBncgD93WV9a8oMu"
+          },
+          "matchType": "allConditions",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "concept_id",
+                "condition": "eq",
+                "keyValue": "={{ $('Read Studio Review Envelope').first().json.concept_id }}"
+              }
+            ]
+          },
+          "returnAll": true
+        }
+      },
+      {
+        "id": "mi-review-bf28e6c19884b24ed2d3",
+        "name": "Build Studio Native Package Digest",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3660
+        ],
+        "parameters": {
+          "jsCode": "function stableNative(value){\n if(Array.isArray(value))return '['+value.map(stableNative).join(',')+']';\n if(value&&typeof value==='object')return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+stableNative(value[k]??null)).join(',')+'}';\n return JSON.stringify(value??null);\n}\nfunction nativePackageDigestMaterial(p){\n return Object.fromEntries(['id','concept_id','package_id','production_version','editorial_handoff_version','caption_draft','slide_sequence_asset_ids','final_caption','final_asset_urls','final_assets_verified','final_approval_status','source_claims_reviewed','source_claims_review_notes','rights_review_status','format','target_slide_count','cover_treatment','sequence_status','slide_manifest','render_batch_id','render_revision','render_manifest_json','render_preflight_status','proof_execution_id'].map(k=>[k,p[k]??null]));\n}const p=$('Read Effective Studio Review Package').all().map(i=>i.json).filter(p=>p.concept_id);if(p.length!==1)throw Error('STUDIO_REVIEW_PACKAGE_AMBIGUOUS');return [{json:{native_material:stableNative(nativePackageDigestMaterial(p[0]))}}];"
+        }
+      },
+      {
+        "id": "mi-review-6ce313af338bf4894e7f",
+        "name": "Hash Current Studio Native Package",
+        "type": "n8n-nodes-base.crypto",
+        "typeVersion": 1,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3680
+        ],
+        "parameters": {
+          "action": "hash",
+          "type": "SHA256",
+          "value": "={{ $json.native_material }}",
+          "dataPropertyName": "actual_package_digest",
+          "encoding": "hex"
+        }
+      },
+      {
+        "id": "mi-review-013f96f5b54a3e49f6c3",
+        "name": "Validate Exact Studio Editorial Transfer",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3700
+        ],
+        "parameters": {
+          "jsCode": "function stableNative(value){\n if(Array.isArray(value))return '['+value.map(stableNative).join(',')+']';\n if(value&&typeof value==='object')return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+stableNative(value[k]??null)).join(',')+'}';\n return JSON.stringify(value??null);\n}\nfunction priorBufferHandoff(rows,conceptId){\n return rows.some(r=>r.concept_id===conceptId&&(r.buffer_id||r.buffer_post_id||String(r.state??r.status??'unknown')!=='abandoned'));\n}\nfunction validateNativePostTransfer(packet,{story,packages,media,manual,guarded,packageDigest}){\n const bad=code=>{throw Error(code);},keys=['version','kind','requestId','contentDigest','expected','post','images'];\n if(!packet||Object.keys(packet).some(k=>!keys.includes(k))||packet.version!==1||packet.kind!=='mildincident_studio_post_review'||!/^[-a-f0-9]{36}$/.test(packet.requestId||'')||!/^[a-f0-9]{64}$/.test(packet.contentDigest||''))bad('STUDIO_TRANSFER_INVALID');\n const e=packet.expected,p=packages.length===1?packages[0]:null,post=packet.post;\n if(!p||!story||story.concept_id!==e?.storyId||p.concept_id!==e.storyId||p.id!==e.packageRowId||p.package_id!==e.packageId||p.production_version!==e.packageVersion||packageDigest!==e.packageDigest)bad('STUDIO_TRANSFER_SOURCE_CHANGED');\n if(!e.storyState||Object.keys(e.storyState).length!==5||['title','hook','format','stage','approval_status'].some(k=>typeof e.storyState[k]!=='string'||e.storyState[k]!==String(story[k]||'')))bad('STUDIO_TRANSFER_STORY_CHANGED');\n if(!['approved','concept_approved'].includes(story.approval_status)||story.published_url)bad('STUDIO_TRANSFER_CONCEPT_APPROVAL_REQUIRED');\n if(priorBufferHandoff([...manual,...guarded],e.storyId)||!['idle'].includes(p.buffer_claim_state))bad('STUDIO_TRANSFER_PRIOR_HANDOFF');\n if(!post||Object.keys(post).some(k=>!['caption','selectedAssetIds','format','title','hook','sourceRevision','workingVersion'].includes(k))||typeof post.caption!=='string'||post.caption.trim().length<25||[...post.caption].length>2200||/INTERNAL[\\s\\S]{0,60}TEST|DO\\s+NOT\\s+PUBLISH|verified_fact|hypothesis:/i.test(post.caption))bad('STUDIO_TRANSFER_CAPTION_INVALID');\n if(post.caption!==post.caption.trim())bad('STUDIO_TRANSFER_OUTER_CAPTION_WHITESPACE');\n if(!['carousel','single_image'].includes(post.format)||post.format!==story.format||post.format!==p.format)bad('STUDIO_TRANSFER_FORMAT_REVIEW_REQUIRED');\n const ids=post.selectedAssetIds,min=post.format==='single_image'?1:3,max=post.format==='single_image'?1:10;\n if(!Array.isArray(ids)||ids.length<min||ids.length>max||new Set(ids).size!==ids.length||!Array.isArray(packet.images)||packet.images.length!==ids.length)bad('STUDIO_TRANSFER_SEQUENCE_INVALID');\n const newMedia=[];\n for(const [i,id]of ids.entries()){\n  const image=packet.images[i];if(!image||image.assetId!==id||Object.keys(image).some(k=>!['assetId','sourceUrl','imageUrl','creator','credit','sourceCaption','width','height','originalSha256','previewSha256','acquisition'].includes(k)))bad('STUDIO_TRANSFER_IMAGE_INVALID');\n  const matches=media.filter(m=>m.concept_id===story.concept_id&&m.asset_id===id);if(matches.length>1)bad('STUDIO_TRANSFER_IMAGE_AMBIGUOUS');\n  if(matches.length){if((matches[0].source_page_url||'')!==image.sourceUrl||(matches[0].file_url||'')!==image.imageUrl||(matches[0].creator||'')!==image.creator)bad('STUDIO_TRANSFER_IMAGE_SOURCE_CHANGED');continue;}\n  const a=image.acquisition,https=v=>{try{const u=new URL(v);return u.protocol==='https:'&&!u.username&&!u.password&&!u.port&&!/^(?:localhost|0\\.|127\\.|10\\.|169\\.254\\.|192\\.168\\.|172\\.(?:1[6-9]|2\\d|3[01])\\.|\\[|metadata\\.)|\\.(?:local|internal|localhost)$/i.test(u.hostname);}catch{return false;}};\n  if(!/^photo:[a-f0-9]{16,64}$/.test(id)||!https(image.sourceUrl)||!https(image.imageUrl)||!image.creator?.trim()||![image.originalSha256,image.previewSha256,a?.pageSha256,a?.inputDigest].every(h=>/^[a-f0-9]{64}$/.test(h||''))||a?.basis!=='photo_request_source_copy'||!/^[-a-f0-9]{36}$/.test(a.requestId||'')||![image.width,image.height].every(n=>Number.isInteger(n)&&n>0&&n<=20000))bad('STUDIO_TRANSFER_ACQUISITION_REQUIRED');\n  newMedia.push({concept_id:story.concept_id,asset_id:id,title:String(image.sourceCaption||'Source-backed project photograph').slice(0,600),creator:image.creator,attribution_text:image.credit||'',source_page_url:image.sourceUrl,file_url:image.imageUrl,thumb_url:image.imageUrl,width:image.width,height:image.height,rights_status:'preview_unreviewed',license:'',provider:'studio_source_acquisition',notes:'STUDIO SOURCE SHA256 '+image.originalSha256+' | source page SHA256 '+a.pageSha256+' | receipt '+a.requestId+' | private decoded reference; identity, attribution and usage rights require human review.'});\n }\n const unchanged=p.caption_draft===post.caption&&story.title===post.title&&(story.hook||'')===(post.hook||'')&&stableNative(JSON.parse(p.slide_sequence_asset_ids||'[]'))===stableNative(ids)&&!newMedia.length;\n return {unchanged,requestId:packet.requestId,contentDigest:packet.contentDigest,conceptId:story.concept_id,packageRowId:p.id,packageVersion:p.production_version,nextVersion:unchanged?p.production_version:p.production_version+1,newMedia,post,priorPackage:Object.fromEntries(Object.entries(p).filter(([k])=>!/token|secret|password|credential/i.test(k)))};\n}const packet=$('Read Studio Review Envelope').first().json.packet,read=name=>$(name).all().map(i=>i.json).filter(r=>r.concept_id),ps=read('Read Effective Studio Review Package'),c=read('Read Studio Review Story');if(c.length!==1||ps.length!==1||$('Hash Studio Review Packet').first().json.actual_content_digest!==packet.contentDigest)throw Error('STUDIO_REVIEW_IDENTITY_CHANGED');const marker='STUDIO_EDITORIAL_TRANSFER '+packet.requestId+' '+packet.contentDigest,prior=ps[0];if(prior.editorial_handoff_note===marker&&prior.caption_draft===packet.post.caption&&prior.slide_sequence_asset_ids===JSON.stringify(packet.post.selectedAssetIds))return [{json:{unchanged:true,requestId:packet.requestId,contentDigest:packet.contentDigest,conceptId:prior.concept_id,nextVersion:prior.production_version}}];let effective=packet;if(packet.expected.packageVersion===null){let reserved=false;try{reserved=$('Verify Initial Studio Package Reservation').isExecuted===true;}catch{}const saved=$('Save Initial Studio Package').all().map(i=>i.json).filter(i=>i.id===prior.id),marker='STUDIO_PACKAGE_START '+packet.requestId+' '+packet.contentDigest;if(!reserved||saved.length!==1||prior.production_version!==1||prior.package_id!=='PKG-'+packet.expected.storyId||prior.editorial_handoff_note!==marker||prior.final_approval_status!=='pending'||prior.buffer_claim_state!=='idle')throw Error('STUDIO_INITIAL_PACKAGE_UNVERIFIED');effective={...packet,expected:{...packet.expected,packageId:prior.package_id,packageRowId:prior.id,packageVersion:prior.production_version,packageDigest:$input.first().json.actual_package_digest}};}const plan=validateNativePostTransfer(effective,{story:c[0],packages:ps,media:read('Read Studio Review Media'),manual:read('Read Studio Review Manual Handoffs'),guarded:read('Read Studio Review Guarded Handoffs'),packageDigest:$input.first().json.actual_package_digest});return [{json:{...plan,marker,claim:{packageRowId:plan.packageRowId,conceptId:plan.conceptId,packageVersion:plan.packageVersion,owner:'mildincident:studio-review:'+packet.requestId,digest:packet.contentDigest}}}];"
+        }
+      },
+      {
+        "id": "mi-review-8eb3ad216fb309a7deec",
+        "name": "Studio Review Already Current?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3720
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.unchanged === true }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "mi-review-3bfc8a56316bdcdca583",
+        "name": "Reserve Studio Editorial Review",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3740
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "update",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "cCFwaHyKVVTZvr5s"
+          },
+          "matchType": "allConditions",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "id",
+                "condition": "eq",
+                "keyValue": "={{ $('Validate Exact Studio Editorial Transfer').first().json.claim.packageRowId }}"
+              },
+              {
+                "keyName": "concept_id",
+                "condition": "eq",
+                "keyValue": "={{ $('Validate Exact Studio Editorial Transfer').first().json.claim.conceptId }}"
+              },
+              {
+                "keyName": "production_version",
+                "condition": "eq",
+                "keyValue": "={{ $('Validate Exact Studio Editorial Transfer').first().json.claim.packageVersion }}"
+              },
+              {
+                "keyName": "buffer_claim_state",
+                "condition": "eq",
+                "keyValue": "idle"
+              }
+            ]
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "buffer_claim_state": "reserved",
+              "buffer_claim_owner": "={{ $('Validate Exact Studio Editorial Transfer').first().json.claim.owner }}",
+              "buffer_claim_digest": "={{ $('Validate Exact Studio Editorial Transfer').first().json.claim.digest }}"
+            }
+          }
+        }
+      },
+      {
+        "id": "mi-review-97bae4790c0b44d1186b",
+        "name": "Read Reserved Studio Editorial Package",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "executeOnce": true,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3760
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "cCFwaHyKVVTZvr5s"
+          },
+          "matchType": "allConditions",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "concept_id",
+                "condition": "eq",
+                "keyValue": "={{ $('Read Studio Review Envelope').first().json.concept_id }}"
+              }
+            ]
+          },
+          "returnAll": true
+        }
+      },
+      {
+        "id": "mi-review-15a90bcd2d5a5b627759",
+        "name": "Verify Studio Review Reservation",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3780
+        ],
+        "parameters": {
+          "jsCode": "function assertSharedBufferClaim(rows,claim,state){\n if(rows.length!==1)throw Error('SHARED_BUFFER_CLAIM_NOT_ACQUIRED');const r=rows[0];\n if(r.id!==claim.packageRowId||r.concept_id!==claim.conceptId||r.production_version!==claim.packageVersion||r.buffer_claim_state!==state||r.buffer_claim_owner!==claim.owner||r.buffer_claim_digest!==claim.digest)throw Error('SHARED_BUFFER_CLAIM_NOT_ACQUIRED');\n return r;\n}const p=$('Validate Exact Studio Editorial Transfer').first().json;if($('Reserve Studio Editorial Review').all().filter(i=>i.json.id===p.packageRowId).length!==1)throw Error('STUDIO_REVIEW_NOT_RESERVED');assertSharedBufferClaim($input.all().map(i=>i.json),p.claim,'reserved');return [{json:p}];"
+        }
+      },
+      {
+        "id": "mi-review-b6f411aaafc142cdf0a3",
+        "name": "Studio Review Has New Photographs?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3800
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.newMedia.length > 0 }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "mi-review-babb1e33a38de726ecdc",
+        "name": "Expand New Studio Photographs",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3820
+        ],
+        "parameters": {
+          "jsCode": "return $('Validate Exact Studio Editorial Transfer').first().json.newMedia.map(json=>({json}));"
+        }
+      },
+      {
+        "id": "mi-review-f5b2c60d8f59d17460f1",
+        "name": "Register Source Backed Studio Photographs",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3840
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "insert",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "ARiuqg92GgVSpZMr"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "concept_id": "={{ $json.concept_id }}",
+              "asset_id": "={{ $json.asset_id }}",
+              "title": "={{ $json.title }}",
+              "creator": "={{ $json.creator }}",
+              "attribution_text": "={{ $json.attribution_text }}",
+              "source_page_url": "={{ $json.source_page_url }}",
+              "file_url": "={{ $json.file_url }}",
+              "thumb_url": "={{ $json.thumb_url }}",
+              "width": "={{ $json.width }}",
+              "height": "={{ $json.height }}",
+              "rights_status": "={{ $json.rights_status }}",
+              "license": "={{ $json.license }}",
+              "provider": "={{ $json.provider }}",
+              "notes": "={{ $json.notes }}"
+            }
+          }
+        }
+      },
+      {
+        "id": "mi-review-17ede4b8181b73d44f56",
+        "name": "Reload Studio Review Photographs",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "executeOnce": true,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3860
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "ARiuqg92GgVSpZMr"
+          },
+          "matchType": "allConditions",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "concept_id",
+                "condition": "eq",
+                "keyValue": "={{ $('Read Studio Review Envelope').first().json.concept_id }}"
+              }
+            ]
+          },
+          "returnAll": true
+        }
+      },
+      {
+        "id": "mi-review-cc4e77b187d3fc8bc7d6",
+        "name": "Studio Planner Intent",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3880
+        ],
+        "parameters": {
+          "jsCode": "const p=$('Validate Exact Studio Editorial Transfer').first().json,c=$('Read Studio Review Story').first().json;return [{json:{concept_id:p.conceptId,review_token:c.review_token,slide_sequence_asset_ids:p.post.selectedAssetIds.join(','),cover_treatment:'Preserve full image with neutral 4:5 padding',confirm_plan:true,sequence_notes:'Exact Studio review '+p.requestId+'; previous versions retained.'}}];"
+        }
+      },
+      {
+        "id": "mi-review-cf5d957fec8881f81d09",
+        "name": "Studio Planner Story",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3900
+        ],
+        "parameters": {
+          "jsCode": "const c=$('Read Studio Review Story').first().json;return [{json:{...c,stage:'approved_for_sourcing',approval_status:'concept_approved'}}];"
+        }
+      },
+      {
+        "id": "mi-review-f0234ec0e0960c8b07ff",
+        "name": "Studio Planner Package",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3920
+        ],
+        "parameters": {
+          "jsCode": "const plan=$('Validate Exact Studio Editorial Transfer').first().json,p=$('Read Effective Studio Review Package').first().json;return [{json:{...p,caption_draft:plan.post.caption,target_slide_count:plan.post.selectedAssetIds.length,production_status:'needs_curator_selection',final_approval_status:'pending',final_asset_urls:'[]'}}];"
+        }
+      },
+      {
+        "id": "mi-review-26041248b3c83f9ace20",
+        "name": "Use Actual Studio Planner Photographs",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3940
+        ],
+        "parameters": {
+          "jsCode": "return $('Reload Studio Review Photographs').all();"
+        }
+      },
+      {
+        "id": "mi-review-c9a88ff39147473a0ee8",
+        "name": "Plan Exact Studio Slide Sequence",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3960
+        ],
+        "parameters": {
+          "jsCode": "// Human editorial ORDER ONLY. Every proposed image must belong to the same approved concept.\n// No rights state, final assets, published status or final token is modified.\nconst f=$('Studio Planner Intent').first().json||{},c=$('Studio Planner Story').first().json||{},p=$('Studio Planner Package').first().json||{};\nconst assets=$input.all().map(i=>i.json||{}).filter(x=>x.asset_id);\nconst id=String(f.concept_id||'').trim(),token=String(f.review_token||'').trim(),fmt=String(c.format||'');\nconst mut=['source_discovery_needed','needs_rights_clearance','needs_curator_selection','needs_verified_original_files','needs_additional_assets','needs_caption_edit','media_ready_for_design','video_production_required','format_production_unsupported','asset_download_blocked','insufficient_media'];\nif(!id||id!==c.concept_id||c.review_token!==token||p.concept_id!==id||!p.package_id||!['approved','concept_approved'].includes(String(c.approval_status))||!['approved_for_sourcing','media_review_required','sourcing_complete','ready_for_production'].includes(String(c.stage))||!mut.includes(String(p.production_status||''))||String(p.final_approval_status||'pending')!=='pending'||!['','[]','null'].includes(String(p.final_asset_urls||'').trim()))throw new Error('SLIDE_PLAN_DENIED: current approved concept, editable package and matching token required.');\nif(!['single_image','carousel'].includes(fmt)||p.format!==fmt)throw new Error('SLIDE_PLAN_DENIED: still-image layout planner supports single image and carousel only.');\nconst raw=String(f.slide_sequence_asset_ids||'').trim();\nconst ids=raw.split(/[\\n,;]+/).map(x=>x.trim()).filter(Boolean);\nif(!ids.length||ids.length>10||new Set(ids).size!==ids.length||(fmt==='single_image'&&ids.length!==1))throw new Error('SLIDE_PLAN_DENIED: supply 1\u201310 distinct asset IDs (exactly 1 for a single-image post).');\nconst treatment={ 'Preserve full image with neutral 4:5 padding':'contain_neutral_padding', 'Propose crop after visual proof and founder review':'crop_requires_final_proof', 'Editorial border / headline, original image preserved':'editorial_border_preserve_original' }[String(f.cover_treatment||'')];\nconst confirm=f.confirm_plan===true||f.confirm_plan==='true'||(Array.isArray(f.confirm_plan)&&f.confirm_plan.includes('I have inspected the proposed images and understand exports still require rights clearance.'));\nconst note=String(f.sequence_notes||'').trim();\nif(!treatment||!confirm||note.length>1800)throw new Error('SLIDE_PLAN_DENIED: explicit human confirmation, crop treatment and concise notes required.');\nconst byID=new Map(assets.filter(x=>x.concept_id===id&&x.asset_id).map(a=>[String(a.asset_id),a]));\nconst deniedRights=new Set(['invalid_preview_automated','rejected_by_editor','blocked_restrictive_license','missing','discovery_reference_only']);\nconst safe=v=>{const s=String(v||'').trim();return /^https:\\/\\/[a-z0-9.-]+(?::443)?(?:[/?#]|$)/i.test(s)&&!/[<>\"'\\s\\\\{}]/.test(s)&&!/^https:\\/\\/(?:localhost|127\\.|10\\.|192\\.168\\.|169\\.254\\.)/i.test(s)?s.slice(0,1200):'';};\nconst picked=[];\nfor(const key of ids){\n const a=byID.get(key);\n if(!a||deniedRights.has(String(a.rights_status||''))||String(a.media_kind||'').endsWith('_reference')||a.media_kind==='no_candidate'||a.visual_review_status==='visually_rejected')throw new Error('SLIDE_PLAN_DENIED: unavailable, unrelated or disqualified image asset '+key);\n const exception=(a.rights_status==='editorial_exception_authorized'&&String(a.notes||'').includes('HUMAN EDITORIAL EXCEPTION REVIEW')&&String(a.notes||'').includes(' | purpose: ')&&String(a.notes||'').includes(' | nature: ')&&String(a.notes||'').includes(' | amount: ')&&String(a.notes||'').includes(' | market: ')&&/\\bevidence:\\s*https:\\/\\//i.test(String(a.notes||'')));\n const cleared=a.rights_status==='reviewed_cleared'||exception;\n const file=safe(a.file_url),page=safe(a.source_page_url),thumb=safe(a.thumb_url);\n const ready=cleared&&!!file&&!!page&&Number(a.width)>=1080&&Number(a.height)>=1080&&!!String(a.attribution_text||'').trim()&&!!String(a.creator||'').trim()&&(!!String(a.license||'').trim()||exception);\n picked.push({asset:a,ready,file,page,thumb});\n}\nconst target=fmt==='carousel'?Math.max(3,Math.min(10,Number(p.target_slide_count)||5),picked.length):1;\nconst slots=Array.from({length:target},(_,i)=>{\n const x=picked[i],a=x?.asset||{},ready=!!x?.ready;\n return {slide:i+1,role:i===0?'cover':'supporting',candidate_asset_id:a.asset_id||'',candidate_title:String(a.title||''),preview_url:x?.thumb||'',source_url:x?.page||'',original_file_url:ready?x.file:'',creator:String(a.creator||''),attribution:ready?String(a.attribution_text||''):'',rights_status:String(a.rights_status||'not_sourced'),visual_score:Number(a.visual_score||0),production_eligible:ready,requires_original_or_rights:!ready,frame_mode:i===0?treatment:'contain_neutral_padding',editorial_note:i===0?'Use founder-designated cover and protect subject integrity.':'Founder-set slide order; preserve real photograph and credits.'};\n});\nconst readyCount=picked.filter(x=>x.ready).length,minimum=fmt==='carousel'?3:1;\nlet status='',blocker='';\nif(picked.some(x=>!['reviewed_cleared','editorial_exception_authorized'].includes(x.asset.rights_status))){status='needs_rights_clearance';blocker='At least one chosen slide is not rights-cleared. This is an editorial storyboard only, not permission to reproduce images.';}\nelse if(readyCount<minimum){status='needs_additional_assets';blocker='The chosen '+fmt+' needs '+minimum+' distinct, selected, rights-cleared originals at 1080px minimum; only '+readyCount+' of the chosen assets qualifies.';}\nelse if(String(p.production_status)==='needs_caption_edit'){status='needs_caption_edit';blocker=String(p.blocker||'Public caption requires editing.');}\nelse{status='media_ready_for_design';blocker='Human-selected images are eligible for design only. Composition proof, claim review, final exports and second founder approval still required.';}\nconst existingSeq=String(p.slide_sequence_asset_ids||'[]'),newSeq=JSON.stringify(ids);\n\nconst frame={platform:'instagram',account:'@mildincident',format:fmt,width:1080,height:1350,mode:'image-led editorial',default_fit:'contain_preserve_full_image',background:'#f2f1ed',min_original_width:1080,min_original_height:1080,upscale_permitted:false,cropping:'never without founder-checked proof',proposed_cover:treatment,slides:slots.map(s=>({slide:s.slide,asset_id:s.candidate_asset_id,fit:s.frame_mode,production_eligible:s.production_eligible}))};\nif(existingSeq===newSeq&&String(p.cover_treatment||'contain_neutral_padding')===treatment&&!note&&String(p.slide_manifest||'')===JSON.stringify(slots)&&String(p.production_status||'')===status&&String(p.blocker||'')===blocker&&String(p.layout_spec_json||'')===JSON.stringify(frame))return [];\nconst oldNotes=String(p.designer_notes||'');\nconst notes=note?(oldNotes?oldNotes+'\\n':'')+'FOUNDER SLIDE ORDER v'+(Number(p.production_version||1)+1)+': '+note:oldNotes;\nconst version=Math.max(1,Number(p.production_version||1));\nconst quality=ids.length+' founder-sequenced image(s), '+readyCount+' eligible originals, '+(ids.length-readyCount)+' pending rights or full-resolution originals. Crop treatment: '+treatment+'.';\nreturn [{json:{concept_id:id,old_production_status:p.production_status,old_production_version:version,new_production_version:version+1,slide_manifest:JSON.stringify(slots),slide_sequence_asset_ids:newSeq,target_slide_count:target,cover_candidate_asset_id:ids[0],cover_asset_id:picked[0].ready?ids[0]:'',cover_source_url:picked[0].ready?picked[0].page:'',cover_original_url:picked[0].ready?picked[0].file:'',cover_license:picked[0].ready?String(picked[0].asset.license||''):'',cover_attribution:picked[0].ready?String(picked[0].asset.attribution_text||''):'',cover_treatment:treatment,layout_spec_json:JSON.stringify(frame),sequence_status:readyCount>=minimum&&readyCount===picked.length?'editor_curated_cleared':'editor_curated_unverified',production_status:status,blocker,rights_review_status:status==='media_ready_for_design'?'reviewed':'incomplete',media_quality_summary:quality,designer_notes:notes.slice(0,4800),updated_date:new Date().toISOString().slice(0,10)}}];"
+        }
+      },
+      {
+        "id": "mi-review-7f21ebab17d18666254e",
+        "name": "Preserve Earlier Studio Native Package",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          3980
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "insert",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "jfIlv4bFRpyUGqF6"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "experiment_id": "={{ $('Read Studio Review Envelope').first().json.concept_id }}",
+              "entry_type": "studio_editorial_transfer",
+              "hypothesis": "",
+              "variable_tested": "exact_caption_and_order",
+              "success_metric": "",
+              "evidence": "={{ JSON.stringify($('Validate Exact Studio Editorial Transfer').first().json.priorPackage) }}",
+              "result": "native_review_pending",
+              "lesson": "Earlier native version preserved; rights, facts and final approval are not imported.",
+              "decision": "={{ $('Validate Exact Studio Editorial Transfer').first().json.marker }}",
+              "status": "logged",
+              "logged_date": "={{ $now.toISODate() }}"
+            }
+          }
+        }
+      },
+      {
+        "id": "mi-review-57a3c766fe941fc623bf",
+        "name": "Reopen Studio Story For Exact Review",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          4000
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "update",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "5AxSMHqi15TNwBZl"
+          },
+          "matchType": "allConditions",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "id",
+                "condition": "eq",
+                "keyValue": "={{ $('Read Studio Review Story').first().json.id }}"
+              },
+              {
+                "keyName": "updatedAt",
+                "condition": "eq",
+                "keyValue": "={{ $('Read Studio Review Envelope').first().json.packet.expected.packageVersion === null ? $('Read Reserved Initial Studio Story').first().json.updatedAt : $('Read Studio Review Story').first().json.updatedAt }}"
+              }
+            ]
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "stage": "approved_for_sourcing",
+              "approval_status": "concept_approved",
+              "title": "={{ $('Validate Exact Studio Editorial Transfer').first().json.post.title }}",
+              "hook": "={{ $('Validate Exact Studio Editorial Transfer').first().json.post.hook }}"
+            }
+          }
+        }
+      },
+      {
+        "id": "mi-review-ab22865ff52fc3f6097d",
+        "name": "Read Reopened Studio Story",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "executeOnce": true,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          4020
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "5AxSMHqi15TNwBZl"
+          },
+          "matchType": "allConditions",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "concept_id",
+                "condition": "eq",
+                "keyValue": "={{ $('Read Studio Review Envelope').first().json.concept_id }}"
+              }
+            ]
+          },
+          "returnAll": true
+        }
+      },
+      {
+        "id": "mi-review-98350c688d7d502a7daf",
+        "name": "Verify Reopened Studio Story",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          4040
+        ],
+        "parameters": {
+          "jsCode": "const c=$input.all().map(i=>i.json),old=$('Read Studio Review Story').first().json;if($('Reopen Studio Story For Exact Review').all().filter(i=>i.json.id===old.id).length!==1||c.length!==1||c[0].id!==old.id||c[0].concept_id!==old.concept_id||c[0].stage!=='approved_for_sourcing')throw Error('STUDIO_STORY_VERSION_CHANGED');return $('Plan Exact Studio Slide Sequence').all();"
+        }
+      },
+      {
+        "id": "mi-review-ca4526505ce7bb388b71",
+        "name": "Commit Exact Studio Native Review",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          4060
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "update",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "cCFwaHyKVVTZvr5s"
+          },
+          "matchType": "allConditions",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "id",
+                "condition": "eq",
+                "keyValue": "={{ $('Validate Exact Studio Editorial Transfer').first().json.claim.packageRowId }}"
+              },
+              {
+                "keyName": "concept_id",
+                "condition": "eq",
+                "keyValue": "={{ $('Validate Exact Studio Editorial Transfer').first().json.claim.conceptId }}"
+              },
+              {
+                "keyName": "production_version",
+                "condition": "eq",
+                "keyValue": "={{ $('Validate Exact Studio Editorial Transfer').first().json.claim.packageVersion }}"
+              },
+              {
+                "keyName": "buffer_claim_owner",
+                "condition": "eq",
+                "keyValue": "={{ $('Validate Exact Studio Editorial Transfer').first().json.claim.owner }}"
+              },
+              {
+                "keyName": "buffer_claim_digest",
+                "condition": "eq",
+                "keyValue": "={{ $('Validate Exact Studio Editorial Transfer').first().json.claim.digest }}"
+              },
+              {
+                "keyName": "buffer_claim_state",
+                "condition": "eq",
+                "keyValue": "reserved"
+              }
+            ]
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "slide_manifest": "={{ $('Plan Exact Studio Slide Sequence').first().json.slide_manifest }}",
+              "slide_sequence_asset_ids": "={{ $('Plan Exact Studio Slide Sequence').first().json.slide_sequence_asset_ids }}",
+              "target_slide_count": "={{ $('Plan Exact Studio Slide Sequence').first().json.target_slide_count }}",
+              "cover_candidate_asset_id": "={{ $('Plan Exact Studio Slide Sequence').first().json.cover_candidate_asset_id }}",
+              "cover_asset_id": "={{ $('Plan Exact Studio Slide Sequence').first().json.cover_asset_id }}",
+              "cover_source_url": "={{ $('Plan Exact Studio Slide Sequence').first().json.cover_source_url }}",
+              "cover_original_url": "={{ $('Plan Exact Studio Slide Sequence').first().json.cover_original_url }}",
+              "cover_license": "={{ $('Plan Exact Studio Slide Sequence').first().json.cover_license }}",
+              "cover_attribution": "={{ $('Plan Exact Studio Slide Sequence').first().json.cover_attribution }}",
+              "cover_treatment": "={{ $('Plan Exact Studio Slide Sequence').first().json.cover_treatment }}",
+              "layout_spec_json": "={{ $('Plan Exact Studio Slide Sequence').first().json.layout_spec_json }}",
+              "sequence_status": "={{ $('Plan Exact Studio Slide Sequence').first().json.sequence_status }}",
+              "production_status": "={{ $('Plan Exact Studio Slide Sequence').first().json.production_status }}",
+              "blocker": "={{ $('Plan Exact Studio Slide Sequence').first().json.blocker }}",
+              "rights_review_status": "={{ $('Plan Exact Studio Slide Sequence').first().json.rights_review_status }}",
+              "media_quality_summary": "={{ $('Plan Exact Studio Slide Sequence').first().json.media_quality_summary }}",
+              "designer_notes": "={{ $('Plan Exact Studio Slide Sequence').first().json.designer_notes }}",
+              "updated_date": "={{ $('Plan Exact Studio Slide Sequence').first().json.updated_date }}",
+              "production_version": "={{ $('Validate Exact Studio Editorial Transfer').first().json.nextVersion }}",
+              "caption_draft": "={{ $('Validate Exact Studio Editorial Transfer').first().json.post.caption }}",
+              "title": "={{ $('Validate Exact Studio Editorial Transfer').first().json.post.title }}",
+              "final_caption": "",
+              "final_asset_urls": "[]",
+              "final_assets_verified": false,
+              "final_review_token": "",
+              "final_approval_status": "pending",
+              "source_claims_reviewed": false,
+              "source_claims_review_notes": "",
+              "source_claims_reviewed_date": "",
+              "render_batch_id": "",
+              "render_manifest_json": "",
+              "render_preflight_status": "not_checked",
+              "render_preflight_date": "",
+              "render_preflight_notes": "",
+              "asset_count": 0,
+              "editorial_handoff_version": "={{ $('Validate Exact Studio Editorial Transfer').first().json.nextVersion }}",
+              "editorial_handoff_date": "={{ $now.toISO() }}",
+              "editorial_handoff_note": "={{ $('Validate Exact Studio Editorial Transfer').first().json.marker }}",
+              "buffer_claim_state": "idle",
+              "buffer_claim_owner": "",
+              "buffer_claim_digest": ""
+            }
+          }
+        }
+      },
+      {
+        "id": "mi-review-6cc2a14619de7f4754fa",
+        "name": "Read Committed Studio Editorial Package",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "executeOnce": true,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          4080
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "cCFwaHyKVVTZvr5s"
+          },
+          "matchType": "allConditions",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "concept_id",
+                "condition": "eq",
+                "keyValue": "={{ $('Read Studio Review Envelope').first().json.concept_id }}"
+              }
+            ]
+          },
+          "returnAll": true
+        }
+      },
+      {
+        "id": "mi-review-39ae6e71204bfba0f4e6",
+        "name": "Verify Exact Studio Native Review Commit",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          4100
+        ],
+        "parameters": {
+          "jsCode": "const p=$('Validate Exact Studio Editorial Transfer').first().json,rows=$input.all().map(i=>i.json);if($('Commit Exact Studio Native Review').all().filter(i=>i.json.id===p.packageRowId).length!==1||rows.length!==1||rows[0].id!==p.packageRowId||rows[0].production_version!==p.nextVersion||rows[0].caption_draft!==p.post.caption||rows[0].slide_sequence_asset_ids!==JSON.stringify(p.post.selectedAssetIds)||rows[0].final_approval_status!=='pending'||rows[0].buffer_claim_state!=='idle')throw Error('STUDIO_REVIEW_COMMIT_UNCERTAIN');return [{json:p}];"
+        }
+      },
+      {
+        "id": "mi-review-31160ddf157568b5cc59",
+        "name": "Return Exact Studio Review Receipt",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          4120
+        ],
+        "parameters": {
+          "jsCode": "const p=$('Validate Exact Studio Editorial Transfer').first().json;return [{json:{state:p.unchanged?'unchanged':'native_review_saved',requestId:p.requestId,contentDigest:p.contentDigest,storyId:p.conceptId,packageVersion:p.nextVersion,executionId:String($execution.id),rightsGranted:false,publicationApproved:false}}];"
+        }
+      },
+      {
+        "id": "mi-review-b91821e65f7d52674315",
+        "name": "Read Studio Private File Scope",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          4160
+        ],
+        "parameters": {
+          "jsCode": "let trusted=false;try{trusted=$('Internal Finalize Render Request').isExecuted===true;}catch{}const r=$input.first().json;if(!trusted||r.request_kind!=='mildincident_finalize_v1'||r.phase!=='studio_file'||!/^CON-[A-Za-z0-9_-]{5,95}$/.test(r.concept_id||'')||!Number.isInteger(r.production_version)||!r.file_record_id||!/^[a-f0-9]{64}$/.test(r.sha256||''))throw Error('STUDIO_PRIVATE_FILE_SCOPE_INVALID');return [{json:r}];"
+        }
+      },
+      {
+        "id": "mi-review-6028f4b5234e7b422f39",
+        "name": "Read Studio Private File Package",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          4180
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "cCFwaHyKVVTZvr5s"
+          },
+          "matchType": "allConditions",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "concept_id",
+                "condition": "eq",
+                "keyValue": "={{ $('Read Studio Private File Scope').first().json.concept_id }}"
+              }
+            ]
+          },
+          "returnAll": true
+        }
+      },
+      {
+        "id": "mi-review-f6c1cf29171898ea2d9f",
+        "name": "Read Studio Private File Registry",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          4200
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "HOjGxJlmAiJZHYsR"
+          },
+          "matchType": "allConditions",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "concept_id",
+                "condition": "eq",
+                "keyValue": "={{ $('Read Studio Private File Scope').first().json.concept_id }}"
+              }
+            ]
+          },
+          "returnAll": true
+        }
+      },
+      {
+        "id": "mi-review-34fc1edd59e40a831b49",
+        "name": "Validate Studio Private Final File",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          4220
+        ],
+        "parameters": {
+          "jsCode": "const s=$('Read Studio Private File Scope').first().json,ps=$('Read Studio Private File Package').all().map(i=>i.json).filter(p=>p.concept_id===s.concept_id),p=ps[0],rows=$input.all().map(i=>i.json).filter(f=>f.file_record_id===s.file_record_id&&f.concept_id===s.concept_id);if(ps.length!==1||p.production_version!==s.production_version||p.final_assets_verified!==true||rows.length!==1)throw Error('STUDIO_PRIVATE_FILE_CHANGED');const f=rows[0];if(f.package_id!==p.package_id||f.package_version!==s.production_version||f.render_batch_id!==p.render_batch_id||f.checksum_sha256!==s.sha256||f.source_asset_id!==s.asset_id||f.storage_provider!=='google_drive'||f.storage_status!=='verified_private'||f.storage_verified!==true||f.render_quality_status!=='passed'||f.mime_type!=='image/jpeg'||f.pixel_width!==1080||f.pixel_height!==1350||f.size_bytes>8388608||!['human_cleared','founder_exception_reviewed'].includes(f.rights_evidence_status))throw Error('STUDIO_PRIVATE_FILE_UNVERIFIED');return [{json:f}];"
+        }
+      },
+      {
+        "id": "mi-review-19c3f11a1f8b3364fd81",
+        "name": "Download Studio Private Final JPEG",
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          4240
+        ],
+        "parameters": {
+          "resource": "file",
+          "operation": "download",
+          "authentication": "oAuth2",
+          "fileId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ $json.storage_object_id }}"
+          },
+          "options": {
+            "binaryPropertyName": "data"
+          }
+        },
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "fixture-googleDriveOAuth2Api",
+            "name": "Isolated test credential"
+          }
+        }
+      },
+      {
+        "id": "mi-review-91f64ae29d095fe586ec",
+        "name": "Hash Studio Private Final JPEG",
+        "type": "n8n-nodes-base.crypto",
+        "typeVersion": 1,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          4260
+        ],
+        "parameters": {
+          "action": "hash",
+          "type": "SHA256",
+          "binaryData": true,
+          "binaryPropertyName": "data",
+          "dataPropertyName": "native_final_sha256",
+          "encoding": "hex"
+        }
+      },
+      {
+        "id": "mi-review-f33aac652851054a427a",
+        "name": "Restore Studio Private Final JPEG",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          4280
+        ],
+        "parameters": {
+          "jsCode": "const f=$('Validate Studio Private Final File').first().json,hash=$input.first().json.native_final_sha256,download=$('Download Studio Private Final JPEG').first();if(hash!==f.checksum_sha256||!download.binary?.data)throw Error('STUDIO_PRIVATE_FILE_HASH_CHANGED');return [{json:f,binary:download.binary}];"
+        }
+      },
+      {
+        "id": "mi-review-002265a1f3d34ac4c699",
+        "name": "Return Verified Studio Private JPEG",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2000,
+          4300
+        ],
+        "parameters": {
+          "jsCode": "const f=$input.first().json,bytes=await this.helpers.getBinaryDataBuffer(0,'data');if(bytes.length!==f.size_bytes||bytes.length>8388608)throw Error('STUDIO_PRIVATE_FILE_SIZE_CHANGED');return [{json:{state:'verified_private_file',storyId:f.concept_id,assetId:f.source_asset_id,packageVersion:f.package_version,sha256:f.checksum_sha256,contentType:'image/jpeg',width:1080,height:1350,data:bytes.toString('base64')}}];"
+        }
+      },
+      {
+        "id": "mi-prepare-0e0224d9608a3e81915d",
+        "name": "Studio Post Needs Initial Package?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "retryOnFail": false,
+        "position": [
+          2500,
+          4320
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $('Read Studio Review Package').all().filter(i => i.json.concept_id).length === 0 }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "mi-prepare-37347c35810fa70a5fd2",
+        "name": "Validate Studio Package Start",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2500,
+          4340
+        ],
+        "parameters": {
+          "jsCode": "function stableNative(value){\n if(Array.isArray(value))return '['+value.map(stableNative).join(',')+']';\n if(value&&typeof value==='object')return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+stableNative(value[k]??null)).join(',')+'}';\n return JSON.stringify(value??null);\n}\nfunction priorBufferHandoff(rows,conceptId){\n return rows.some(r=>r.concept_id===conceptId&&(r.buffer_id||r.buffer_post_id||String(r.state??r.status??'unknown')!=='abandoned'));\n}\nfunction validateNativePostTransfer(packet,{story,packages,media,manual,guarded,packageDigest}){\n const bad=code=>{throw Error(code);},keys=['version','kind','requestId','contentDigest','expected','post','images'];\n if(!packet||Object.keys(packet).some(k=>!keys.includes(k))||packet.version!==1||packet.kind!=='mildincident_studio_post_review'||!/^[-a-f0-9]{36}$/.test(packet.requestId||'')||!/^[a-f0-9]{64}$/.test(packet.contentDigest||''))bad('STUDIO_TRANSFER_INVALID');\n const e=packet.expected,p=packages.length===1?packages[0]:null,post=packet.post;\n if(!p||!story||story.concept_id!==e?.storyId||p.concept_id!==e.storyId||p.id!==e.packageRowId||p.package_id!==e.packageId||p.production_version!==e.packageVersion||packageDigest!==e.packageDigest)bad('STUDIO_TRANSFER_SOURCE_CHANGED');\n if(!e.storyState||Object.keys(e.storyState).length!==5||['title','hook','format','stage','approval_status'].some(k=>typeof e.storyState[k]!=='string'||e.storyState[k]!==String(story[k]||'')))bad('STUDIO_TRANSFER_STORY_CHANGED');\n if(!['approved','concept_approved'].includes(story.approval_status)||story.published_url)bad('STUDIO_TRANSFER_CONCEPT_APPROVAL_REQUIRED');\n if(priorBufferHandoff([...manual,...guarded],e.storyId)||!['idle'].includes(p.buffer_claim_state))bad('STUDIO_TRANSFER_PRIOR_HANDOFF');\n if(!post||Object.keys(post).some(k=>!['caption','selectedAssetIds','format','title','hook','sourceRevision','workingVersion'].includes(k))||typeof post.caption!=='string'||post.caption.trim().length<25||[...post.caption].length>2200||/INTERNAL[\\s\\S]{0,60}TEST|DO\\s+NOT\\s+PUBLISH|verified_fact|hypothesis:/i.test(post.caption))bad('STUDIO_TRANSFER_CAPTION_INVALID');\n if(post.caption!==post.caption.trim())bad('STUDIO_TRANSFER_OUTER_CAPTION_WHITESPACE');\n if(!['carousel','single_image'].includes(post.format)||post.format!==story.format||post.format!==p.format)bad('STUDIO_TRANSFER_FORMAT_REVIEW_REQUIRED');\n const ids=post.selectedAssetIds,min=post.format==='single_image'?1:3,max=post.format==='single_image'?1:10;\n if(!Array.isArray(ids)||ids.length<min||ids.length>max||new Set(ids).size!==ids.length||!Array.isArray(packet.images)||packet.images.length!==ids.length)bad('STUDIO_TRANSFER_SEQUENCE_INVALID');\n const newMedia=[];\n for(const [i,id]of ids.entries()){\n  const image=packet.images[i];if(!image||image.assetId!==id||Object.keys(image).some(k=>!['assetId','sourceUrl','imageUrl','creator','credit','sourceCaption','width','height','originalSha256','previewSha256','acquisition'].includes(k)))bad('STUDIO_TRANSFER_IMAGE_INVALID');\n  const matches=media.filter(m=>m.concept_id===story.concept_id&&m.asset_id===id);if(matches.length>1)bad('STUDIO_TRANSFER_IMAGE_AMBIGUOUS');\n  if(matches.length){if((matches[0].source_page_url||'')!==image.sourceUrl||(matches[0].file_url||'')!==image.imageUrl||(matches[0].creator||'')!==image.creator)bad('STUDIO_TRANSFER_IMAGE_SOURCE_CHANGED');continue;}\n  const a=image.acquisition,https=v=>{try{const u=new URL(v);return u.protocol==='https:'&&!u.username&&!u.password&&!u.port&&!/^(?:localhost|0\\.|127\\.|10\\.|169\\.254\\.|192\\.168\\.|172\\.(?:1[6-9]|2\\d|3[01])\\.|\\[|metadata\\.)|\\.(?:local|internal|localhost)$/i.test(u.hostname);}catch{return false;}};\n  if(!/^photo:[a-f0-9]{16,64}$/.test(id)||!https(image.sourceUrl)||!https(image.imageUrl)||!image.creator?.trim()||![image.originalSha256,image.previewSha256,a?.pageSha256,a?.inputDigest].every(h=>/^[a-f0-9]{64}$/.test(h||''))||a?.basis!=='photo_request_source_copy'||!/^[-a-f0-9]{36}$/.test(a.requestId||'')||![image.width,image.height].every(n=>Number.isInteger(n)&&n>0&&n<=20000))bad('STUDIO_TRANSFER_ACQUISITION_REQUIRED');\n  newMedia.push({concept_id:story.concept_id,asset_id:id,title:String(image.sourceCaption||'Source-backed project photograph').slice(0,600),creator:image.creator,attribution_text:image.credit||'',source_page_url:image.sourceUrl,file_url:image.imageUrl,thumb_url:image.imageUrl,width:image.width,height:image.height,rights_status:'preview_unreviewed',license:'',provider:'studio_source_acquisition',notes:'STUDIO SOURCE SHA256 '+image.originalSha256+' | source page SHA256 '+a.pageSha256+' | receipt '+a.requestId+' | private decoded reference; identity, attribution and usage rights require human review.'});\n }\n const unchanged=p.caption_draft===post.caption&&story.title===post.title&&(story.hook||'')===(post.hook||'')&&stableNative(JSON.parse(p.slide_sequence_asset_ids||'[]'))===stableNative(ids)&&!newMedia.length;\n return {unchanged,requestId:packet.requestId,contentDigest:packet.contentDigest,conceptId:story.concept_id,packageRowId:p.id,packageVersion:p.production_version,nextVersion:unchanged?p.production_version:p.production_version+1,newMedia,post,priorPackage:Object.fromEntries(Object.entries(p).filter(([k])=>!/token|secret|password|credential/i.test(k)))};\n}\nfunction validateNativePackageStart(packet,context){\n const {story,packages,media,manual,guarded}=context,e=packet?.expected;\n if(!story||packages.length!==0||!e||['packageId','packageRowId','packageVersion','packageDigest'].some(k=>e[k]!==null)||!['approved_for_sourcing','media_review_required','sourcing_complete','ready_for_production'].includes(story.stage))throw Error('STUDIO_PACKAGE_START_DENIED');\n // The normal transfer validator verifies concept approval, exact original\n // state, image evidence, caption and selected order; no relaxed parallel path.\n const p={id:0,concept_id:story.concept_id,package_id:'PKG-'+story.concept_id,production_version:0,format:story.format,caption_draft:'',slide_sequence_asset_ids:'[]',buffer_claim_state:'idle'};\n const effective={...packet,expected:{...e,packageId:p.package_id,packageRowId:0,packageVersion:0,packageDigest:'preparation'}};\n validateNativePostTransfer(effective,{story,packages:[p],media,manual,guarded,packageDigest:'preparation'});\n if(!Number.isInteger(story.id)||!story.updatedAt)throw Error('STUDIO_PACKAGE_STORY_REVISION_REQUIRED');\n return {storyId:story.concept_id,storyRowId:story.id,storyUpdatedAt:story.updatedAt,requestId:packet.requestId,contentDigest:packet.contentDigest};\n}const read=name=>$(name).all().map(i=>i.json).filter(r=>r.concept_id),ss=read('Read Studio Review Story'),packet=$('Read Studio Review Envelope').first().json.packet;if(ss.length!==1||$('Hash Studio Review Packet').first().json.actual_content_digest!==packet.contentDigest)throw Error('STUDIO_PACKAGE_INPUT_CHANGED');return [{json:validateNativePackageStart(packet,{story:ss[0],packages:read('Read Studio Review Package'),media:read('Read Studio Review Media'),manual:read('Read Studio Review Manual Handoffs'),guarded:read('Read Studio Review Guarded Handoffs')})}];"
+        }
+      },
+      {
+        "id": "mi-prepare-e1ff60550705e71aeafb",
+        "name": "Build Shared Initial Package Reservation",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2500,
+          4360
+        ],
+        "parameters": {
+          "jsCode": "let studio=false,legacy=false;try{studio=$('Validate Studio Package Start').isExecuted===true;}catch{}try{legacy=$('Guard New Production Package').isExecuted===true;}catch{}if(studio===legacy)throw Error('INITIAL_PACKAGE_ENTRY_AMBIGUOUS');const c=$(studio?'Read Studio Review Story':'Get Concept for Production Package').first().json;if(!Number.isInteger(c.id)||!c.updatedAt||!['approved','concept_approved'].includes(c.approval_status)||!['approved_for_sourcing','media_review_required','sourcing_complete','ready_for_production'].includes(c.stage))throw Error('INITIAL_PACKAGE_CONCEPT_CHANGED');if(legacy){const p=$('Assemble Production Package Draft').first().json;if(p.draft_action!=='create'||p.concept_id!==c.concept_id||p.production_version!==1)throw Error('INITIAL_PACKAGE_CREATE_REQUIRED');}return [{json:{storyId:c.concept_id,storyRowId:c.id,storyUpdatedAt:c.updatedAt,storyStage:c.stage,route:studio?'studio':'legacy'}}];"
+        }
+      },
+      {
+        "id": "mi-prepare-3e9b5d3960c3b5ea4b9c",
+        "name": "Reserve Initial Studio Package",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2500,
+          4380
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "update",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "5AxSMHqi15TNwBZl"
+          },
+          "matchType": "allConditions",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "id",
+                "condition": "eq",
+                "keyValue": "={{ $('Build Shared Initial Package Reservation').first().json.storyRowId }}"
+              },
+              {
+                "keyName": "updatedAt",
+                "condition": "eq",
+                "keyValue": "={{ $('Build Shared Initial Package Reservation').first().json.storyUpdatedAt }}"
+              },
+              {
+                "keyName": "stage",
+                "condition": "eq",
+                "keyValue": "={{ $('Build Shared Initial Package Reservation').first().json.storyStage }}"
+              }
+            ]
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "stage": "studio_package_preparing"
+            }
+          }
+        }
+      },
+      {
+        "id": "mi-prepare-3f4ee09fe3a63fc200b0",
+        "name": "Read Reserved Initial Studio Story",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "executeOnce": true,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2500,
+          4400
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "5AxSMHqi15TNwBZl"
+          },
+          "matchType": "allConditions",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "concept_id",
+                "condition": "eq",
+                "keyValue": "={{ $('Build Shared Initial Package Reservation').first().json.storyId }}"
+              }
+            ]
+          },
+          "returnAll": true
+        }
+      },
+      {
+        "id": "mi-prepare-727f33c11c9f5e419f54",
+        "name": "Verify Initial Studio Package Reservation",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2500,
+          4420
+        ],
+        "parameters": {
+          "jsCode": "const c=$('Build Shared Initial Package Reservation').first().json,rows=$input.all().map(i=>i.json).filter(r=>r.concept_id);if($('Reserve Initial Studio Package').all().filter(i=>i.json.id===c.storyRowId).length!==1||rows.length!==1||rows[0].id!==c.storyRowId||rows[0].concept_id!==c.storyId||rows[0].stage!=='studio_package_preparing')throw Error('STUDIO_PACKAGE_NOT_RESERVED');return [{json:{}}];"
+        }
+      },
+      {
+        "id": "mi-prepare-0b53d35e9c481b2441aa",
+        "name": "Initial Package Comes From Studio?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "retryOnFail": false,
+        "position": [
+          2500,
+          4440
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $('Build Shared Initial Package Reservation').first().json.route === 'studio' }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "mi-prepare-87a80ea2f2c54e4fa72b",
+        "name": "Assemble Initial Studio Package",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2500,
+          4540
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "// Stage 06 internal editorial manifest. No media rights, final render or publish privileges.\nconst f=({concept_id:$('Read Studio Review Story').first().json.concept_id,review_token:$('Read Studio Review Story').first().json.review_token,designer_notes:''})||{},c=$('Read Studio Review Story').first().json||{};\nconst media=$('Read Studio Review Media').all().map(i=>i.json||{}).filter(a=>a.asset_id),old=$input.first().json||{};\nconst cid=String(f.concept_id||'').trim(),token=String(f.review_token||'').trim(),format=String(c.format||'').toLowerCase();\nif(!/^CON-[a-z0-9_-]{5,95}$/i.test(cid)||c.concept_id!==cid||!token||c.review_token!==token||!['approved','concept_approved'].includes(String(c.approval_status))||!['approved_for_sourcing','media_review_required','sourcing_complete','ready_for_production'].includes(String(c.stage)))throw new Error('PACKAGE_DENIED: currently Chief+founder approved concept and current review token required.');\nif(!['single_image','carousel','reel','video','mixed_media'].includes(format))throw new Error('PACKAGE_DENIED: unknown editorial format.');\nconst notes=String(f.designer_notes||'').trim();if(notes.length>2500)throw new Error('PACKAGE_DENIED: designer notes too long.');\nconst existing=old.concept_id===cid,locked=['final_assets_ready_for_review','published','cover_proof_generated_awaiting_final_post_approval','visual_proof_pending_final_editor_review','final_post_approved'];\nconst mutable=['source_discovery_needed','needs_rights_clearance','needs_curator_selection','needs_verified_original_files','needs_additional_assets','needs_caption_edit','media_ready_for_design','video_production_required','format_production_unsupported','asset_download_blocked','insufficient_media'];\nif(existing&&(!mutable.includes(String(old.production_status||''))||locked.includes(String(old.production_status||''))||String(old.final_approval_status||'pending')!=='pending'||!['','[]','null'].includes(String(old.final_asset_urls||'').trim())))throw new Error('PACKAGE_PROTECTED: finished, reviewed or legacy production packages cannot be overwritten.');\nif(existing&&['editor_curated_unverified','editor_curated_cleared'].includes(String(old.sequence_status||'')))throw new Error('PACKAGE_PROTECTED: founder-curated slide order exists; refresh via Arrange Editorial Slides to preserve chosen image order.');\nconst https=v=>{const s=String(v||'').trim();return /^https:\\/\\/[a-z0-9.-]+(?::443)?(?:[/?#]|$)/i.test(s)&&!/[<>\"'\\s\\\\{}]/.test(s)&&!/^https:\\/\\/(?:localhost|127\\.|10\\.|192\\.168\\.|169\\.254\\.)/i.test(s)?s.slice(0,1250):'';};\nconst rejected=new Set(['invalid_preview_automated','rejected_by_editor','blocked_restrictive_license','missing']);\nconst all=media.filter(a=>a.concept_id===cid&&a.provider!=='none'&&!String(a.media_kind||'').endsWith('_reference')&&a.rights_status!=='discovery_reference_only'&&!rejected.has(String(a.rights_status||''))&&a.visual_review_status!=='visually_rejected').map(a=>{\n const rights=String(a.rights_status||'unknown'),selected=a.selected===true||a.selected==='true',url=https(a.file_url),page=https(a.source_page_url),preview=https(a.thumb_url);\n const creator=String(a.creator||'').trim(),credit=String(a.attribution_text||'').trim(),license=String(a.license||'').trim(),score=Number(a.visual_score||0);\n const exception=rights==='editorial_exception_authorized'&&String(a.notes||'').includes('HUMAN EDITORIAL EXCEPTION REVIEW')&&/\\bevidence:\\s*https:\\/\\//i.test(String(a.notes||''));\n const ready=(rights==='reviewed_cleared'||exception)&&selected&&!!url&&!!page&&Number(a.width)>=1080&&Number(a.height)>=1080&&!!creator&&!!credit&&(!!license||exception);\n const priority=(ready?400:0)+(selected?100:0)+((rights==='reviewed_cleared'||rights==='editorial_exception_authorized')?75:0)+(a.visual_review_status==='strong_candidate'?30:0)+Math.max(0,Math.min(5,score))*8+(preview?5:0)-(Number(a.rank||0)||0);\n return {asset_id:String(a.asset_id),title:String(a.title||'').slice(0,150),provider:String(a.provider||''),media_kind:String(a.media_kind||''),rights_status:rights,selected,visual_score:score,visual_review_status:String(a.visual_review_status||''),strengths:String(a.visual_strengths||'').slice(0,350),concerns:String(a.visual_concerns||'').slice(0,350),thumbnail_url:preview,source_page_url:page,original_file_url:ready?url:'',creator:creator.slice(0,120),attribution:credit.slice(0,270),license:license.slice(0,150),width:Number(a.width||0),height:Number(a.height||0),production_eligible:ready,priority,source_order:Number(a.id||0)};\n});\nall.sort((a,b)=>b.priority-a.priority||a.source_order-b.source_order||a.asset_id.localeCompare(b.asset_id));\nconst seen=new Set(),visuals=new Set(),shortlist=[];for(const a of all){if(seen.has(a.asset_id))continue;const key=a.original_file_url||a.thumbnail_url;if(key&&visuals.has(key))continue;seen.add(a.asset_id);if(key)visuals.add(key);shortlist.push(a);if(shortlist.length===12)break;}\nconst cleared=shortlist.filter(x=>['reviewed_cleared','editorial_exception_authorized'].includes(x.rights_status)).length,selected=shortlist.filter(x=>['reviewed_cleared','editorial_exception_authorized'].includes(x.rights_status)&&x.selected).length,usable=shortlist.filter(x=>x.production_eligible);\nconst caption=String(c.caption||'').trim().slice(0,4800),captionOk=caption.length>15&&caption.length<=2200&&!/verified_fact|interpretation:|hypothesis:/i.test(caption);\nlet state='',blocker='';\nif(['reel','video','mixed_media'].includes(format)){state='video_production_required';blocker='Video assembly, export and footage/music permissions are not yet implemented; still-image previews are not usable video deliverables.';}\nelse if(!shortlist.length){state='source_discovery_needed';blocker='No viable original-source images are available yet.';}\nelse if(!cleared){state='needs_rights_clearance';blocker='Source previews are unlicensed. Obtain originals and verify rights before production.';}\nelse if(!selected){state='needs_curator_selection';blocker='Rights-cleared candidates exist, but none has been explicitly chosen by the editor.';}\nelse if(!usable.length){state='needs_verified_original_files';blocker='Selected media must include human-clearance, original HTTPS file, source, dimensions >=1080x1080 and photographer/credit/license.';}\nelse if(usable.length<(format==='carousel'?3:1)){state='needs_additional_assets';blocker='Carousel needs at least three selected, rights-cleared, full-size original images; found '+usable.length+'.';}\nelse if(!captionOk){state='needs_caption_edit';blocker='Caption needs copy editing and must be 1-2200 characters, without internal research labels.';}\nelse{state='media_ready_for_design';blocker='Original media are eligible for design. Final rendering/export, fact checks and second founder approval are still required.';}\nconst desired=state==='media_ready_for_design'&&format==='carousel'?Math.max(3,Math.min(10,usable.length)):format==='carousel'?5:1;\nconst pool=state==='media_ready_for_design'?usable:shortlist;\nconst slides=Array.from({length:desired},(_,i)=>{\n const a=pool[i],ready=!!a?.production_eligible;\n return {slide:i+1,role:i===0?'cover':'supporting',candidate_asset_id:a?.asset_id||'',candidate_title:a?.title||'',preview_url:a?.thumbnail_url||'',source_url:a?.source_page_url||'',original_file_url:ready?a.original_file_url:'',creator:a?.creator||'',attribution:ready?a.attribution:'',rights_status:a?.rights_status||'not_sourced',visual_score:a?.visual_score||0,production_eligible:ready,requires_original_or_rights:!ready,editorial_note:i===0?'Choose a strong, authentic cover; no deceptive crop.':'Sequence for visual contrast and context; preserve original attribution.'};\n});\nconst cover=usable[0]||null,lead=shortlist[0]||null,version=existing?Math.max(1,Number(old.production_version||1))+1:1;\nconst pkg={package_id:'PKG-'+cid,concept_id:cid,title:String(c.title||'').slice(0,200),format,target_account:'@mildincident',package_origin:'stage06_editorial_manifest_v1',caption_draft:caption,final_caption:'',slide_manifest:JSON.stringify(slides),media_shortlist_json:JSON.stringify(shortlist.map(({priority,...a})=>a)),target_slide_count:desired,cover_candidate_asset_id:lead?.asset_id||'',cover_asset_id:cover?.asset_id||'',cover_source_url:cover?.source_page_url||'',cover_original_url:cover?.original_file_url||'',cover_license:cover?.license||'',cover_attribution:cover?.attribution||'',designer_notes:(notes||String(old.designer_notes||'').trim()||String(c.slide_outline||'')).replace(/^EDITORIAL LEAD\\s*\\/\\s*NOT CHIEF-APPROVED\\.?\\s*/i,'').slice(0,4800),media_quality_summary:shortlist.length+' image lead(s) \u00b7 '+cleared+' rights-reviewed \u00b7 '+selected+' selected \u00b7 '+usable.length+' original(s) eligible; scored from source metadata and human input, NOT AI vision.',asset_count:0,final_asset_urls:'[]',rights_review_status:state==='media_ready_for_design'?'reviewed':'incomplete',source_claims_reviewed:false,final_approval_status:'pending',final_review_token:'',production_status:state,blocker,production_version:version,updated_date:new Date().toISOString().slice(0,10),draft_action:existing?'refresh':'create',old_production_status:String(old.production_status||''),old_production_version:Number(old.production_version||0)};\nif(existing&&['production_status','blocker','caption_draft','slide_manifest','media_shortlist_json','cover_candidate_asset_id','cover_asset_id','designer_notes','target_slide_count','rights_review_status','media_quality_summary'].every(k=>String(old[k]??'')===String(pkg[k]??'')))return [];\nreturn [{json:pkg}];"
+        }
+      },
+      {
+        "id": "mi-prepare-2173024dc697ac75c461",
+        "name": "Save Initial Studio Package",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2500,
+          4560
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "insert",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "cCFwaHyKVVTZvr5s"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "package_id": "={{ $json.package_id }}",
+              "concept_id": "={{ $json.concept_id }}",
+              "title": "={{ $json.title }}",
+              "format": "={{ $json.format }}",
+              "target_account": "={{ $json.target_account }}",
+              "package_origin": "={{ $json.package_origin }}",
+              "caption_draft": "={{ $json.caption_draft }}",
+              "final_caption": "={{ $json.final_caption }}",
+              "slide_manifest": "={{ $json.slide_manifest }}",
+              "media_shortlist_json": "={{ $json.media_shortlist_json }}",
+              "target_slide_count": "={{ $json.target_slide_count }}",
+              "cover_candidate_asset_id": "={{ $json.cover_candidate_asset_id }}",
+              "cover_asset_id": "={{ $json.cover_asset_id }}",
+              "cover_source_url": "={{ $json.cover_source_url }}",
+              "cover_original_url": "={{ $json.cover_original_url }}",
+              "cover_license": "={{ $json.cover_license }}",
+              "cover_attribution": "={{ $json.cover_attribution }}",
+              "designer_notes": "={{ $json.designer_notes }}",
+              "media_quality_summary": "={{ $json.media_quality_summary }}",
+              "asset_count": "={{ $json.asset_count }}",
+              "final_asset_urls": "={{ $json.final_asset_urls }}",
+              "rights_review_status": "={{ $json.rights_review_status }}",
+              "source_claims_reviewed": "={{ $json.source_claims_reviewed }}",
+              "final_approval_status": "={{ $json.final_approval_status }}",
+              "final_review_token": "={{ $json.final_review_token }}",
+              "production_status": "={{ $json.production_status }}",
+              "blocker": "={{ $json.blocker }}",
+              "production_version": "={{ $json.production_version }}",
+              "updated_date": "={{ $json.updated_date }}",
+              "buffer_claim_state": "idle",
+              "buffer_claim_owner": "",
+              "buffer_claim_digest": "",
+              "editorial_handoff_note": "={{ 'STUDIO_PACKAGE_START '+$('Read Studio Review Envelope').first().json.packet.requestId+' '+$('Read Studio Review Envelope').first().json.packet.contentDigest }}"
+            }
+          }
+        }
+      },
+      {
+        "id": "mi-prepare-100f00c82e54a277350f",
+        "name": "Read Effective Studio Review Package",
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "executeOnce": true,
+        "alwaysOutputData": true,
+        "retryOnFail": false,
+        "position": [
+          2500,
+          4580
+        ],
+        "parameters": {
+          "resource": "row",
+          "operation": "get",
+          "dataTableId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "cCFwaHyKVVTZvr5s"
+          },
+          "matchType": "allConditions",
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "concept_id",
+                "condition": "eq",
+                "keyValue": "={{ $('Read Studio Review Envelope').first().json.concept_id }}"
+              }
+            ]
+          },
+          "returnAll": true
+        }
+      }
+    ],
+    "connections": {
+      "Is Studio Editorial Review?": {
+        "main": [
+          [
+            {
+              "node": "Read Studio Review Envelope",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      },
+      "Read Studio Review Envelope": {
+        "main": [
+          [
+            {
+              "node": "Hash Studio Review Packet",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Hash Studio Review Packet": {
+        "main": [
+          [
+            {
+              "node": "Read Studio Review Story",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Studio Review Story": {
+        "main": [
+          [
+            {
+              "node": "Read Studio Review Package",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Studio Review Package": {
+        "main": [
+          [
+            {
+              "node": "Read Studio Review Media",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Studio Review Media": {
+        "main": [
+          [
+            {
+              "node": "Read Studio Review Manual Handoffs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Studio Review Manual Handoffs": {
+        "main": [
+          [
+            {
+              "node": "Read Studio Review Guarded Handoffs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Studio Review Guarded Handoffs": {
+        "main": [
+          [
+            {
+              "node": "Studio Post Needs Initial Package?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Studio Native Package Digest": {
+        "main": [
+          [
+            {
+              "node": "Hash Current Studio Native Package",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Hash Current Studio Native Package": {
+        "main": [
+          [
+            {
+              "node": "Validate Exact Studio Editorial Transfer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate Exact Studio Editorial Transfer": {
+        "main": [
+          [
+            {
+              "node": "Studio Review Already Current?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Studio Review Already Current?": {
+        "main": [
+          [
+            {
+              "node": "Return Exact Studio Review Receipt",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Reserve Studio Editorial Review",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Reserve Studio Editorial Review": {
+        "main": [
+          [
+            {
+              "node": "Read Reserved Studio Editorial Package",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Reserved Studio Editorial Package": {
+        "main": [
+          [
+            {
+              "node": "Verify Studio Review Reservation",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Verify Studio Review Reservation": {
+        "main": [
+          [
+            {
+              "node": "Studio Review Has New Photographs?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Studio Review Has New Photographs?": {
+        "main": [
+          [
+            {
+              "node": "Expand New Studio Photographs",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Reload Studio Review Photographs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Expand New Studio Photographs": {
+        "main": [
+          [
+            {
+              "node": "Register Source Backed Studio Photographs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Register Source Backed Studio Photographs": {
+        "main": [
+          [
+            {
+              "node": "Reload Studio Review Photographs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Reload Studio Review Photographs": {
+        "main": [
+          [
+            {
+              "node": "Studio Planner Intent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Studio Planner Intent": {
+        "main": [
+          [
+            {
+              "node": "Studio Planner Story",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Studio Planner Story": {
+        "main": [
+          [
+            {
+              "node": "Studio Planner Package",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Studio Planner Package": {
+        "main": [
+          [
+            {
+              "node": "Use Actual Studio Planner Photographs",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Use Actual Studio Planner Photographs": {
+        "main": [
+          [
+            {
+              "node": "Plan Exact Studio Slide Sequence",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Plan Exact Studio Slide Sequence": {
+        "main": [
+          [
+            {
+              "node": "Preserve Earlier Studio Native Package",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Preserve Earlier Studio Native Package": {
+        "main": [
+          [
+            {
+              "node": "Reopen Studio Story For Exact Review",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Reopen Studio Story For Exact Review": {
+        "main": [
+          [
+            {
+              "node": "Read Reopened Studio Story",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Reopened Studio Story": {
+        "main": [
+          [
+            {
+              "node": "Verify Reopened Studio Story",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Verify Reopened Studio Story": {
+        "main": [
+          [
+            {
+              "node": "Commit Exact Studio Native Review",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Commit Exact Studio Native Review": {
+        "main": [
+          [
+            {
+              "node": "Read Committed Studio Editorial Package",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Committed Studio Editorial Package": {
+        "main": [
+          [
+            {
+              "node": "Verify Exact Studio Native Review Commit",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Verify Exact Studio Native Review Commit": {
+        "main": [
+          [
+            {
+              "node": "Return Exact Studio Review Receipt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Studio Private File Scope": {
+        "main": [
+          [
+            {
+              "node": "Read Studio Private File Package",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Studio Private File Package": {
+        "main": [
+          [
+            {
+              "node": "Read Studio Private File Registry",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Studio Private File Registry": {
+        "main": [
+          [
+            {
+              "node": "Validate Studio Private Final File",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate Studio Private Final File": {
+        "main": [
+          [
+            {
+              "node": "Download Studio Private Final JPEG",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Download Studio Private Final JPEG": {
+        "main": [
+          [
+            {
+              "node": "Hash Studio Private Final JPEG",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Hash Studio Private Final JPEG": {
+        "main": [
+          [
+            {
+              "node": "Restore Studio Private Final JPEG",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Restore Studio Private Final JPEG": {
+        "main": [
+          [
+            {
+              "node": "Return Verified Studio Private JPEG",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Studio Post Needs Initial Package?": {
+        "main": [
+          [
+            {
+              "node": "Validate Studio Package Start",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Read Effective Studio Review Package",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate Studio Package Start": {
+        "main": [
+          [
+            {
+              "node": "Build Shared Initial Package Reservation",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Shared Initial Package Reservation": {
+        "main": [
+          [
+            {
+              "node": "Reserve Initial Studio Package",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Reserve Initial Studio Package": {
+        "main": [
+          [
+            {
+              "node": "Read Reserved Initial Studio Story",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Reserved Initial Studio Story": {
+        "main": [
+          [
+            {
+              "node": "Verify Initial Studio Package Reservation",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Verify Initial Studio Package Reservation": {
+        "main": [
+          [
+            {
+              "node": "Initial Package Comes From Studio?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Initial Package Comes From Studio?": {
+        "main": [
+          [
+            {
+              "node": "Assemble Initial Studio Package",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      },
+      "Assemble Initial Studio Package": {
+        "main": [
+          [
+            {
+              "node": "Save Initial Studio Package",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Save Initial Studio Package": {
+        "main": [
+          [
+            {
+              "node": "Read Effective Studio Review Package",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Effective Studio Review Package": {
+        "main": [
+          [
+            {
+              "node": "Build Studio Native Package Digest",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  },
+  "coordinator": {
+    "name": "ISOLATED native source configuration",
+    "settings": {
+      "executionOrder": "v1",
+      "availableInMCP": true
+    },
+    "nodes": [
+      {
+        "id": "mi-gateway-c5c0c9387beb40eb18de",
+        "name": "Studio Publishing Request",
+        "webhookId": "mildincident-studio-native-publishing-v1",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "retryOnFail": false,
+        "position": [
+          2200,
+          1230
+        ],
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "mildincident-studio-post-handoff",
+          "authentication": "jwtAuth",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "credentials": {
+          "jwtAuth": {
+            "id": "fixture-jwtAuth",
+            "name": "Isolated test credential"
+          }
+        }
+      },
+      {
+        "id": "mi-gateway-13eb9dfaf15f7fd75947",
+        "name": "Canonical Studio Publishing Body",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2200,
+          1260
+        ],
+        "parameters": {
+          "jsCode": "function stableNative(value){\n if(Array.isArray(value))return '['+value.map(stableNative).join(',')+']';\n if(value&&typeof value==='object')return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+stableNative(value[k]??null)).join(',')+'}';\n return JSON.stringify(value??null);\n}const r=$input.first().json;return [{json:{body:r.body,authorization:r.headers?.authorization||'',body_json:stableNative(r.body)}}];"
+        }
+      },
+      {
+        "id": "mi-gateway-ab5d6cc1f0f75cfc3b86",
+        "name": "Hash Studio Publishing Body",
+        "type": "n8n-nodes-base.crypto",
+        "typeVersion": 1,
+        "retryOnFail": false,
+        "position": [
+          2200,
+          1290
+        ],
+        "parameters": {
+          "action": "hash",
+          "type": "SHA256",
+          "value": "={{ $json.body_json }}",
+          "dataPropertyName": "body_sha256",
+          "encoding": "hex"
+        }
+      },
+      {
+        "id": "mi-gateway-f5d8266ae6ac9221d2c1",
+        "name": "Read Authenticated Studio Publishing Envelope",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2200,
+          1320
+        ],
+        "parameters": {
+          "jsCode": "const preparationRequest=$('Canonical Studio Publishing Body').first().json.body;if(!['review','file','connection'].includes(preparationRequest?.action))throw Error('PREPARATION_ONLY_ACTION_DENIED');\nlet trusted=false;try{trusted=$('Studio Publishing Request').isExecuted===true;}catch{}const raw=$('Canonical Studio Publishing Body').first().json,r=raw.body,token=String(raw.authorization).replace(/^Bearer /,''),parts=token.split('.');let header,claims;try{header=JSON.parse(Buffer.from(parts[0],'base64url').toString());claims=JSON.parse(Buffer.from(parts[1],'base64url').toString());}catch{throw Error('STUDIO_PUBLISHING_AUTH_INVALID');}const now=Math.floor(Date.now()/1000);if(!trusted||parts.length!==3||header.alg!=='HS256'||claims.iss!=='mildincident-studio'||claims.aud!=='mildincident-native-publishing-v1'||claims.sub!=='founder'||claims.jti!==r?.requestId||claims.bodySha256!==$input.first().json.body_sha256||!Number.isInteger(claims.iat)||!Number.isInteger(claims.exp)||claims.exp<=now||claims.iat>now+30||claims.exp-claims.iat>300)throw Error('STUDIO_PUBLISHING_AUTH_INVALID');if(!r||r.version!==1||Object.keys(r).some(k=>!['version','action','requestId','storyId','packageVersion','caption','selectedAssetIds','fileManifest','confirm','factsReviewed','slidesReviewed','packet','fileRecordId','assetId','sha256','postId','contentDigest'].includes(k))||!['review','approve','send','file','read_post','connection'].includes(r.action)||!/^[-a-f0-9]{36}$/.test(r.requestId||'')||!/^CON-[A-Za-z0-9_-]{5,95}$/.test(r.storyId||'')||(!(r.action==='review'&&r.packageVersion===null&&r.packet?.expected?.packageVersion===null&&r.confirm==='submit_exact_post_for_native_review')&&(!Number.isInteger(r.packageVersion)||r.packageVersion<1)))throw Error('STUDIO_PUBLISHING_REQUEST_INVALID');return [{json:{studio_request:r,studio_action:r.action,concept_id:r.storyId,production_version:r.packageVersion,request_kind:'mildincident_finalize_v1'}}];"
+        }
+      },
+      {
+        "id": "mi-gateway-4fdb36ef41a6ab765b0a",
+        "name": "Studio Operation Runs Asynchronously?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "retryOnFail": false,
+        "position": [
+          2200,
+          1350
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ ['review','approve','send'].includes($json.studio_action) }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "mi-gateway-9a2e63fbd6e44e12d36e",
+        "name": "Acknowledge One Studio Native Operation",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.4,
+        "retryOnFail": false,
+        "position": [
+          2200,
+          1380
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ {state:'native_accepted',requestId:$json.studio_request.requestId,executionId:String($execution.id)} }}",
+          "options": {
+            "responseCode": 202,
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Cache-Control",
+                  "value": "private, no-store"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": "mi-gateway-c6ee9533ba62f4e03430",
+        "name": "Studio Requests Native Review?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "retryOnFail": false,
+        "position": [
+          2200,
+          1410
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.studio_action === 'review' }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "mi-gateway-1f5d47851debbe53dc29",
+        "name": "Studio Reads Private Final File?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "retryOnFail": false,
+        "position": [
+          2200,
+          1440
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "leftValue": "={{ $json.studio_action === 'file' }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "mi-gateway-765f3ed8dbdf954b9a32",
+        "name": "Store Studio Operation Result",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          2200,
+          2130
+        ],
+        "parameters": {
+          "jsCode": "return $input.all();"
+        }
+      },
+      {
+        "id": "mi-gateway-03634346381ca655b312",
+        "name": "Return Studio Publishing JSON",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.4,
+        "retryOnFail": false,
+        "position": [
+          2200,
+          2160
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ $json }}",
+          "options": {
+            "responseCode": 200,
+            "responseHeaders": {
+              "entries": [
+                {
+                  "name": "Cache-Control",
+                  "value": "private, no-store"
+                }
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Studio Publishing Request": {
+        "main": [
+          [
+            {
+              "node": "Canonical Studio Publishing Body",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Canonical Studio Publishing Body": {
+        "main": [
+          [
+            {
+              "node": "Hash Studio Publishing Body",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Hash Studio Publishing Body": {
+        "main": [
+          [
+            {
+              "node": "Read Authenticated Studio Publishing Envelope",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Authenticated Studio Publishing Envelope": {
+        "main": [
+          [
+            {
+              "node": "Studio Operation Runs Asynchronously?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Studio Operation Runs Asynchronously?": {
+        "main": [
+          [
+            {
+              "node": "Acknowledge One Studio Native Operation",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Studio Requests Native Review?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Acknowledge One Studio Native Operation": {
+        "main": [
+          [
+            {
+              "node": "Studio Requests Native Review?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Studio Requests Native Review?": {
+        "main": [
+          [],
+          [
+            {
+              "node": "Studio Reads Private Final File?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Studio Reads Private Final File?": {
+        "main": [
+          [],
+          []
+        ]
+      }
+    }
+  },
+  "guarded": {
+    "name": "ISOLATED native source configuration",
+    "settings": {
+      "executionOrder": "v1",
+      "availableInMCP": true,
+      "callerPolicy": "workflowsFromAList",
+      "callerIds": "v5ThKs5ZYP3RhZop"
+    },
+    "nodes": [
+      {
+        "id": "mi-buffer-aa56d2881cf67a2912ed",
+        "name": "Validate Studio Buffer Connection Check",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          3450,
+          1590
+        ],
+        "parameters": {
+          "jsCode": "if(!$('Internal Buffer Release Handoff').isExecuted||$input.first().json.request_kind!=='mildincident_finalize_v1'||$input.first().json.phase!=='studio_connection_check')throw Error('BUFFER_READ_SCOPE_DENIED');return [{json:{channelId:'6adfbc112f1f5ed648dee51f'}}];"
+        }
+      },
+      {
+        "id": "mi-buffer-ec8efe3394603295cb77",
+        "name": "Read Existing Buffer Channel",
+        "type": "@n8n/n8n-nodes-langchain.mcpClient",
+        "typeVersion": 1.1,
+        "retryOnFail": false,
+        "position": [
+          3450,
+          1620
+        ],
+        "parameters": {
+          "serverTransport": "httpStreamable",
+          "endpointUrl": "https://mcp.buffer.com/mcp",
+          "authentication": "bearerAuth",
+          "tool": {
+            "__rl": true,
+            "mode": "id",
+            "value": "get_channel"
+          },
+          "inputMode": "json",
+          "jsonInput": "={{ JSON.stringify({channelId:$json.channelId}) }}",
+          "options": {
+            "timeout": 30000,
+            "convertToBinary": false
+          }
+        },
+        "credentials": {
+          "httpBearerAuth": {
+            "id": "fixture-httpBearerAuth",
+            "name": "Isolated test credential"
+          }
+        }
+      },
+      {
+        "id": "mi-buffer-c7977728b152d11a09b3",
+        "name": "Return Verified Buffer Connection",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "retryOnFail": false,
+        "position": [
+          3450,
+          1650
+        ],
+        "parameters": {
+          "jsCode": "const r=$input.first().json;let p=r.structuredContent??r.content?.find(i=>i.type==='text')?.text??r;if(typeof p==='string'){try{p=JSON.parse(p);}catch{throw Error('BUFFER_CHANNEL_READ_FAILED');}}const c=p.channel??p.data?.channel??p;if(r.isError||c.id!=='6adfbc112f1f5ed648dee51f'||c.isDisconnected!==false||c.isLocked!==false)throw Error('BUFFER_CHANNEL_READ_FAILED');return [{json:{verified:true,channelId:c.id,isDisconnected:false,isLocked:false,source:'existing_native_buffer_credential'}}];"
+        }
+      }
+    ],
+    "connections": {
+      "Validate Studio Buffer Connection Check": {
+        "main": [
+          [
+            {
+              "node": "Read Existing Buffer Channel",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Existing Buffer Channel": {
+        "main": [
+          [
+            {
+              "node": "Return Verified Buffer Connection",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+}
