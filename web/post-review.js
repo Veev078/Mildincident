@@ -10,6 +10,7 @@ export function postReview(story,state={}){
  let status='Draft',message='',action='';
  const button=(label,attrs)=>`<button class="button button-dark" ${attrs} data-story="${esc(story.id)}">${label}</button>`;
  if(d?.canCheck){status=d.state==='confirmed_draft'?'In Buffer':'Checking delivery';message=d.message;action=button('Check delivery','data-buffer-action="check"');}
+ else if(['sending','needs_reconciliation','confirmed_draft'].includes(d?.state)){status='Delivery recorded';message=d.message||'Check the recorded delivery before another send.';action=button('View delivery','data-post-inspector="delivery"');}
  else if(previous){status='Earlier delivery recorded';message='Check the existing Buffer post before another send.';action=button('View delivery','data-post-inspector="delivery"');}
  else if(c?.pending&&c.canResume){status='Final confirmation recorded';message='Continue this approved delivery; no second confirmation is needed.';action=button('Continue delivery','data-post-completion="advance"');}
  else if(stale){status='Changes to compare';message='Your saved version is safe. Compare the source changes first.';action=`<a class="button button-dark" href="${storyUrl(story.id,'refine')}">Compare changes</a>`;}
@@ -19,9 +20,9 @@ export function postReview(story,state={}){
  else if(transferPending){status='Preparing post';message=t.state==='uncertain'?'Preparation needs checking. It will not be submitted again.':'Your caption and slide order are being saved privately.';action=button('Check preparation','data-native-review="check"');}
  else if(d?.canSend||c?.available){status='Ready for your decision';message='One unscheduled Buffer draft. You decide when to publish.';action=button('Send to Buffer','data-post-completion="review"');}
  else if(t?.filesPrepared===true&&!n?.finalFilesVerified){status='Checking finished slides';message='The saved production files need a private preview check.';action=button('Check slides','data-native-review="check"');}
- else if(t?.state==='native_review_saved'&&n?.nativeContentCurrent){status='Preparation verified';message='The native copy matches your caption and slide order. Nothing has been sent to Buffer.';}
- else if(n?.reviewAvailable&&!n?.finalFilesVerified){status='Ready to prepare';message='Save this caption and slide order privately. This does not approve permissions or send a post.';action=button('Prepare for approval','data-native-review="review-transfer"');}
- else {status='Preparation unavailable';message=n?.preparationReason||n?.message||'Private preparation is not connected. Your caption and photographs are saved.';}
+ else if(t?.state==='native_review_saved'&&n?.nativeContentCurrent){status='Preparation verified';message='The native copy matches your caption and slide order. Review the final post and any remaining delivery requirements.';action=button('Send to Buffer','data-post-completion="review"');}
+ else if(n?.reviewAvailable&&!n?.finalFilesVerified){status='Draft';message='Review your caption, slides and delivery readiness together.';action=button('Send to Buffer','data-post-completion="review"');}
+ else {status='Draft';message='Review your caption, slides and delivery readiness together.';action=button('Send to Buffer','data-post-completion="review"');}
  return `<section class="post-review post-final" aria-label="Your post" data-story-task="review"><header class="review-heading"><h2 class="sr-only">Your post.</h2><button class="text-button" data-post-inspector="sources" data-story="${esc(story.id)}">Post details</button></header><div class="review-desk"><div class="review-visual"><div data-post-preview-slot>${photos.length?postPreview(story,state.postSlides?.[story.id]||0):'<div class="review-no-photo"><p>Choose the photographs first.</p></div>'}</div><nav class="review-edit-links"><a href="${storyUrl(story.id,'build')}">Edit slides</a><a href="${storyUrl(story.id,'refine')}">Edit caption</a></nav></div><aside class="review-preparation"><span class="review-state">${esc(status)}</span><p class="completion-next" role="status">${esc(message)}</p><section class="review-transfer">${action}</section></aside></div></section>`;
 }
 

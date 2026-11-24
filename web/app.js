@@ -1255,11 +1255,14 @@ document.addEventListener('click',async event=>{
  const id=b.dataset.story,action=b.dataset.postCompletion;if(completionCalls.has(id))return;completionCalls.add(id);b.disabled=true;
  try{
   if(!await flushAllDrafts())throw Error('Save your caption and slides first.');
-  const story=storyById(id);state.completionReviews ||= {};
+  let story=storyById(id);state.completionReviews ||= {};
   if(action==='advance'){await advanceCompletion(id);return;}
   if(action==='review'){
+   delete state.completionReviews[id];if(state.bufferReviews)delete state.bufferReviews[id];
+   story=await loadStory(id);
+   if(!story.postCompletion?.available&&!story.bufferDraft?.canSend){openDialog(bufferConfirmDialog(story,{...story.bufferDraft,ready:false}));return;}
    const r=await api('/api/stories/'+encodeURIComponent(id)+'/post-completion/review',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:crypto.randomUUID()})});
-   if(!r.delivery.ready){toast(r.delivery.message,{error:true});return;}
+   if(!r.delivery.ready){openDialog(bufferConfirmDialog(story,r.delivery));return;}
    if(!r.delivery.completion){state.bufferReviews ||= {};state.bufferReviews[id]={...r.delivery,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0};}
    else state.completionReviews[id]={...r.delivery,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:crypto.randomUUID()};
    openDialog(bufferConfirmDialog(story,r.delivery));return;

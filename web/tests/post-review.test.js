@@ -8,15 +8,19 @@ test('source changes, missing selection and prior provider activity retain truth
  assert.ok(postReview({...sparse,localDraft:{stale:true,caption:'Retain me'}}).includes('Compare changes'));assert.ok(postReview({...sparse,publishing:{observed:'buffer_sent',requiresReview:true,postIds:['recorded-id']}}).includes('Earlier delivery recorded'));assert.ok(!postReview(sparse).includes('data-requirement='));
 });
 
-test('a private review copy stays Needs review, with one next action and no zoom or invented approval',()=>{
+test('an unsent post keeps Send to Buffer visible without inventing approval',()=>{
  const story={id:'CON-review',caption:'Exact caption',selectedAssetIds:['a'],media:[{id:'a',previewUrl:'https://example.org/photo.jpg'}],approvalRequest:{unchanged:true,id:'local-copy',message:'Saved privately.'}};
- const html=postReview(story);assert.match(html,/Preparation unavailable/);assert.match(html,/Private preparation is not connected/);assert.doesNotMatch(html,/Photo permission needed|Review photo permissions/);assert.doesNotMatch(html,/data-approval-prepare=/);assert.doesNotMatch(html,/photo-expand/);assert.doesNotMatch(html,/data-buffer-action="send"/);assert.match(html,/Post details/);assert.match(html,/data-post-preview=/);
+ const html=postReview(story);assert.match(html,/Send to Buffer/);assert.match(html,/data-post-completion="review"/);assert.doesNotMatch(html,/Photo permission needed|Review photo permissions/);assert.doesNotMatch(html,/data-approval-prepare=/);assert.doesNotMatch(html,/photo-expand/);assert.doesNotMatch(html,/data-buffer-action="send"/);assert.match(html,/Post details/);assert.match(html,/data-post-preview=/);
 });
 
- test('unreviewed photographs never hide an available private preparation, and confirmation remains explicit',()=>{
- const story={id:'CON-private',caption:'A saved caption',selectedAssetIds:['a'],media:[{id:'a',nativeRightsReview:{reviewed:false,rightsGranted:false}}],nativePublishing:{reviewAvailable:true,finalFilesVerified:false}},before=JSON.stringify(story),html=postReview(story);assert.match(html,/Prepare for approval/);assert.match(html,/data-native-review="review-transfer"/);assert.doesNotMatch(html,/data-native-review="submit"|Review photo permissions|Send to Buffer/);assert.equal(JSON.stringify(story),before);
- const disabled=postReview({...story,nativePublishing:{reviewAvailable:false,preparationReason:'Private preparation is switched off.'}});assert.match(disabled,/Private preparation is switched off/);assert.doesNotMatch(disabled,/permission needed|Prepare for approval/);
+ test('Send to Buffer remains available to review after preparation closes without clearing image rights',()=>{
+ const story={id:'CON-private',caption:'A saved caption',selectedAssetIds:['a'],media:[{id:'a',nativeRightsReview:{reviewed:false,rightsGranted:false}}],nativePublishing:{reviewAvailable:true,finalFilesVerified:false}},before=JSON.stringify(story),html=postReview(story);assert.match(html,/Send to Buffer/);assert.match(html,/data-post-completion="review"/);assert.doesNotMatch(html,/data-native-review="submit"|Review photo permissions/);assert.equal(JSON.stringify(story),before);
+ const disabled=postReview({...story,nativePublishing:{reviewAvailable:false,preparationReason:'Private preparation is switched off.'}});assert.match(disabled,/Send to Buffer/);assert.doesNotMatch(disabled,/permission needed|Prepare for approval/);
  const done=postReview({...story,nativePublishing:{reviewAvailable:false,nativeContentCurrent:true},nativeReviewTransfer:{state:'native_review_saved',filesPrepared:false}});assert.match(done,/Preparation verified/);assert.doesNotMatch(done,/permission needed|Prepare for approval|Preparation unavailable/);
- const changed=postReview({...story,nativePublishing:{reviewAvailable:true,nativeContentCurrent:false},nativeReviewTransfer:{state:'native_review_saved',filesPrepared:false}});assert.match(changed,/Prepare for approval/);
+ const changed=postReview({...story,nativePublishing:{reviewAvailable:true,nativeContentCurrent:false},nativeReviewTransfer:{state:'native_review_saved',filesPrepared:false}});assert.match(changed,/Send to Buffer/);assert.match(done,/Send to Buffer/);
  const inspector=postInspector(story,'permissions');assert.doesNotMatch(inspector,/Photo permissions|Open permission records|Credit needed/);assert.match(inspector,/Facts & attribution/);
  });
+
+test('uncertain or recorded deliveries cannot offer another send even when the reader is unavailable',()=>{
+ for(const state of ['sending','needs_reconciliation','confirmed_draft']){const html=postReview({id:'CON',caption:'Caption',selectedAssetIds:['a'],media:[{id:'a'}],bufferDraft:{state,canCheck:false}});assert.doesNotMatch(html,/data-post-completion="review"/);assert.match(html,/View delivery/);}
+});

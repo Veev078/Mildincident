@@ -1,12 +1,26 @@
-import {esc,effective,postMediaFor,image} from './components.js';
+import {esc,effective,postMediaFor,image,storyUrl} from './components.js';
 
 export function bufferDraftPanel(story,{compact=false}={}){
  const delivery=story.bufferDraft||{state:'blocked',message:'Sending from Studio is not enabled. Complete approval in the existing workflow.'};
  return `<section class="buffer-draft-status" data-buffer-status role="status"><h4>${delivery.state==='confirmed_draft'?'Buffer draft verified':delivery.state==='needs_reconciliation'?'Check delivery':'Send to Buffer'}</h4><p class="small">${esc(delivery.message)}</p>${delivery.postId&&!compact?`<p class="small">Buffer post ID: <code>${esc(delivery.postId)}</code></p>`:''}${delivery.canSend?`<button class="button button-dark" data-buffer-action="review" data-story="${esc(story.id)}">Send to Buffer</button>`:''}${delivery.canCheck?`<button class="small-button" data-buffer-action="check" data-story="${esc(story.id)}">Check delivery status</button>`:''}</section>`;
 }
 
+// Present delivery requirements in the final post review, without granting approvals.
+export function bufferDeliveryIssues(delivery={}){
+ const codes=(delivery.blockers||[]).map(b=>b.code||''),issues=[];
+ if(codes.some(c=>/RIGHTS|PERMISSION/.test(c)))issues.push('Some selected photos have no verified usage basis. Record valid evidence or choose replacements before sending.');
+ if(codes.some(c=>/JPEG|ASSET|MEDIA|FILE/.test(c)))issues.push('The finished slide files still need verification. Previews alone are not delivery-ready files.');
+ if(codes.some(c=>/BUFFER_CONNECTION|NOT_AUTHORIZED/.test(c)))issues.push('Buffer draft delivery is switched off. It needs a separately authorized activation before this post can be sent.');
+ if(codes.some(c=>/FACT|CAPTION_APPROVAL/.test(c)))issues.push('The exact caption and factual checks are not yet cleared for delivery.');
+ const known=/RIGHTS|PERMISSION|JPEG|ASSET|MEDIA|FILE|BUFFER_CONNECTION|NOT_AUTHORIZED|FACT|CAPTION_APPROVAL/;
+ if(codes.some(c=>!known.test(c)))issues.push('The saved post and current delivery evidence still need to match before sending.');
+ if(!issues.length)issues.push(delivery.message||'Delivery readiness has not been verified. Nothing has been sent.');
+ return issues;
+}
+
 export function bufferConfirmDialog(story,delivery){
  const assets=postMediaFor(story),draft=effective(story);
+ if(delivery.ready!==true)return `<div class="dialog-heading"><div><p class="eyebrow">Unscheduled draft only</p><h2>Send this post to Buffer</h2></div><button class="icon-button" data-action="close-dialog" aria-label="Close final post review">×</button></div><p>Nothing has been sent. These items need attention before you can confirm this draft.</p><ol class="buffer-confirm-slides" aria-label="Selected slide order">${assets.map((a,i)=>`<li>${image(a,{compact:true,storyId:story.id,index:i})}<span>${i===0?'Cover':`Slide ${i+1}`}</span></li>`).join('')}</ol><details open><summary>Caption</summary><p class="body-copy">${esc(draft.caption)}</p></details><section role="status" aria-label="Before sending"><h3>Before sending</h3><ul>${bufferDeliveryIssues(delivery).map(issue=>`<li>${esc(issue)}</li>`).join('')}</ul></section><div class="dialog-actions"><a class="button button-light" href="${storyUrl(story.id,'build')}">Choose replacement photos</a><button class="button button-light" data-action="close-dialog">Keep editing</button></div>`;
  return `<div class="dialog-heading"><div><p class="eyebrow">Unscheduled draft only</p><h2>${delivery.completion?'Approve & send this post?':'Send this post to Buffer?'}</h2></div><button class="icon-button" data-action="close-dialog" aria-label="Cancel Buffer handoff">×</button></div><p>One draft for MILDINCIDENT. You will review it in Buffer before scheduling or publishing.</p><ol class="buffer-confirm-slides" aria-label="Final slide order">${assets.map((a,i)=>`<li>${image(a,{compact:true,storyId:story.id,index:i})}<span>${i===0?'Cover':`Slide ${i+1}`}</span></li>`).join('')}</ol><details open><summary>Final caption</summary><p class="body-copy">${esc(draft.caption)}</p></details><p class="small muted">${delivery.fileCount} final JPEG files verified. Your caption and slide order must still match the approved version when sent.</p>${delivery.completion?'<p><label><input type="checkbox" data-final-post-reviewed> I have checked the facts, credits, caption and finished slides.</label></p>':''}<div class="dialog-actions"><button class="button button-light" data-action="close-dialog">Keep editing</button><button class="button button-dark" ${delivery.completion?'data-post-completion="confirm"':'data-buffer-action="send"'} data-story="${esc(story.id)}">Confirm Buffer draft</button></div>`;
 }
 
