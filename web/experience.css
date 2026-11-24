@@ -20,3 +20,8 @@
 @media(max-width:700px){.post-final .review-desk{display:flex;flex-direction:column;gap:16px}.post-final .review-preparation{padding:0}.post-final .review-transfer .button{width:100%}.post-final .review-caption>summary>span{display:none}.post-final .review-caption .body-copy{font-size:13px}.post-final .review-heading{margin-bottom:12px}}
 @media(max-width:700px){.post-final .review-preparation{order:-1;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;align-items:center}.post-final .review-state{justify-self:start}.post-final .completion-next{grid-column:1/-1;grid-row:2;margin:0;font-size:12px}.post-final .review-transfer{grid-column:2;grid-row:1}.post-final .review-transfer .button{min-height:40px;padding:10px 12px;font-size:12px}.post-final .review-heading h2{font-size:27px}}
 .post-final .review-heading{display:flex;justify-content:flex-end;margin:0 0 8px;min-height:28px}.post-final .review-heading .sr-only{position:absolute}
+/* Keep the complete photograph in a compact, neutral Instagram frame. */
+.post-final .review-desk{grid-template-columns:minmax(0,420px) minmax(220px,300px)}
+.post-final .review-post{max-width:420px}.post-final .rehearsal-stage .photo{background:var(--paper)}
+.post-final .photo img,.buffer-confirm-slides .photo img{object-fit:contain}
+#asset-dialog:has(.post-inspector-body){width:min(620px,calc(100vw - 24px));max-height:85dvh;overflow:auto}
