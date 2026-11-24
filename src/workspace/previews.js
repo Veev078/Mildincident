@@ -8,7 +8,7 @@ import sharp from 'sharp';
 import { safePhotoReference } from '../n8n/photo-url-guard.js';
 import { HandoffError, requireThat } from '../errors.js';
 
-export const IMAGE_FEEDBACK_BASES=['editorial_taste','photographic_style','composition','mood','story_potential','factual_issue','source_issue','rights_issue','retrieval_issue','interface_issue'];
+export const IMAGE_FEEDBACK_BASES=['project_relevance','editorial_taste','photographic_style','composition','mood','story_potential','factual_issue','source_issue','rights_issue','retrieval_issue','interface_issue'];
 
 export const MAX_PREVIEW_BYTES = 25 * 1024 * 1024;
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -212,7 +212,7 @@ export class LocalPreviewStore {
   }
 
   tasteFeedback(){
-    return [...this.allReviews()].map(([key,review])=>{const [storyId,assetId]=JSON.parse(key),context=review.context;return {candidateId:'image-dialog:'+storyId+':'+assetId,subject:context?.subject||'Specific photograph '+assetId,decision:review.decision==='shortlist'?'approved':review.decision==='reject'?'rejected':'needs_research',reason:review.reason.slice(0,700),reviewer:'founder',basis:['factual_issue','source_issue','rights_issue','retrieval_issue','interface_issue'].includes(context?.decisionBasis)?'reported_'+context.decisionBasis:'editorial_taste',decisionBasis:context?.decisionBasis||'editorial_taste',scope:'specific_photograph_selection',origin:'image_dialog',photograph:{storyId,assetId,sourceUrl:context?.sourceUrl||'',previewSha256:context?.previewSha256||null,previewVersionRecorded:Boolean(context?.previewSha256),...(context?.photographicResearch?{research:context.photographicResearch}:{})},sourceRevision:context?.sourceRevision||null,workingVersion:context?.workingVersion??null,reviewVersion:review.version,createdAt:review.updatedAt};}).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,6);
+    return [...this.allReviews()].map(([key,review])=>{const [storyId,assetId]=JSON.parse(key),context=review.context;return {candidateId:'image-dialog:'+storyId+':'+assetId,subject:context?.subject||'Specific photograph '+assetId,decision:review.decision==='shortlist'?'approved':review.decision==='reject'?'rejected':'needs_research',reason:review.reason.slice(0,700),reviewer:'founder',basis:context?.decisionBasis==='project_relevance'?'project_relevance':['factual_issue','source_issue','rights_issue','retrieval_issue','interface_issue'].includes(context?.decisionBasis)?'reported_'+context.decisionBasis:'editorial_taste',decisionBasis:context?.decisionBasis||'editorial_taste',scope:'specific_photograph_selection',origin:'image_dialog',photograph:{storyId,assetId,sourceUrl:context?.sourceUrl||'',previewSha256:context?.previewSha256||null,previewVersionRecorded:Boolean(context?.previewSha256),...(context?.photographicResearch?{research:context.photographicResearch}:{})},sourceRevision:context?.sourceRevision||null,workingVersion:context?.workingVersion??null,reviewVersion:review.version,createdAt:review.updatedAt};}).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,6);
   }
 
   saveReview(storyId, assetId, input,{context=null}={}) {

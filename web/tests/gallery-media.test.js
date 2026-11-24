@@ -1,0 +1,11 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {galleryMedia,acceptedSavedPhoto} from '../gallery-media.js';import {photoDeskWorkspace} from '../photo-desk.js';
+const story=()=>({id:'CON-test',subject:'A specific music-video look',revision:'r1',caption:'Preserve writing',selectedAssetIds:[],media:[0,1,2,3].map(i=>({id:'photo-'+i,title:'Page cover / social preview',sourceRelation:'page_cover',photoRelevance:{category:'unconfirmed'},rightsStatus:'preview_unreviewed',localPreview:{sha256:String(i).repeat(64),originalSha256:String(i).repeat(64)}}))});
+test('saved unconfirmed originals are accessible for inspection without automatic project promotion',()=>{
+ const s=story(),before=JSON.stringify(s),g=galleryMedia(s);assert.equal(g.saved.length,0);assert.equal(g.inspect.length,4);assert.equal(g.other.length,0);const html=photoDeskWorkspace({},s);assert.match(html,/Saved to inspect/);assert.equal((html.match(/data-photo-accept=/g)||[]).length,4);assert.match(html,/does not clear usage rights/);assert.equal(JSON.stringify(s),before);
+});
+test('explicit acceptance is version/hash/subject-bound and changes only gallery membership',()=>{
+ const s=story(),a=s.media[0];a.localReview={decision:'shortlist',context:{decisionBasis:'project_relevance',previewSha256:a.localPreview.sha256,sourceRevision:s.revision,subject:s.subject}};assert(acceptedSavedPhoto(s,a));s.revision='stage-only-update';assert(acceptedSavedPhoto(s,a));assert.equal(galleryMedia(s).saved.length,1);assert.equal(s.selectedAssetIds.length,0);assert.equal(a.rightsStatus,'preview_unreviewed');assert.equal(a.photoRelevance.category,'unconfirmed');a.localPreview.sha256='changed';assert(!acceptedSavedPhoto(s,a));assert.equal(galleryMedia(s).saved.length,0);
+});
+test('duplicate hashes, rejected images and an unrelated aesthetic shortlist are not promoted',()=>{
+ const s=story();s.media[1].localPreview={...s.media[0].localPreview};s.media[2].localReview={decision:'reject'};s.media[3].localReview={decision:'shortlist',context:{decisionBasis:'composition',previewSha256:s.media[3].localPreview.sha256}};const g=galleryMedia(s);assert.equal(g.saved.length,0);assert.equal(g.inspect.length,2);assert.equal(g.other.length,2);
+});

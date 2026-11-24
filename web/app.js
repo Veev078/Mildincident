@@ -1387,3 +1387,13 @@ document.addEventListener('click',async event=>{
  state.photoRefresh ||= {};state.photoRefresh[id]=true;b.disabled=true;
  try{await discoverStoryPhotos(id,b);}finally{state.photoRefresh[id]=false;b.disabled=false;}
 });
+
+document.addEventListener('click',async event=>{
+ const b=event.target.closest('[data-photo-accept]');if(!b||b.disabled)return;const id=b.dataset.story,key='photo-accept:'+id+':'+b.dataset.photoAccept;
+ if(captionRequestLocks.has(key))return;captionRequestLocks.add(key);b.disabled=true;
+ try{
+  if(!await flushAllDrafts())throw Error('Save your current edit first.');const story=await loadStory(id),a=story.media.find(a=>a.id===b.dataset.photoAccept);if(!a?.localPreview)throw Error('This photograph has no saved file.');if(a.localPreview.sha256!==b.dataset.previewHash||story.revision!==b.dataset.revision||(a.localReview?.version||0)!==Number(b.dataset.reviewVersion))throw Error('This image or its saved decision changed. Inspect the current version before keeping it.');
+  await api('/api/stories/'+encodeURIComponent(id)+'/assets/'+encodeURIComponent(a.id)+'/review',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({expectedVersion:a.localReview?.version||0,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,previewSha256:a.localPreview.sha256,decision:'shortlist',basis:'project_relevance',reason:'Founder explicitly confirmed this saved photograph is relevant to this story.'})});
+  state.galleryFilters ||= {};state.galleryFilters[id]='saved';await loadStory(id);announce('Kept in Saved photographs. Your selected slides and image rights are unchanged.');
+ }catch(error){toast(error.message,{error:true});}finally{captionRequestLocks.delete(key);b.disabled=false;}
+});

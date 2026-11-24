@@ -328,6 +328,7 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
           const input=await body(request),{story,asset}=findAsset();let context=null;
           const scoped=['sourceRevision','workingVersion','previewSha256'].some(k=>Object.hasOwn(input,k));
           if(scoped){requireThat(input.sourceRevision===story.revision&&input.workingVersion===(story.localDraft?.version||0)&&input.previewSha256===(asset.localPreview?.sha256||''),'EDIT_CONFLICT','This story or preview changed. Reopen the image before reviewing.');const photographicResearch=imageFeedbackProvenance(asset);context={subject:story.subject||story.title,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,sourceUrl:asset.sourceUrl||'',previewSha256:asset.localPreview?.sha256||null,...(photographicResearch?{photographicResearch}:{})};}
+          if(input.basis==='project_relevance'){requireThat(scoped&&asset.localPreview&&input.previewSha256===asset.localPreview.sha256,'INVALID_IMAGE_REVIEW','Inspect the exact saved image before keeping it as relevant.');await previews.readOriginal(storyId,assetId,input.previewSha256);}
           const reviewInput={...input};for(const k of ['sourceRevision','workingVersion','previewSha256'])delete reviewInput[k];
           json(response, 200, { review: previews.saveReview(storyId, assetId, reviewInput,{context}), scope: 'local_only', rightsGranted: false, productionApplied: false }); return;
         }
