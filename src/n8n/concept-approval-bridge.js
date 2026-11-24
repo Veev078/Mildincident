@@ -1,0 +1,30 @@
+import {requireThat} from '../errors.js';
+import {publishingGraphSha} from './buffer-handoff-security.js';
+export const CONCEPT_WORKFLOW='77xnMJZ4bzo4VCVX',CONCEPT_PATH='mildincident-studio-concept-decision';
+// Pure validator used by the EXISTING canonical decision node, never a local approval authority.
+export function studioConceptPlan(r,c){
+ const e=r?.expected,deny=()=>{throw Error('STUDIO_CONCEPT_CHANGED');};
+ if(r?.action!=='concept_approve'||r.confirm!=='approve_concept_only'||!/^[-a-f0-9]{36}$/.test(r.requestId||'')||!e||c.id!==e.id||c.concept_id!==r.storyId||c.updatedAt!==e.updatedAt||c.stage!==e.stage||c.approval_status!==e.approvalStatus||c.title!==e.title||c.published_url||!c.review_token||!/^CON-[A-Za-z0-9_-]{5,95}$/.test(r.storyId||'')||!(/^[a-f0-9]{64}$/.test(r.nextReviewToken||'')))deny();
+ if(!['awaiting_chief_review','needs_revision','awaiting_founder_approval'].includes(c.stage)||!['pending','revision_requested','awaiting_founder_approval',''].includes(c.approval_status||''))deny();
+ const note='Founder concept approval from Studio Finish Post. Chief verdict unchanged; facts, rights and publication remain pending. STUDIO_CONCEPT '+r.requestId;
+ return {valid:true,concept_id:c.concept_id,review_token:c.review_token,old_stage:c.stage,old_approval_status:c.approval_status,decision:'approve',old_chief_verdict:c.chief_verdict||'pending',old_queue:c.editorial_queue||'desk',new_token:r.nextReviewToken,new_stage:'approved_for_sourcing',new_approval_status:'concept_approved',new_queue:'desk',new_feedback:note,notice:'concept_greenlit',audit_note:note};
+}
+/** Local patch only. Reuses canonical save, verification and audit; no new workflow. */
+export function prepareConceptBridge(workflow,{expectedVersion,expectedSha256,privateEntry}){
+ requireThat(workflow.id===CONCEPT_WORKFLOW&&workflow.versionId===expectedVersion&&publishingGraphSha(workflow)===expectedSha256,'CONCEPT_BASE_CHANGED','Review the current canonical concept workflow.');
+ const w=Object.fromEntries(['name','nodes','connections','settings'].map(k=>[k,structuredClone(workflow[k])]));
+ const get=name=>{const n=w.nodes.filter(n=>n.name===name);requireThat(n.length===1,'CONCEPT_NODE_CHANGED','Canonical approval node changed.');return n[0];};
+ const add=(source,name)=>{const n=structuredClone(source);n.name=name;n.id='studio-concept-'+w.nodes.length;n.position=[2000,w.nodes.length*100];w.nodes.push(n);return n;},edge=node=>({node,type:'main',index:0}),link=(a,b)=>w.connections[a]={main:[[edge(b)]]};
+ const from=name=>privateEntry.nodes.find(n=>n.name===name);
+ const trigger=add(from('Studio Publishing Request'),'Studio Concept Request');trigger.parameters.path=CONCEPT_PATH;trigger.webhookId='studio-concept-decision-v1';requireThat(trigger.credentials?.jwtAuth?.id,'CONCEPT_AUTH_REQUIRED','Reuse the existing dedicated JWT credential.');
+ const canon=add(from('Canonical Studio Publishing Body'),'Canonical Studio Concept Body'),hash=add(from('Hash Studio Publishing Body'),'Hash Studio Concept Body');
+ const auth=add(from('Store Studio Operation Result'),'Authenticate Studio Concept');auth.parameters.jsCode=`const raw=$('Canonical Studio Concept Body').first().json,r=raw.body,p=String(raw.authorization).replace(/^Bearer /,'').split('.');let h,c;try{h=JSON.parse(Buffer.from(p[0],'base64url'));c=JSON.parse(Buffer.from(p[1],'base64url'));}catch{throw Error('CONCEPT_AUTH_INVALID');}const now=Math.floor(Date.now()/1000);if(p.length!==3||h.alg!=='HS256'||c.iss!=='mildincident-studio'||c.aud!=='mildincident-native-publishing-v1'||c.sub!=='founder'||c.jti!==r?.requestId||c.bodySha256!==$input.first().json.body_sha256||!Number.isInteger(c.iat)||!Number.isInteger(c.exp)||c.exp<=now||c.iat>now+30||c.exp-c.iat>300)throw Error('CONCEPT_AUTH_INVALID');if(r?.version!==1||r.action!=='concept_approve'||Object.keys(r).some(k=>!['version','action','requestId','storyId','confirm','expected','nextReviewToken'].includes(k)))throw Error('CONCEPT_ACTION_DENIED');return [{json:r}];`;
+ link(trigger.name,canon.name);link(canon.name,hash.name);link(hash.name,auth.name);link(auth.name,'Inline Decision — Read Current Story');
+ const read=get('Inline Decision — Read Current Story');read.parameters.filters.conditions[0].keyValue="={{ $('Studio Concept Request').isExecuted ? $('Authenticate Studio Concept').first().json.storyId : $('Inline Founder Greenlight').first().json.body.concept_id }}";read.parameters.returnAll=true;delete read.parameters.limit;
+ const validate=get('Inline Decision — Validate');validate.parameters.jsCode=`let studio=false;try{studio=$('Studio Concept Request').isExecuted===true;}catch{}if(studio){if($input.all().length!==1)throw Error('CONCEPT_RECORD_AMBIGUOUS');const plan=${studioConceptPlan.toString()};return [{json:plan($('Authenticate Studio Concept').first().json,$input.first().json)}];}\n`+validate.parameters.jsCode;
+ get('Inline Decision — Save Founder State').parameters.filters.conditions.push({keyName:'updatedAt',condition:'eq',keyValue:"={{ $('Inline Decision — Read Current Story').first().json.updatedAt }}"});
+ const route=add(get('Inline Decision — Greenlit?'),'Studio Concept Receipt?');route.parameters.conditions.conditions[0]={leftValue:"={{ $('Studio Concept Request').isExecuted === true }}",rightValue:true,operator:{type:'boolean',operation:'true',singleValue:true}};
+ const reply=add(from('Return Studio Publishing JSON'),'Return Studio Concept Receipt');reply.parameters.responseBody="={{ {state:'concept_approved',storyId:$('Inline Decision — Validate').first().json.concept_id,requestId:$('Authenticate Studio Concept').first().json.requestId,executionId:String($execution.id),rightsGranted:false,publicationApproved:false} }}";
+ link('Inline Decision — Audit',route.name);w.connections[route.name]={main:[[edge(reply.name)],[edge('Inline Decision — Greenlit?')]]};
+ return {update:w,review:{graphSha256:publishingGraphSha(w),existingCanonicalWriter:true,existingAudit:true,automaticSourcing:false,bufferWrites:false,installed:false}};
+}

@@ -1282,6 +1282,7 @@ document.addEventListener('click',async event=>{
  try{
   if(!await flushAllDrafts())throw Error('Save your caption and slides first.');
   let story=storyById(id);state.completionReviews ||= {};
+  if(action==='concept'){const current=await loadStory(id);await api('/api/stories/'+encodeURIComponent(id)+'/post-completion/concept',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify({sourceRevision:current.revision,workingVersion:current.localDraft?.version||0,idempotencyKey:crypto.randomUUID(),confirm:'approve_concept_only'})});await finishPost(id);return;}
   if(action==='finish'||action==='finish-check'){await finishPost(id,action==='finish-check');return;}
   if(action==='advance'){await advanceCompletion(id);return;}
   if(action==='review'){
@@ -1302,7 +1303,7 @@ document.addEventListener('click',async event=>{
    await api('/api/stories/'+encodeURIComponent(id)+'/post-completion/confirm',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(input)});
    document.querySelector('#asset-dialog')?.close();delete state.completionReviews[id];toast('Your final confirmation is saved. Preparing one Buffer draft.');await advanceCompletion(id);
   }
- }catch(error){if((action==='finish'||action==='finish-check')&&route().id===id&&storyById(id))openDialog(finishPostDialog(storyById(id),{issue:{code:error.code,action:'check',message:error.message}}));else toast(error.message,{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}
+ }catch(error){if((action==='finish'||action==='finish-check'||action==='concept')&&route().id===id&&storyById(id))openDialog(finishPostDialog(storyById(id),{issue:{code:error.code,action:error.code==='CONCEPT_APPROVAL_DISABLED'?'connection':'check',message:error.message}}));else toast(error.message,{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}
  finally{completionCalls.delete(id);b.disabled=false;}
 });
 

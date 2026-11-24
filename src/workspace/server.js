@@ -184,11 +184,11 @@ export function createWorkspaceServer({ source, drafts, previews, research, engi
         requireThat(photography,'RESEARCH_UNAVAILABLE','Photographic research is unavailable.');const id=decodeURIComponent(photoSearch[1]),readStory=()=>view().stories.find(s=>s.id===id),story=readStory();requireThat(story,'STORY_NOT_FOUND','Open the original story.');
         const photoRequest=await photography.searchStoryRequest(story,photoSearch[2],await body(request),{readStory});json(response,200,{photoRequest,productionApplied:false,paidCalls:0});return;
       }
-      const completionRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/post-completion\/(finish|check|review|confirm|advance)$/);
+      const completionRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/post-completion\/(finish|concept|check|review|confirm|advance)$/);
       if(completionRoute&&request.method==='POST'){
         const id=decodeURIComponent(completionRoute[1]),story=view({storyId:id}).stories.find(s=>s.id===id);requireThat(story,'STORY_NOT_FOUND','Open the original post.');const input=await body(request),action=completionRoute[2];
         if(action==='advance')requireThat(Object.keys(input).length===0,'INVALID_BUFFER_REQUEST','Continue only the recorded final confirmation.');
-        const result=action==='finish'||action==='check'?await postCompletion.finish(story,input,{checkOnly:action==='check'}):action==='review'?await postCompletion.review(story,input):action==='confirm'?await postCompletion.confirm(story,input):await postCompletion.advance(story);
+        const result=action==='concept'?await postCompletion.confirmConcept(story,input):action==='finish'||action==='check'?await postCompletion.finish(story,input,{checkOnly:action==='check'}):action==='review'?await postCompletion.review(story,input):action==='confirm'?await postCompletion.confirm(story,input):await postCompletion.advance(story);
         json(response,200,result);return;
       }
       const nativeReviewRoute=url.pathname.match(/^\/api\/stories\/([^/]+)\/native-review\/(submit|approve|check)$/);

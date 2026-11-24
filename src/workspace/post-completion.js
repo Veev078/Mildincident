@@ -1,3 +1,4 @@
+import {nativePreparationReadiness} from './native-post-readiness.js';
 import {finishPhotoEvidence} from './finish-evidence.js';
 import {randomUUID} from 'node:crypto';
 import {canonical,sha256} from '../package.js';
@@ -34,7 +35,7 @@ export class PostCompletion {
    await this.connection?.inspect?.({force:true});
    if(!checkOnly&&this.refreshSource){await this.refreshSource();story=await this.readStory(story.id);this.buffer.assertContent(story,input);}
    if(story.production?.handoffs?.some(h=>h.state!=='abandoned')||story.production?.provider?.length)return blocked({code:'EXISTING_DELIVERY',message:'An earlier delivery is now recorded. Check it before any new preparation or send.',action:'delivery'});
-   if(story.localDraft?.stale)return blocked({code:'EDIT_CONFLICT',message:'The source changed. Your writing and earlier versions are saved. Compare them before continuing.',action:'edit_caption'});
+   const conceptPrior=this.transfers?.latest(story.id);if(['concept_dispatching','concept_uncertain'].includes(conceptPrior?.state)){try{await this.acceptConcept(story,conceptPrior);story=await this.readStory(story.id);}catch{return blocked({code:'CONCEPT_APPROVAL_UNCERTAIN',message:'The existing concept decision needs confirmation. It will not be submitted again.',action:'check'});}}
    let prior=this.transfers?.latest(story.id);
    if(prior?.deliveryConsent&&(['dispatching','running','uncertain'].includes(prior.state)||prior.deliveryConsent.expiresAt>this.now()&&prior.deliveryConsent.digest===completionContent(story)))return {state:'confirmed',pending:false,message:'Your final confirmation is recorded. Continue its existing delivery.',resumeDelivery:true};
    if(['dispatching','running','uncertain'].includes(prior?.state)){
@@ -42,6 +43,7 @@ export class PostCompletion {
     catch{return blocked({code:'PREPARATION_UNCERTAIN',message:'The existing preparation has not been confirmed. It is preserved and will not be submitted again.',action:'check'});}
     story=await this.readStory(story.id);prior=this.transfers.latest(story.id);
    }
+   if(story.localDraft?.stale)return blocked({code:'EDIT_CONFLICT',message:'The source changed. Your writing and earlier versions are saved. Compare them before continuing.',action:'edit_caption'});
    const w={...story,...story.localDraft},ids=w.selectedAssetIds||[];
    if(!w.caption?.trim())return blocked({code:'CAPTION_REQUIRED',message:'Add the caption before finishing this post.',action:'edit_caption'});
    if(!ids.length||new Set(ids).size!==ids.length||ids.some(id=>story.media.filter(a=>a.id===id).length!==1))return blocked({code:'PHOTOS_REQUIRED',message:'Choose an unambiguous photograph sequence before finishing.',action:'replace_photo'});
@@ -49,6 +51,7 @@ export class PostCompletion {
    const current=!story.localDraft?.stale&&w.caption===story.caption&&canonical(ids)===canonical(story.selectedAssetIds)&&['title','hook','format','targetSlideCount'].every(k=>w[k]===story[k]);
    const saved=current&&story.production?.package&&(prior?.packageVersion===story.production.package.version&&['native_review_saved','native_post_approved'].includes(prior.state)||story.production.package.finalAssetsVerified);
    if(!saved){
+    const readiness=nativePreparationReadiness(story);if(!readiness.available)return blocked({code:readiness.code,message:readiness.reason,action:readiness.conceptConfirmationRequired?'approve_concept':readiness.code==='STALE_SOURCE'?'edit_caption':'connection',conceptApprovalAvailable:this.connection?.conceptApprovalAvailable===true});
     if(checkOnly)return blocked({code:'FINISH_REQUIRED',message:'Your saved post needs preparation. Finish Post will prepare this version.',action:'finish'});
     if(!this.transfers||!this.connection?.status?.(story).reviewAvailable)return blocked({code:'PREPARATION_DISABLED',message:this.connection?.status?.(story).preparationReason||'Private preparation is not enabled. Your post is saved; an authorized connection is needed to continue.',action:'connection'});
     const prepared=this.transfers.approvals.prepare(story,{sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:input.idempotencyKey,confirm:'prepare_review_only'});
@@ -62,6 +65,29 @@ export class PostCompletion {
    const r=await this.review(story,{sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:checkOnly?randomUUID():input.idempotencyKey});
    if(!r.delivery.ready)return blocked({code:'DELIVERY_NOT_READY',message:r.delivery.message,action:'delivery'});
    return {state:'ready',pending:false,delivery:r.delivery,sourceRevision:story.revision,workingVersion:story.localDraft?.version||0};
+  }finally{this.locks.delete(story.id);}
+ }
+ async acceptConcept(story,prior){
+  await this.connection.readConceptReceipt(story.id,prior.approvalId);await this.refreshSource?.();const current=await this.readStory(story.id),local=this.transfers.drafts.get(story.id);
+  requireThat(nativePreparationReadiness(current).conceptApproved&&current.stage==='approved_for_sourcing'&&current.caption===story.caption&&canonical(current.selectedAssetIds)===canonical(story.selectedAssetIds),'CONCEPT_APPROVAL_UNCERTAIN','The independently read concept or content does not match.');
+  requireThat((local?.version||0)===prior.workingVersion,'EDIT_CONFLICT','Your edit changed while concept approval was saved. Both versions are preserved.');
+  if(local&&current.revision!==prior.sourceRevision)this.transfers.drafts.rebase(current,{expectedVersion:local.version,previousRevision:prior.sourceRevision,currentRevision:current.revision,confirm:'keep_local_after_review'});
+  this.transfers.event({id:prior.approvalId},story,'concept_approved',{sourceRevision:prior.sourceRevision,workingVersion:prior.workingVersion,rightsGranted:false,publicationApproved:false});
+  return {state:'concept_approved',pending:false,continueFinish:true};
+ }
+ async confirmConcept(story,input){
+  requireThat(input&&Object.keys(input).every(k=>['sourceRevision','workingVersion','idempotencyKey','confirm'].includes(k))&&input.confirm==='approve_concept_only','CONCEPT_CONFIRMATION_REQUIRED','Explicitly approve this editorial concept only.');
+  const readiness=nativePreparationReadiness(story);if(readiness.conceptApproved)return {state:'concept_approved',continueFinish:true};
+  this.buffer.assertContent(story,input);
+  requireThat(readiness.conceptConfirmationRequired,'CONCEPT_STATE_INVALID',readiness.reason||'Reconcile the canonical concept state.');
+  await this.connection?.inspect?.({force:true});
+  requireThat(this.connection?.conceptApprovalAvailable===true,'CONCEPT_APPROVAL_DISABLED','The canonical concept-approval connection needs authorized activation. Your post is saved; no decision was written.');
+  requireThat(!this.locks.has(story.id),'RECONCILIATION_REQUIRED','The existing concept decision is being checked.');this.locks.add(story.id);
+  try{
+   const previous=this.transfers.latest(story.id);if(['concept_dispatching','concept_uncertain'].includes(previous?.state))return await this.acceptConcept(story,previous);
+   const a=this.transfers.approvals.prepare(story,{sourceRevision:story.revision,workingVersion:input.workingVersion,idempotencyKey:input.idempotencyKey,confirm:'prepare_review_only'}),prior={approvalId:a.id,sourceRevision:story.revision,workingVersion:input.workingVersion};
+   this.transfers.event(a,story,'concept_dispatching',prior);
+   try{await this.connection.approveConcept(story,{requestId:a.id});return await this.acceptConcept(story,prior);}catch(error){this.transfers.event(a,story,['CONCEPT_APPROVAL_DISABLED','CONCEPT_RECORD_CHANGED','EDIT_CONFLICT'].includes(error.code)?'concept_not_started':'concept_uncertain',prior);throw error;}
   }finally{this.locks.delete(story.id);}
  }
  async review(story,input){
