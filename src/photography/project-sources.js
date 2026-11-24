@@ -12,13 +12,14 @@ import {readPublicSource} from './public-source-transport.js';
 // already present in this story's retained research may be fetched.
 export const PROJECT_PAGE_HOSTS=Object.freeze(['www.dazeddigital.com','www.life.com','life.com','thephotographersgallery.org.uk','www.thephotographersgallery.org.uk','www.booooooom.com','josharonson.us','www.josharonson.us','sophyrickett.com','www.sophyrickett.com','www.cobgallery.com','www.cheeriopublishing.com','www.climaxbooks.com','www.theguardian.com','www.artsy.net','www.windowseat.ph','windowseat.ph','www.gelitin.net','gelitin.net','www.itsnicethat.com']);
 const digest=value=>createHash('sha256').update(value).digest('hex');
-export const PROJECT_IMAGE_PARSER_VERSION='project-images-v5';
+export const PROJECT_IMAGE_PARSER_VERSION='project-images-v6';
 export const PUBLIC_SOURCE_CONNECTION_POLICY='evidence_bound_public_v1';
 const restrictedHost=host=>/(?:^|\.)(?:linkedin\.com|instagram\.com|facebook\.com|fb\.com|tiktok\.com|pinterest\.com|twitter\.com|x\.com|accounts\.google\.com)$/.test(host);
 const archiveHost=host=>/^(?:(?:www\.)?loc\.gov|(?:www\.|api\.)?artic\.edu|commons\.wikimedia\.org)$/.test(host);
 export function supportedProjectPage(url,{connectionPolicy=PUBLIC_SOURCE_CONNECTION_POLICY}={}){
  if(!safePhotoReference(url))return false;const u=new URL(url);
  if(connectionPolicy!==PUBLIC_SOURCE_CONNECTION_POLICY)return PROJECT_PAGE_HOSTS.includes(u.hostname);
+ if(u.hostname==='commons.wikimedia.org')return /^\/wiki\/File:[^/]+$/i.test(u.pathname)&&!u.search;
  if(restrictedHost(u.hostname)||archiveHost(u.hostname)||/^(?:staging|admin|internal|login|accounts)\./i.test(u.hostname))return false;
  return !/(?:^|\/)(?:search|category|categories|tags?)(?:\/|$)|\/(?:archives?|collections?)\/?$/i.test(u.pathname)&&![...u.searchParams.keys()].some(k=>/^(?:q|s|search|searchterm|query)$/i.test(k));
 }

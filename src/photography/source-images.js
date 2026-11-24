@@ -41,9 +41,9 @@ export function permittedSourceImage(sourceUrl,imageUrl,capture=null){
  return PROJECT_PAGE_HOSTS.includes(source)&&(source===image||(CDN_HOSTS[source]||[]).includes(image));
 }
 
-/** One transport attempt, bounded streaming and no redirects/authentication. */
+/** One transport attempt, bounded streaming and validated redirects and no authentication. */
 export async function readSourceImage(url,{fetchImpl=fetch,allowedRedirectUrls=[],...transportOptions}={}){
- let result;try{result=await readPublicSource(url,{...transportOptions,fetchImpl,allowedRedirectUrls,sameHostRedirects:false,accept:'image/jpeg,image/png,image/webp',maxBytes:MAX_SOURCE_IMAGE_BYTES,timeoutMs:15000,maxRedirects:2});}catch(error){if(error.code==='SOURCE_TOO_LARGE')error.code='SOURCE_IMAGE_TOO_LARGE';if(error.code==='SOURCE_SIZE_CHANGED')error.code='SOURCE_IMAGE_SIZE_CHANGED';throw error;}
+ let result;try{result=await readPublicSource(url,{...transportOptions,fetchImpl,allowedRedirectUrls,sameHostRedirects:true,accept:'image/jpeg,image/png,image/webp',maxBytes:MAX_SOURCE_IMAGE_BYTES,timeoutMs:15000,maxRedirects:2});}catch(error){if(error.code==='SOURCE_TOO_LARGE')error.code='SOURCE_IMAGE_TOO_LARGE';if(error.code==='SOURCE_SIZE_CHANGED')error.code='SOURCE_IMAGE_SIZE_CHANGED';throw error;}
  requireThat(['image/jpeg','image/png','image/webp'].includes(result.contentType),'INVALID_PREVIEW_TYPE','The source did not return a supported still image.');return result;
 }
 

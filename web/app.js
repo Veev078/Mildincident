@@ -1378,3 +1378,11 @@ document.addEventListener('keydown',event=>{const preview=event.target.closest('
 let inlineSwipe=null;
 document.addEventListener('pointerdown',event=>{const preview=event.target.closest('[data-post-preview] .instagram-slide');if(preview&&event.pointerType!=='mouse')inlineSwipe={id:preview.closest('[data-post-preview]').dataset.postPreview,x:event.clientX,y:event.clientY};});
 document.addEventListener('pointerup',event=>{const start=inlineSwipe;inlineSwipe=null;if(!start)return;const dx=event.clientX-start.x,dy=event.clientY-start.y;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.4)movePostPreview(start.id,(state.postSlides?.[start.id]||0)+(dx<0?1:-1));});
+
+// Explicit recovery for a completed failed read; never a timed retry or a paid action.
+document.addEventListener('click',async event=>{
+ const b=event.target.closest('[data-photo-recheck]');if(!b||b.disabled)return;const id=b.dataset.photoRecheck,story=storyById(id);
+ if(story?.photoRequests?.[0]?.state!=='unavailable')return;
+ state.photoRefresh ||= {};state.photoRefresh[id]=true;b.disabled=true;
+ try{await discoverStoryPhotos(id,b);}finally{state.photoRefresh[id]=false;b.disabled=false;}
+});

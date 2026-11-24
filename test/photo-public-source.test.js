@@ -87,5 +87,24 @@ test('page redirect bases stay attached to original source identity and image re
  const s=story(),page=await fetchProjectPage(s,source,{withEvidence:true,fetchImpl:async url=>url===source?response(null,{status:301,headers:{location:'/moved/project/'}}):response(html('frame.jpg'))});
  const parsed=projectPageReferences(s,{url:source,html:page.html,transport:page.transport});assert.equal(parsed.photos[0].sourceUrl,source);assert.equal(parsed.photos[0].previewUrl,'https://unfamiliar-publisher.example/moved/project/frame.jpg');assert.equal(parsed.sourceCapture.transport.initialUrl,source);
  await assert.rejects(readSourceImage(cdn,{fetchImpl:async()=>response(null,{status:302,headers:{location:'https://other-cdn.example/not-in-capture.jpg'}})}),{code:'SOURCE_REDIRECT_NOT_BOUND'});
- await assert.rejects(readSourceImage(cdn,{fetchImpl:async()=>response(null,{status:302,headers:{location:'/not-in-capture.jpg'}})}),{code:'SOURCE_REDIRECT_NOT_BOUND'});
+ await assert.rejects(readSourceImage(cdn,{fetchImpl:async()=>response(null,{status:302,headers:{location:'/not-in-capture.jpg'}})}),{code:'SOURCE_REDIRECT_LOOP'});
+});
+
+test('equivalent IPv6 spellings compare canonically and a public IPv4 answer is preferred without retrying',async()=>{
+ const {normalizedSourceAddress}=await import('../src/photography/public-source-transport.js');assert.equal(normalizedSourceAddress('2606:4700:4700:0000:0000:0000:0000:1111'),normalizedSourceAddress('2606:4700:4700::1111'));
+ const addresses=await resolvePublicSource('bound.example',{lookupImpl:async()=>[{address:'2606:4700:4700::1111',family:6},{address:'93.184.216.34',family:4}]});assert.equal(addresses[0].family,4);
+});
+test('image relocation on its own host and exact www canonical alias stay pinned; cross-CDN and private destinations stay denied',async()=>{
+ let calls=0;const r=await readSourceImage('https://www.nasa.gov/original.jpg',{proxyConfigured:false,lookupImpl:publicDns,requestImpl:async()=>++calls===1?response(null,{status:302,headers:{location:'https://nasa.gov/original.jpg'}}):response('JPEG bytes supplied by isolated transport',{headers:{'content-type':'image/jpeg'}})});assert.equal(r.transport.requests,2);
+ await assert.rejects(readSourceImage('https://www.nasa.gov/original.jpg',{lookupImpl:publicDns,requestImpl:async()=>response(null,{status:302,headers:{location:'https://unbound-cdn.example/original.jpg'}})}),{code:'SOURCE_REDIRECT_NOT_BOUND'});
+});
+test('an exact Commons file record is a project source and its enclosing original replaces the display thumbnail',()=>{
+ const url='https://commons.wikimedia.org/wiki/File:Earthrise.jpg';assert(supportedProjectPage(url));assert(!supportedProjectPage('https://commons.wikimedia.org/wiki/Category:Earth'));
+ const s={...story(),subject:'Apollo 8 Earthrise',research:[{url}]},p=automaticPhotoPlan(s);assert.equal(p.source,'project');
+ const r=projectPageReferences(s,{url,html:'<html><h1>Apollo 8 Earthrise</h1><figure><a href="https://upload.wikimedia.org/wikipedia/commons/a/a8/Earthrise.jpg"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Earthrise.jpg/640px-Earthrise.jpg" alt="Apollo 8 Earthrise photograph by NASA Bill Anders"></a><figcaption>Apollo 8 Earthrise photograph by NASA Bill Anders</figcaption></figure></html>'});assert(r.photos.some(p=>p.previewUrl==='https://upload.wikimedia.org/wikipedia/commons/a/a8/Earthrise.jpg'));assert(!r.photos.some(p=>p.previewUrl.includes('/thumb/')));
+});
+test('one DNS/security failure advances to a different retained source and acquires a decoded file without retrying the failed source',async t=>{
+ const s=story(),other='https://another-publisher.example/projects/test-project';s.research.push({url:other});const calls=[],bytes=await sharp({create:{width:1400,height:1600,channels:3,background:'#345'}}).jpeg().toBuffer();
+ const {service,previews}=await setup(t,{readProjectPage:async(_,url)=>{calls.push(url);if(url===source)throw Error('SOURCE_DNS_CHANGED');return html();},fetchImage:async()=>new Response(bytes,{headers:{'content-type':'image/jpeg'}})});
+ const p=service.prepareDiscovery(s,prepare(s)),r=await service.searchStoryRequest(s,p.id,confirm(s));assert.deepEqual(calls,[source,other]);assert.equal(r.state,'complete');assert.equal(r.decodedImageCount,1);assert.equal(r.sourceAttempts[0].errorCode,'SOURCE_DNS_CHANGED');assert.equal(r.paidCalls,0);assert(service.storyMedia(s).some(a=>previews.get(s.id,a.id)?.originalSha256));
 });

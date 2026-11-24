@@ -8,7 +8,7 @@ import {requireThat} from '../errors.js';
 // DNS is checked on every hop and the TLS socket uses that checked address.
 export function publicSourceAddress(value){
  const family=isIP(value);if(!family)return false;
- if(family===4){const [a,b,c]=value.split('.').map(Number);return !(a===0||a===10||a===127||a>=224||a===169&&b===254||a===172&&b>=16&&b<=31||a===192&&(b===168||b===0||b===88&&c===99)||a===100&&b>=64&&b<=127||a===198&&(b===18||b===19||b===51)||a===203&&b===0);}
+ if(family===4){const [a,b,c]=value.split('.').map(Number);return !(a===0||a===10||a===127||a>=224||a===169&&b===254||a===172&&b>=16&&b<=31||a===192&&(b===168||b===0||b===88&&c===99)||a===100&&b>=64&&b<=127||a===198&&(b===18||b===19||b===51&&c===100)||a===203&&b===0&&c===113);}
  // Accept global unicast only. Mapped, transition, documentation, link-local,
  // multicast and unique-local IPv6 cannot smuggle a private IPv4 destination.
  const parts=value.toLowerCase().split(':');const first=parseInt(parts[0],16);
@@ -20,8 +20,10 @@ export function publicSourceAddress(value){
 export async function resolvePublicSource(hostname,{lookupImpl=lookup}={}){
  let answers;try{answers=await lookupImpl(hostname,{all:true,verbatim:true});}catch{throw Error('SOURCE_DNS_UNAVAILABLE');}
  requireThat(Array.isArray(answers)&&answers.length>0&&answers.length<=32&&answers.every(a=>publicSourceAddress(a.address)&&Number(a.family)===isIP(a.address)),'SOURCE_NONPUBLIC_ADDRESS','Every source DNS answer must be a public address.');
- return answers.map(a=>({address:a.address,family:Number(a.family)}));
+ return answers.map(a=>({address:a.address,family:Number(a.family)})).sort((a,b)=>a.family-b.family);
 }
+
+export const normalizedSourceAddress=value=>isIP(value)===6?new URL('http://['+value+']/').hostname.slice(1,-1):value;
 
 export function pinnedSourceRequest(url,{address,headers,signal}){
  return new Promise((resolve,reject)=>{
@@ -29,7 +31,7 @@ export function pinnedSourceRequest(url,{address,headers,signal}){
    // Check the connected endpoint as well as lookup; no ambient Agent, socket
    // reuse or environment proxy may choose a different endpoint.
    const remote=response.socket?.remoteAddress?.replace(/^::ffff:/i,'');
-   if(remote!==address.address){response.destroy();reject(Error('SOURCE_DNS_CHANGED'));return;}
+   if(!remote||normalizedSourceAddress(remote)!==normalizedSourceAddress(address.address)){response.destroy();reject(Error('SOURCE_DNS_CHANGED'));return;}
    const responseHeaders=new Headers();for(const [k,v]of Object.entries(response.headers))if(v!==undefined)responseHeaders.set(k,Array.isArray(v)?v.join(', '):v);
    resolve({status:response.statusCode,headers:responseHeaders,body:response});
   });
@@ -38,6 +40,7 @@ export function pinnedSourceRequest(url,{address,headers,signal}){
 }
 
 const safeUrl=value=>{const valid=safePhotoReference(value);requireThat(valid,'SOURCE_UNSAFE_URL','Use a public HTTPS source without credentials.');return valid;};
+export function publisherAliasRedirect(from,to){const a=new URL(from),b=new URL(to);return a.hostname.replace(/^www\./,'')===b.hostname.replace(/^www\./,'')&&a.pathname.replace(/\/$/,'')===b.pathname.replace(/\/$/,'')&&a.search===b.search;}
 const cancel=async body=>{if(body?.destroy)body.destroy();else try{await body?.cancel?.();}catch{/* Already consumed. */}};
 
 /** Injected fetchImpl is a fixture seam, never the default network transport. */
@@ -53,13 +56,13 @@ export async function readPublicSource(url,{accept,maxBytes,timeoutMs=12000,maxR
   safeUrl(current);requireThat(!seen.has(current),'SOURCE_REDIRECT_LOOP','The source redirected in a loop.');seen.add(current);
   const answers=injected?[]:await within(resolvePublicSource(new URL(current).hostname,{lookupImpl}));signal.throwIfAborted();
   const headers={Accept:accept,'User-Agent':'MILDINCIDENT/1.0 (private editorial source review)','Accept-Encoding':'identity'};
-  const response=await within(injected?fetchImpl(current,{method:'GET',redirect:'manual',credentials:'omit',referrerPolicy:'no-referrer',headers,signal}):requestImpl(current,{address:answers[0],headers,signal}));
+  let response;try{response=await within(injected?fetchImpl(current,{method:'GET',redirect:'manual',credentials:'omit',referrerPolicy:'no-referrer',headers,signal}):requestImpl(current,{address:answers[0],headers,signal}));}catch(error){if(/^SOURCE_/.test(error.code||error.message||''))throw error;throw Error(signal.aborted?'SOURCE_TIMEOUT':'SOURCE_CONNECTION_FAILED');}
   const status=Number(response.status);hops.push({url:current,status,address:answers[0]?.address||null});
   if([301,302,303,307,308].includes(status)){
    const location=response.headers.get('location');await cancel(response.body);
    requireThat(hop<maxRedirects&&location,'SOURCE_REDIRECT_LIMIT','The source redirect limit was reached.');
    let next;try{next=new URL(location,current).href;}catch{throw Error('SOURCE_UNSAFE_REDIRECT');}safeUrl(next);
-   requireThat(sameHostRedirects&&new URL(next).hostname===new URL(current).hostname||allowedRedirectUrls.includes(next),'SOURCE_REDIRECT_NOT_BOUND','A redirect must stay on its source host or another exact URL bound to this request.');
+   requireThat(sameHostRedirects&&(new URL(next).hostname===new URL(current).hostname||publisherAliasRedirect(current,next))||allowedRedirectUrls.includes(next),'SOURCE_REDIRECT_NOT_BOUND','A redirect must stay on its source host or another exact URL bound to this request.');
    current=next;continue;
   }
   try{

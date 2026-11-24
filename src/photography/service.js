@@ -131,11 +131,12 @@ export class PhotographyService extends PhotoResearch {
        const result=await read(context,next);sourceCapture=result.sourceCapture;found.push(...result.photos);
        context={...initialContext,recordedProjectLinks:[...(initialContext.recordedProjectLinks||[]),...captures.flatMap(c=>c.projectTrails||[])]};
       }catch(error){
-       lastError=error;const attempt=p.sourceAttempts.at(-1);attempt.status='failed';attempt.errorCode=/^SOURCE_[A-Z0-9_]+$/.test(error.code||error.message||'')?(error.code||error.message):'SOURCE_UNAVAILABLE';p.failedSourceUrl=next;
+       lastError=error;const attempt=p.sourceAttempts.at(-1);if(!attempt||attempt.url!==next||attempt.status)throw error;attempt.status='failed';attempt.errorCode=/^SOURCE_[A-Z0-9_]+$/.test(error.code||error.message||'')?(error.code||error.message):'SOURCE_UNAVAILABLE';p.failedSourceUrl=next;
        this.db.prepare('UPDATE photo_story_requests SET data_json=? WHERE request_id=?').run(JSON.stringify(p),p.id);
-       // Only known denied/missing pages can fall through to a DIFFERENT source.
-       // Uncertain transport failures stop; no URL is ever automatically retried.
-       if(!/^SOURCE_HTTP_(401|403|404|410)$/.test(error.code||error.message||'')){if(captures.length){p.sourceProgressIncomplete=true;break;}throw error;}
+       // A failed read is not an ambiguous remote write. Continue to a DIFFERENT
+       // independently bound source; never retry this URL or weaken its guard.
+       if(!/^SOURCE_[A-Z0-9_]+$/.test(error.code||error.message||'')){if(captures.length){p.sourceProgressIncomplete=true;break;}throw error;}
+       p.sourceProgressIncomplete=true;
       }
       next=[...captures.flatMap(c=>c.projectTrails||[]).map(l=>l.url),...(payload.sourceCandidates||[])].find(u=>!visited.has(sourcePageKey(u))&&permittedProjectPage(context,u,{connectionPolicy:payload.sourceConnectionPolicy||'legacy'}));
      }

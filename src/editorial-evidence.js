@@ -73,7 +73,10 @@ export function photoEvidenceTools(publicReference) {
       const width=parseInt(a.width||'0',10)||0,height=parseInt(a.height||'0',10)||0;
       const responsive=bestResponsive(a.srcset||a['data-srcset']||a['data-lazy-srcset']),lazy=a['data-src']||a['data-image']||a['data-lazy-src']||a['data-original']||a['data-original-src']||a['data-flickity-lazyload-src'];
       const direct=responsive||lazy||(resolve(a.src,page)?a.src:'');
-      const url=responsive||lazy||direct||picture;
+      // Prefer an explicit original-file link enclosing THIS image, never a nearby link.
+      const enclosing=body.slice(0,tag.index).match(/<a\b([^>]*)>\s*$/i),linked=enclosing?resolve(attrs(enclosing[1]).href,page):'';
+      const original=linked&&/\.(?:jpe?g|png|webp)(?:[?#]|$)/i.test(linked)?linked:'';
+      const url=original||responsive||lazy||direct||picture;
       if(((width&&width<100)||(height&&height<100))&&!lazy&&!responsive&&!picture)continue;
       const referenced=String(a['aria-describedby']||'').split(/\s+/).map(id=>referencedCaptions.get(id)).filter(Boolean).join(' ');
       const nearby=referenced||(figure?.images===1||figure?.captionGroup?figure.caption:'');const alt=a.alt||a.title||'';
@@ -86,7 +89,7 @@ export function photoEvidenceTools(publicReference) {
         const kind=/(?:photograph(?:y|s)?|photos?|images?)\s*(?:by|:)\s*$/i.test(before)?'photographer':/(?:from|in|of)\s+(?:the\s+)?(?:series|project|book)\s*[:—-]?\s*$/i.test(before)?'series':null;
         const target=resolve(attrs(link[1]).href,page);if(kind&&target&&label&&researchLinks.length<6)researchLinks.push({kind,label,url:target,basis:'single_figure_caption_link',verified:false});
       }
-      add(url,caption,false,width,height,basis,researchLinks,{},[a.src,lazy,...responsiveSources(a.srcset||a['data-srcset']||a['data-lazy-srcset']).map(s=>s.url)].filter(Boolean));
+      add(url,caption,false,width,height,basis,researchLinks,{},[original,a.src,lazy,...responsiveSources(a.srcset||a['data-srcset']||a['data-lazy-srcset']).map(s=>s.url)].filter(Boolean));
       if(picture&&resolve(url,page)&&fileKey(resolve(picture,page))===fileKey(resolve(url,page)))add(picture,caption,false,width,height,basis,researchLinks);
     }
     const images=[...candidates.values()];const subject=tokens(story.subject||story.title||'').filter(t=>!stop.has(t));
