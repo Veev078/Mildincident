@@ -1,3 +1,4 @@
+import {finishPostDialog} from './finish-post.js';
 import {postInspector} from './post-review.js';
 import {postPreview} from './post-preview.js';
 import {renderStudio} from './studio-render.js';
@@ -535,6 +536,8 @@ document.addEventListener('click', async event => {
     case 'toggle-asset': {
       if (!story) break;
       const selected = [...effective(story).selectedAssetIds];
+      const replacement=state.finishReplacement,replaceIndex=replacement?.storyId===story.id?selected.indexOf(replacement.assetId):-1;
+      if(replaceIndex>=0&&!selected.includes(button.dataset.asset)){selected[replaceIndex]=button.dataset.asset;state.finishReplacement=null;editDraft(story.id,{selectedAssetIds:selected},{rerender:true,immediate:true});announce('Photograph replaced in the same slide position. Earlier versions and image permissions are unchanged.');break;}
       const index = selected.indexOf(button.dataset.asset);
       if (index >= 0) selected.splice(index, 1);
       else if (selected.length >= 10) { toast('The local preparation limit is ten slides. Remove an image before adding another.', { error: true }); break; }
@@ -1250,12 +1253,36 @@ async function advanceCompletion(id){
  }
  await loadWorkspace({quiet:true});toast('The existing operation is still running. Its confirmation is saved.');
 }
+async function finishPost(id,checkOnly=false){
+ const story=await loadStory(id),binding={sourceRevision:story.revision,workingVersion:story.localDraft?.version||0,idempotencyKey:crypto.randomUUID()};
+ state.completionReviews ||= {};delete state.completionReviews[id];if(state.bufferReviews)delete state.bufferReviews[id];
+ openDialog(finishPostDialog(story,{pending:true}));
+ let result;
+ for(let i=0;i<12;i++){
+  result=await api('/api/stories/'+encodeURIComponent(id)+'/post-completion/'+(checkOnly||i?'check':'finish'),{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(checkOnly||i?{}:binding)});
+  const current=await loadStory(id);
+  if(!document.querySelector('#asset-dialog[open] [data-finish-story="'+CSS.escape(id)+'"]')||route().id!==id)return;
+  if(result.state==='ready'){
+   const delivery={...result.delivery,finish:true};
+   if(delivery.completion)state.completionReviews[id]={...delivery,sourceRevision:result.sourceRevision,workingVersion:result.workingVersion,idempotencyKey:crypto.randomUUID()};
+   else{state.bufferReviews ||= {};state.bufferReviews[id]={...delivery,sourceRevision:result.sourceRevision,workingVersion:result.workingVersion};}
+   openDialog(bufferConfirmDialog(current,delivery));return;
+  }
+  if(result.delivery){document.querySelector('#asset-dialog')?.close();await loadWorkspace({quiet:true});toast(result.delivery.message);return;}
+  if(!document.querySelector('#asset-dialog')?.open)return; // Closing does not cancel/repeat native work.
+  openDialog(finishPostDialog(current,result));
+  if(!result.pending)return;
+  if(i<11)await new Promise(resolve=>setTimeout(resolve,1800));
+ }
+ openDialog(finishPostDialog(storyById(id),{issue:{action:'check',message:'Preparation is still running. Its request is saved. Check it later without starting another.'}}));
+}
 document.addEventListener('click',async event=>{
  const b=event.target.closest('[data-post-completion]');if(!b||b.disabled)return;
  const id=b.dataset.story,action=b.dataset.postCompletion;if(completionCalls.has(id))return;completionCalls.add(id);b.disabled=true;
  try{
   if(!await flushAllDrafts())throw Error('Save your caption and slides first.');
   let story=storyById(id);state.completionReviews ||= {};
+  if(action==='finish'||action==='finish-check'){await finishPost(id,action==='finish-check');return;}
   if(action==='advance'){await advanceCompletion(id);return;}
   if(action==='review'){
    delete state.completionReviews[id];if(state.bufferReviews)delete state.bufferReviews[id];
@@ -1268,13 +1295,14 @@ document.addEventListener('click',async event=>{
    openDialog(bufferConfirmDialog(story,r.delivery));return;
   }
   if(action==='confirm'){
-   if(!document.querySelector('[data-final-post-reviewed]')?.checked)throw Error('Confirm that you reviewed the facts, credits and finished post.');
-   const r=state.completionReviews[id];if(!r)throw Error('Open the final post review first.');
+   const r=state.completionReviews[id];
+   if(!r?.finish&&!document.querySelector('[data-final-post-reviewed]')?.checked)throw Error('Confirm that you reviewed the facts, credits and finished post.');
+   if(!r)throw Error('Open the final post review first.');
    const input={sourceRevision:r.sourceRevision,workingVersion:r.workingVersion,idempotencyKey:r.idempotencyKey,completionDigest:r.completionDigest,finalPostDigest:r.finalPostDigest,confirm:'approve_and_send_unscheduled_draft'};
    await api('/api/stories/'+encodeURIComponent(id)+'/post-completion/confirm',{method:'POST',headers:{'Content-Type':'application/json','X-Mildincident-Intent':'local-edit'},body:JSON.stringify(input)});
    document.querySelector('#asset-dialog')?.close();delete state.completionReviews[id];toast('Your final confirmation is saved. Preparing one Buffer draft.');await advanceCompletion(id);
   }
- }catch(error){toast(error.message,{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}
+ }catch(error){if((action==='finish'||action==='finish-check')&&route().id===id&&storyById(id))openDialog(finishPostDialog(storyById(id),{issue:{code:error.code,action:'check',message:error.message}}));else toast(error.message,{error:true});await loadWorkspace({quiet:true}).catch(()=>{});}
  finally{completionCalls.delete(id);b.disabled=false;}
 });
 
@@ -1330,8 +1358,15 @@ document.addEventListener('click',async event=>{
  finally{captionRequestLocks.delete(lock);b.disabled=false;}
 });
 
+document.addEventListener('click',event=>{
+ if(event.target.closest('[data-cancel-replacement]')){state.finishReplacement=null;render();return;}
+ const b=event.target.closest('[data-finish-replace]');if(!b)return;
+ state.finishReplacement={storyId:b.dataset.story,assetId:b.dataset.finishReplace};state.galleryFilters ||= {};state.galleryFilters[b.dataset.story]='saved';
+ document.querySelector('#asset-dialog')?.close();
+});
+
 function movePostPreview(id,index){
- const story=storyById(id),slot=document.querySelector('[data-post-preview-slot]');if(!story||!slot)return;
+ const story=storyById(id),slot=document.querySelector('#asset-dialog[open] [data-post-preview-slot]')||document.querySelector('[data-post-preview-slot]');if(!story||!slot)return;
  const count=mediaFor(story).length;state.postSlides ||= {};state.postSlides[id]=Math.max(0,Math.min(count-1,index));
  renderStudio(slot,postPreview(story,state.postSlides[id]));slot.querySelector('[data-post-preview]')?.focus({preventScroll:true});
 }

@@ -25,3 +25,6 @@
 .post-final .review-post{max-width:420px}.post-final .rehearsal-stage .photo{background:var(--paper)}
 .post-final .photo img,.buffer-confirm-slides .photo img{object-fit:contain}
 #asset-dialog:has(.post-inspector-body){width:min(620px,calc(100vw - 24px));max-height:85dvh;overflow:auto}
+/* Finish Post reuses the actual carousel; evidence remains outside its main view. */
+#asset-dialog:has(.finish-confirm-preview),#asset-dialog:has(.finish-post-progress){width:min(620px,calc(100vw - 24px));max-height:92dvh;overflow:auto}
+.finish-confirm-preview .review-post{max-width:380px;margin:auto}.finish-confirm-preview .photo img{object-fit:contain}.finish-confirm-preview .review-caption .body-copy{font-size:14px;line-height:1.6}.finish-confirm-preview .review-caption>summary>span{display:none}.finish-issue-photo{max-width:200px}.finish-issue-photo .photo{aspect-ratio:4/5}.finish-issue-photo img{object-fit:contain}
