@@ -1,4 +1,6 @@
 import {creativeProgress} from './story-progress.js';
+import {storyStage} from './story-flow.js';
+import {previewKind} from './preview-state.js';
 export const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 export const human = value => String(value || 'Not recorded').replace(/_/g, ' ').replace(/^\w/, char => char.toUpperCase());
 export const safeUrl = value => {
@@ -8,7 +10,7 @@ export const date = value => {
   if (!value || !Number.isFinite(Date.parse(value))) return 'Not recorded';
   return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/New_York' }).format(new Date(value));
 };
-export const storyUrl = (id, tab = 'overview') => `#/story/${encodeURIComponent(id)}/${tab}`;
+export const storyUrl = (id, tab = 'build') => `#/story/${encodeURIComponent(id)}/${storyStage(tab)}`;
 export const effective = story => ({
   title: story.localDraft?.title ?? story.title ?? '',
   hook: story.localDraft?.hook ?? story.hook ?? '',
@@ -28,6 +30,13 @@ export const workingStory = story => {
 export const mediaFor = story => {
   const ids = effective(story).selectedAssetIds;
   return ids.map(id => (story.media || []).find(asset => asset.id === id)).filter(Boolean);
+};
+// Only the final post preview uses the native finished JPEGs. Original gallery
+// assets and all editorial selections remain untouched.
+export const postMediaFor = story => {
+  const assets=mediaFor(story),slides=story.nativePublishing?.preparedSlides;
+  if(!Array.isArray(slides)||slides.length!==assets.length||!slides.every((s,i)=>s.assetId===assets[i].id))return assets;
+  return assets.map((asset,i)=>({...asset,previewUrl:slides[i].previewUrl,localPreview:{...asset.localPreview,width:1080,height:1350},finalPostFile:true}));
 };
 export function badge(text, tone = '') { return `<span class="badge ${esc(tone)}">${esc(text)}</span>`; }
 export function stateLabel(story) {
@@ -53,7 +62,7 @@ export function nextAction(story) {
   return { label: 'Review the carousel', tab: 'carousel', reason: 'Check image order, caption and current package together.' };
 }
 export function previewUrl(value) {
-  if (typeof value === 'string' && /^\/api\/stories\/CON-[A-Za-z0-9_-]{1,120}\/assets\/[^/?#\\\s]+\/preview\?hash=[a-f0-9]{64}$/.test(value)) return value;
+  if (typeof value === 'string' && /^\/api\/stories\/CON-[A-Za-z0-9_-]{1,120}\/(?:assets\/[^/?#\\\s]+\/preview|buffer-draft\/files\/[^/?#\\\s]+)\?hash=[a-f0-9]{64}(?:&size=(?:320|640))?$/.test(value)) return value;
   return safeUrl(value);
 }
 // A cover reference, not a sequence edit or proof that the browser loaded pixels.
@@ -64,9 +73,10 @@ export function leadPhoto(story) {
   const direct=candidates.filter(a=>a.photoRelevance?.category==='direct');
   return available(selected)||available(direct)||available(candidates)||selected[0]||direct[0]||candidates[0];
 }
-export function image(asset, { className = '', index, storyId, eager = false, compact = false } = {}) {
-  const url = previewUrl(asset?.previewUrl);
-  return `<div class="photo ${compact?'compact-preview':''} ${esc(className)} ${url ? '' : 'no-preview'}">${url ? `<img src="${esc(url)}" alt="${esc(asset.title || 'Photographic reference')}" loading="${eager ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer"><span class="preview-status" role="status">Loading preview…</span><button type="button" class="preview-retry small-button" data-action="retry-preview" hidden>${compact?'Retry':'Retry preview'}</button>` : `<span class="photo-placeholder"><span aria-hidden="true">◫</span><small>No preview available</small></span>`}${index !== undefined ? `<span class="photo-number">${String(index + 1).padStart(2, '0')}</span>` : ''}${storyId && asset ? `<button class="photo-expand" data-action="inspect" data-story="${esc(storyId)}" data-asset="${esc(asset.id)}" aria-label="Review provenance: ${esc(asset.title || 'image')}">↗</button>` : ''}</div>`;
+export function image(asset, { className = '', index, storyId, eager = false, compact = false, full = false, inspect = true, sourceLink = true } = {}) {
+  const declared=previewUrl(asset?.previewUrl),saved=declared.startsWith('/api/stories/'),original=saved?declared.replace(/&size=(?:320|640)$/,''):declared,url=saved&&!full?original+'&size='+(compact?320:640):original;
+  const kind=previewKind(asset),source=safeUrl(asset?.sourceUrl),dimensions=asset?.localPreview||asset?.savedCopy;
+  return `<div class="photo ${compact?'compact-preview':''} ${esc(className)} ${url ? '' : 'no-preview'}" data-preview-kind="${kind}">${url ? `<img src="${esc(url)}" ${saved&&!full&&!compact?`srcset="${esc(original)}&amp;size=320 320w, ${esc(original)}&amp;size=640 640w" sizes="(max-width: 600px) 46vw, (max-width: 1100px) 28vw, 300px"`:""} data-image-key="${esc(url)}" width="${dimensions?.width||600}" height="${dimensions?.height||750}" alt="${esc(asset.title || 'Photographic reference')}" loading="${eager ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer"><span class="preview-status" role="status">Loading preview…</span><button type="button" class="preview-retry small-button" data-action="retry-preview" hidden>${compact?'Retry':'Retry preview'}</button>` : `<span class="photo-placeholder"><span aria-hidden="true">◫</span><small>No preview available</small><small>${kind==='saved'?'Saved file needs checking':'No photograph saved'}</small></span>`}${source&&sourceLink&&!compact?`<a class="preview-source-link text-link" href="${esc(source)}" target="_blank" rel="noopener noreferrer">Open original source ↗</a>`:''}${index !== undefined ? `<span class="photo-number">${String(index + 1).padStart(2, '0')}</span>` : ''}${inspect && storyId && asset ? `<button class="photo-expand" data-action="inspect" data-story="${esc(storyId)}" data-asset="${esc(asset.id)}" aria-label="Review provenance: ${esc(asset.title || 'image')}">↗</button>` : ''}</div>`;
 }
 export function empty(title, message, action = '') { return `<div class="empty-state"><span aria-hidden="true">↳</span><h3>${esc(title)}</h3><p>${esc(message)}</p>${action}</div>`; }
 export function external(url, label, className = '') {

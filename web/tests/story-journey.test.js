@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {postInspector} from '../post-review.js';
 import {storyWorkspace} from '../views.js';
 import {nextAction} from '../components.js';
 import {buildWorkspace} from '../../src/workspace/model.js';
@@ -7,12 +8,12 @@ import {workspaceSnapshot} from '../../test/helpers/workspace-fixture.js';
 const state={workspace:{hosted:true},compared:[]};
 const story=()=>buildWorkspace(workspaceSnapshot()).stories[0];
 
-test('three story activities retain every existing deep link without numbered creative assignments',()=>{
+test('three story stages retain all legacy tools and deep links',()=>{
  const original=story(),before=JSON.stringify(original);
- for(const [tab,stage] of [['overview','Develop'],['research','Review'],['images','Photographs'],['direction','Develop'],['caption','Develop'],['carousel','Develop'],['music','Develop'],['publishing','Review']]){
-  const html=storyWorkspace(state,original,tab),primary=html.match(/<nav class="story-stages story-activities"[^>]*>([\s\S]*?)<\/nav>/)[1];
+ for(const [tab,stage] of [['overview','Build'],['research','Preview'],['images','Build'],['direction','Refine'],['caption','Refine'],['carousel','Build'],['music','Refine'],['publishing','Preview']]){
+  const html=storyWorkspace(state,original,tab),primary=html.match(/<nav class="story-stages"[^>]*>([\s\S]*?)<\/nav>/)[1];
   assert.equal((primary.match(/<a /g)||[]).length,3);
-  assert.match(primary,new RegExp('aria-current="page">'+stage));
+  assert.match(primary,new RegExp('aria-current="page"><span>[123]</span>'+stage));
   assert.ok(!html.includes('More story tools'));
  }
  assert.equal(JSON.stringify(original),before);
@@ -20,16 +21,16 @@ test('three story activities retain every existing deep link without numbered cr
 
 test('story overview leads with actual references and preserves private notes, working caption and source details',()=>{
  const original=story();original.localDraft={version:1,caption:'Working caption stays preserved',notes:'An unfinished angle'};
- const html=storyWorkspace(state,original,'overview');
+ const html=storyWorkspace(state,original,'refine');
  assert.ok(html.includes('class="writing-hero"'));assert.ok(html.includes('caption-workbench'));
  assert.ok(html.includes('aria-label="Local caption draft"'));assert.ok(html.includes('aria-label="Your direction"'));
  assert.match(html,/An unfinished angle/);assert.match(html,/Working caption stays preserved/);
- assert.match(html,/Story details &amp; version history|Story details & version history/);
- assert.match(html,/data-action="draft-history"/);assert.match(html,/data-proposal-for=/);
+ assert.match(html,/data-post-inspector="sources"/);
+ const inspector=postInspector(original);assert.match(inspector,/data-action="draft-history"/);assert.match(inspector,/data-proposal-for=/);
  assert.match(html,/No preview available|https:\/\/example.org\/thumb/);
  assert.ok(!html.includes('Image verified'));
  original.media=[];original.selectedAssetIds=[];
- const missing=storyWorkspace(state,original,'overview');assert.match(missing,/No photographs selected yet/);assert.ok(!missing.includes('<img '));
+ const missing=storyWorkspace(state,original,'refine');assert.match(missing,/No photographs selected yet/);assert.ok(!missing.includes('<img '));
 });
 
 test('clearer story journey retains stale-edit, permission and existing-provider boundaries',()=>{
@@ -37,9 +38,9 @@ test('clearer story journey retains stale-edit, permission and existing-provider
  const stale=storyWorkspace(state,original,'caption');assert.match(stale,/Compare source and local draft/);assert.match(stale,/id="caption-editor"[^>]*disabled/);
  original.localDraft=null;original.publishing.requiresReview=true;
  const action=nextAction(original);assert.equal(action.tab,'publishing');assert.equal(action.label,'Review existing activity');
- const production=storyWorkspace(state,original,'publishing');assert.match(production,/Your post/);assert.match(production,/Review the existing publishing record/);assert.match(production,/Studio does not transfer, approve, send or schedule/);
+ const production=storyWorkspace(state,original,'publishing');assert.match(production,/Your post/);assert.match(production,/Buffer|publishing record/);assert.match(production,/View delivery/);
 });
 
 test('Develop keeps the explicitly selected cover even when another reference has an available preview',()=>{
- const s=story();s.media=[{id:'chosen',creator:'Chosen photographer',previewUrl:''},{id:'other',creator:'Other photographer',previewUrl:'https://example.org/other.jpg'}];s.selectedAssetIds=['chosen'];s.localDraft=null;const html=storyWorkspace(state,s,'overview');const hero=html.split('writing-hero')[1].split('writing-credit')[1].split('caption-contact-sheet')[0];assert.ok(hero.includes('Chosen photographer'));assert.ok(!hero.includes('Other photographer'));assert.ok(!hero.includes('https://example.org/other.jpg'));
+ const s=story();s.media=[{id:'chosen',creator:'Chosen photographer',previewUrl:''},{id:'other',creator:'Other photographer',previewUrl:'https://example.org/other.jpg'}];s.selectedAssetIds=['chosen'];s.localDraft=null;const html=storyWorkspace(state,s,'refine');const hero=html.split('writing-hero')[1].split('writing-credit')[1].split('caption-contact-sheet')[0];assert.ok(hero.includes('Chosen photographer'));assert.ok(!hero.includes('Other photographer'));assert.ok(!hero.includes('https://example.org/other.jpg'));
 });

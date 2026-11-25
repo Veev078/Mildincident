@@ -1,0 +1,89 @@
+{
+  "status": "PREPARED_NOT_INSTALLED",
+  "patches": [
+    {
+      "id": "BzMqQS8lfkwN7peQ",
+      "expectedVersion": "c6c0d049-57bf-4d18-b687-aa9745988fc4",
+      "expectedSha256": "93433db66f3c9f54de9556b621f0b162b3c0c9281c8941b8299892a427f7d2df",
+      "proposedSha256": "1a551f1b7ee94b7ab6d87584ca2bc5fb1f44af9dfd259313ee497ba16b3614bc",
+      "credentialBindingRequired": false
+    },
+    {
+      "id": "Q02tRHMtZ90Kib18",
+      "expectedVersion": "553385b9-6882-4c9b-9056-a9feda13d80b",
+      "expectedSha256": "d9d0a38e3e64d51c770c4f3995703cdd7b99250b41c3afdacc74df7277f53af8",
+      "proposedSha256": "a9521942769f793a3765a13b17d63fe9ba249bfc710a4cc41e68c2c04741f8f1",
+      "credentialBindingRequired": false
+    },
+    {
+      "id": "YdW8V9Qxl2qn5mC8",
+      "expectedVersion": "1b722e51-1d26-42d0-ba03-8f658690fed0",
+      "expectedSha256": "553297657b11bf0b8cbff6b2ef2a6e825ed4058cc09a1c9920a58bc9ad41dd1a",
+      "proposedSha256": "409edc81f0e70cf22750d2f1a11c05036c9c1639633c78f8603b76df3ef3a8ad",
+      "credentialBindingRequired": false
+    },
+    {
+      "id": "f0LkxPxzvqh3zyUQ",
+      "expectedVersion": "d4d97422-2eae-4bb6-88af-ee9b06d80f9a",
+      "expectedSha256": "9c44dffab18359471367454fb13f5774e67ededa9d8be4212c49ba395d4e7fd7",
+      "proposedSha256": "3cd2f095db180cc3b0ad3f80fb69dbd8c89e2a8b3acdf83b452c98f336d7ff78",
+      "credentialBindingRequired": false
+    },
+    {
+      "id": "v5ThKs5ZYP3RhZop",
+      "expectedVersion": "464d3148-824e-45ad-b1a1-f94df89177a8",
+      "expectedSha256": "a43265488d7ca09ad6f5abf444331c4bb3167d0932a301825811cb2e58ecd954",
+      "proposedSha256": "7c6f911713862c053c232fffc74d2b1ad8ac4a21522989b0512311cac8a67052",
+      "credentialBindingRequired": true
+    }
+  ],
+  "unchangedFinalApproval": {
+    "id": "rhZU4CyF5t0kYMzz",
+    "version": "32219a9c-e855-4c2a-af46-ea6db1d3199e",
+    "sha256": "d8d39ca7cd866acda3a2655f20e947c37c3763de059fdfcbbc8dd6aeec872a83"
+  },
+  "migration": {
+    "columns": [
+      {
+        "name": "buffer_claim_state",
+        "type": "string"
+      },
+      {
+        "name": "buffer_claim_owner",
+        "type": "string"
+      },
+      {
+        "name": "buffer_claim_digest",
+        "type": "string"
+      }
+    ],
+    "initializeEmpty": 12,
+    "blockExistingHandoffs": 7,
+    "preserveExisting": 0
+  },
+  "temporaryProof": {
+    "proofId": "d4e627a3-ff56-4671-b3f6-3ff82dbea848",
+    "rowId": 2,
+    "storyId": "CON-261019SPR2-01",
+    "packageVersion": 8,
+    "owners": [
+      "mildincident:claim-proof:d4e627a3-ff56-4671-b3f6-3ff82dbea848:0",
+      "mildincident:claim-proof:d4e627a3-ff56-4671-b3f6-3ff82dbea848:1"
+    ],
+    "digest": "744c09adb8be62e85071a0b3fd5f9a49177d4c62f88ae5aaec51847957a6892d",
+    "graphSha256": "da4e2e8073b7f849d1f759b9cabc26464823524af989b6ad7c7b101726ff3cce",
+    "bufferNodes": 0,
+    "aiNodes": 0,
+    "columnsTouched": [
+      "buffer_claim_state",
+      "buffer_claim_owner",
+      "buffer_claim_digest"
+    ],
+    "liveApplied": false
+  },
+  "secretRevocationPrepared": true,
+  "providerCredentialsChanged": false,
+  "liveApplied": false,
+  "bufferWrites": 0,
+  "paidCalls": 0
+}

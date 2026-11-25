@@ -14,6 +14,7 @@ export class ApprovalRequests {
  digest(binding){return createHash('sha256').update(canonical(binding)).digest('hex');}
  get(id){const r=this.db.prepare('SELECT * FROM studio_approval_requests WHERE id=?').get(id);return r?{id:r.id,storyId:r.story_id,contentDigest:r.content_digest,packet:JSON.parse(r.packet_json),binding:JSON.parse(r.binding_json),createdAt:r.created_at}:null;}
  prepare(story,input){
+  requireThat(!story?.organization?.trashed,'POST_IN_TRASH','Restore this post before preparing approval.');
   requireThat(story&&input&&Object.keys(input).every(k=>['sourceRevision','workingVersion','idempotencyKey','confirm'].includes(k))&&input.confirm==='prepare_review_only'&&/^[a-f0-9-]{36}$/.test(input.idempotencyKey||''),'INVALID_APPROVAL_REQUEST','Prepare one exact private request for native review; publication flags are not accepted.');
   requireThat(!story.localDraft?.stale&&input.sourceRevision===story.revision&&input.workingVersion===(story.localDraft?.version||0),'EDIT_CONFLICT','Save and review the current caption and photograph order first.');
   const packet=prepareProductionPacket(story);requireThat(packet.editorial.caption?.trim()&&packet.editorial.orderedMedia.length>0&&packet.editorial.orderedMedia.every(m=>m.identityConfirmed),'APPROVAL_CONTENT_REQUIRED','Choose an unambiguous photo sequence and a nonempty caption before preparing review.');

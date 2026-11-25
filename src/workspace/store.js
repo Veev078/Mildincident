@@ -34,10 +34,12 @@ export class LocalDraftStore {
       INSERT OR IGNORE INTO local_editorial_draft_history SELECT story_id,base_revision,version,data_json,updated_at,'saved' FROM local_editorial_drafts;`);
   }
 
-  organization(id){const row=this.db.prepare('SELECT * FROM local_story_organization WHERE story_id=? ORDER BY version DESC LIMIT 1').get(id);return row?{...JSON.parse(row.data_json),version:row.version,updatedAt:row.updated_at}:{archived:false,pinned:false,version:0,updatedAt:null};}
+  organization(id){const row=this.db.prepare('SELECT * FROM local_story_organization WHERE story_id=? ORDER BY version DESC LIMIT 1').get(id);return row?{trashed:false,...JSON.parse(row.data_json),version:row.version,updatedAt:row.updated_at}:{archived:false,pinned:false,trashed:false,version:0,updatedAt:null};}
   organize(story,input){
-    requireThat(input&&Object.keys(input).every(k=>['baseRevision','expectedVersion','archived','pinned'].includes(k))&&input.baseRevision===story.revision&&Number.isSafeInteger(input.expectedVersion)&&input.expectedVersion>=0&&['archived','pinned'].some(k=>Object.hasOwn(input,k))&&['archived','pinned'].every(k=>input[k]===undefined||typeof input[k]==='boolean'),'INVALID_LOCAL_EDIT','Use the current story and organization version with archive or pin choices.');
-    this.db.exec('BEGIN IMMEDIATE');try{const prior=this.organization(story.id);requireThat(prior.version===input.expectedVersion,'EDIT_CONFLICT','Another tab organized this story. Reload before continuing.');const data={archived:input.archived??prior.archived,pinned:input.pinned??prior.pinned};this.db.prepare('INSERT INTO local_story_organization VALUES(?,?,?,?)').run(story.id,prior.version+1,JSON.stringify(data),new Date().toISOString());this.db.exec('COMMIT');return this.organization(story.id);}catch(error){this.db.exec('ROLLBACK');throw error;}
+    const fields=['archived','pinned','trashed'];
+    requireThat(input&&Object.keys(input).every(k=>['baseRevision','expectedVersion','confirm',...fields].includes(k))&&input.baseRevision===story.revision&&Number.isSafeInteger(input.expectedVersion)&&input.expectedVersion>=0&&fields.some(k=>Object.hasOwn(input,k))&&fields.every(k=>input[k]===undefined||typeof input[k]==='boolean'),'INVALID_LOCAL_EDIT','Use the current post and organization version.');
+    requireThat(input.trashed!==true||input.confirm==='move_to_trash','TRASH_CONFIRMATION_REQUIRED','Confirm moving this post to recoverable Trash.');
+    this.db.exec('BEGIN IMMEDIATE');try{const prior=this.organization(story.id);requireThat(prior.version===input.expectedVersion,'EDIT_CONFLICT','Another tab organized this post. Reload before continuing.');const data={archived:input.archived??prior.archived,pinned:input.pinned??prior.pinned,trashed:input.trashed??prior.trashed};this.db.prepare('INSERT INTO local_story_organization VALUES(?,?,?,?)').run(story.id,prior.version+1,JSON.stringify(data),new Date().toISOString());this.db.exec('COMMIT');return this.organization(story.id);}catch(error){this.db.exec('ROLLBACK');throw error;}
   }
 
   get(storyId) {

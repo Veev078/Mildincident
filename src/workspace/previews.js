@@ -8,7 +8,7 @@ import sharp from 'sharp';
 import { safePhotoReference } from '../n8n/photo-url-guard.js';
 import { HandoffError, requireThat } from '../errors.js';
 
-export const IMAGE_FEEDBACK_BASES=['editorial_taste','photographic_style','composition','mood','story_potential','factual_issue','source_issue','rights_issue','retrieval_issue','interface_issue'];
+export const IMAGE_FEEDBACK_BASES=['project_relevance','editorial_taste','photographic_style','composition','mood','story_potential','factual_issue','source_issue','rights_issue','retrieval_issue','interface_issue'];
 
 export const MAX_PREVIEW_BYTES = 25 * 1024 * 1024;
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -72,8 +72,8 @@ export class LocalPreviewStore {
     return this.#public(row);
   }
 
-  all() {
-    const rows = this.db.prepare(`SELECT p.* FROM local_image_previews p WHERE p.id=(SELECT MAX(q.id) FROM local_image_previews q WHERE q.story_id=p.story_id AND q.asset_id=p.asset_id)`).all();
+  all(storyId=null) {
+    const rows = this.db.prepare(`SELECT p.* FROM local_image_previews p WHERE ${storyId?'p.story_id=? AND ':''}p.id=(SELECT MAX(q.id) FROM local_image_previews q WHERE q.story_id=p.story_id AND q.asset_id=p.asset_id)`).all(...(storyId?[storyId]:[]));
     return new Map(rows.map(row => [JSON.stringify([row.story_id, row.asset_id]), this.#public(row)]));
   }
 
@@ -104,7 +104,7 @@ export class LocalPreviewStore {
     } finally { await handle.close(); }
   }
 
-  async save({ storyId, assetId, bytes, contentType, originalName, declaration }) {
+  async save({ storyId, assetId, bytes, contentType, originalName, declaration, onlyIfAbsent=false }) {
     requireThat(declaration === 'private_review_only', 'PREVIEW_DECLARATION_REQUIRED', 'Confirm that this upload is for private review and does not establish publication rights or provenance.');
     requireThat(typeof storyId === 'string' && storyId.length <= 150 && typeof assetId === 'string' && assetId.length > 0 && assetId.length <= 300, 'INVALID_PREVIEW_SCOPE', 'Invalid existing image reference.');
     requireThat(Buffer.isBuffer(bytes) && bytes.length > 0 && bytes.length <= MAX_PREVIEW_BYTES, 'INVALID_PREVIEW_FILE', 'Choose a nonempty JPG, PNG or WebP of at most 25 MiB.');
@@ -126,6 +126,7 @@ export class LocalPreviewStore {
     const visualFingerprint=await fingerprint(preview);
     const originalHash = sha256(bytes);
     const previewHash = sha256(preview);
+    requireThat(!onlyIfAbsent||!this.get(storyId,assetId),'EDIT_CONFLICT','A private preview already exists. Automatic acquisition did not replace or reclassify it.');
     this.db.prepare('INSERT OR IGNORE INTO local_preview_fingerprints VALUES(?,?)').run(previewHash,JSON.stringify(visualFingerprint));
     const previous = this.db.prepare('SELECT * FROM local_image_previews WHERE story_id=? AND asset_id=? AND original_sha256=?').get(storyId, assetId, originalHash);
     if (previous) {
@@ -135,6 +136,7 @@ export class LocalPreviewStore {
     }
     await this.#writeBlob(originalHash, 'original', bytes);
     await this.#writeBlob(previewHash, 'jpg', preview);
+    requireThat(!onlyIfAbsent||!this.get(storyId,assetId),'EDIT_CONFLICT','A private preview was saved during retrieval. Automatic acquisition did not replace it.');
     this.db.prepare(`INSERT OR IGNORE INTO local_image_previews
       (story_id,asset_id,original_sha256,preview_sha256,original_name,width,height,original_width,original_height,original_format,uploaded_at)
       VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(storyId, assetId, originalHash, previewHash, name, info.width, info.height, meta.width, meta.height, meta.format, new Date().toISOString());
@@ -145,7 +147,36 @@ export class LocalPreviewStore {
     requireThat(hash === undefined || /^[a-f0-9]{64}$/.test(hash), 'INVALID_PREVIEW_HASH', 'Invalid preview reference.');
     const preview = this.get(storyId, assetId, hash);
     requireThat(preview, 'PREVIEW_NOT_FOUND', 'No private preview is attached to this image.');
-    return { bytes: await this.#readBlob(preview.sha256, 'jpg'), preview };
+    try { return { bytes: await this.#readBlob(preview.sha256, 'jpg'), preview }; }
+    catch(error){if(error.code==='ENOENT')throw new HandoffError('LOCAL_PREVIEW_MISSING','The saved preview file is unavailable. No files or records were changed.');throw error;}
+  }
+
+  /** Internal custody check for native review transfer; never an arbitrary file route. */
+  async readOriginal(storyId,assetId,previewHash){
+    const preview=this.get(storyId,assetId,previewHash);requireThat(preview,'PREVIEW_NOT_FOUND','The selected saved photograph is unavailable.');
+    return {bytes:await this.#readBlob(preview.originalSha256,'original'),preview};
+  }
+
+  /** Disposable display derivatives. Originals, editorial hashes and saved
+   * selections never change. Coalesce duplicate requests; bound memory to 8 MiB. */
+  async readThumbnail(storyId,assetId,hash,width){
+    requireThat([320,640].includes(width),'INVALID_PREVIEW_SIZE','Choose a supported private thumbnail size.');
+    const preview=this.get(storyId,assetId,hash);requireThat(preview,'PREVIEW_NOT_FOUND','No private preview is attached to this image.');
+    this.thumbnailCache ||= new Map();this.thumbnailPending ||= new Map();
+    const key=preview.sha256+':'+width,filename=path.join(this.root,'blobs',preview.sha256+'.jpg');
+    let stat;try{stat=await fs.stat(filename);}catch{throw new HandoffError('LOCAL_PREVIEW_MISSING','The saved preview file is unavailable. No files or records were changed.');}
+    const cached=this.thumbnailCache.get(key);
+    if(cached&&cached.size===stat.size&&cached.modified===stat.mtimeMs){this.thumbnailCache.delete(key);this.thumbnailCache.set(key,cached);return {...cached,preview};}
+    if(this.thumbnailPending.has(key))return {...await this.thumbnailPending.get(key),preview};
+    const work=(async()=>{
+      const input=await this.readPreview(storyId,assetId,preview.sha256);
+      const bytes=await sharp(input.bytes,{limitInputPixels:40000000}).resize({width,withoutEnlargement:true}).jpeg({quality:74,mozjpeg:true}).toBuffer();
+      const result={bytes,preview,size:stat.size,modified:stat.mtimeMs};this.thumbnailCache.delete(key);this.thumbnailCache.set(key,result);
+      let total=[...this.thumbnailCache.values()].reduce((n,r)=>n+r.bytes.length,0);
+      for(const [old,r] of this.thumbnailCache){if(total<=8*1024*1024)break;this.thumbnailCache.delete(old);total-=r.bytes.length;}
+      return result;
+    })();this.thumbnailPending.set(key,work);
+    try{return await work;}finally{this.thumbnailPending.delete(key);}
   }
 
   sourceInspection(storyId,assetId,hash){const row=this.db.prepare('SELECT * FROM local_source_preview_evidence WHERE story_id=? AND asset_id=? AND preview_sha256=?').get(storyId,assetId,hash);return row?{sourceUrl:row.source_url,imageUrl:row.image_url,executionId:row.acquisition_json?null:row.execution_id,inspectedAt:row.inspected_at,basis:row.acquisition_json?'direct_recorded_source_copy':'recorded_source_copy',...(row.acquisition_json?JSON.parse(row.acquisition_json):{}),identityVerified:false,rightsGranted:false}:null;}
@@ -160,6 +191,13 @@ export class LocalPreviewStore {
     return this.get(storyId,assetId,hash);
   }
 
+  recordPhotoSourceAcquisition(storyId,assetId,hash,{sourceUrl,imageUrl,requestId,inputDigest,pageSha256}){
+    requireThat(this.get(storyId,assetId,hash)&&safePhotoReference(sourceUrl)&&safePhotoReference(imageUrl)&&/^[a-f0-9-]{36}$/.test(requestId)&&[inputDigest,pageSha256].every(v=>/^[a-f0-9]{64}$/.test(v)),'INVALID_PREVIEW_SOURCE','An intact photo receipt and decoded scoped preview are required.');
+    const evidence={basis:'photo_request_source_copy',requestId,inputDigest,pageSha256,visualInspectionPerformed:false};
+    this.db.prepare('INSERT OR IGNORE INTO local_source_preview_evidence(story_id,asset_id,preview_sha256,source_url,image_url,execution_id,inspected_at,acquisition_json) VALUES(?,?,?,?,?,?,?,?)').run(storyId,assetId,hash,sourceUrl,imageUrl,'',new Date().toISOString(),JSON.stringify(evidence));
+    return this.get(storyId,assetId,hash);
+  }
+
   review(storyId, assetId) {
     const rows = this.db.prepare('SELECT * FROM local_image_review_events WHERE story_id=? AND asset_id=? ORDER BY version DESC').all(storyId, assetId);
     const latest = rows[0];
@@ -168,13 +206,13 @@ export class LocalPreviewStore {
       context:JSON.parse(this.db.prepare('SELECT context_json FROM local_image_review_contexts WHERE story_id=? AND asset_id=? AND version=?').get(storyId,assetId,latest.version)?.context_json||'null'),localOnly: true, rightsGranted: false, history: rows.slice(0, 50).map(r => ({version:r.version, decision:r.decision, reason:r.reason, updatedAt:r.created_at,...(contexts.get(r.version)?.decisionBasis?{basis:contexts.get(r.version).decisionBasis}:{})})) } : null;
   }
 
-  allReviews() {
-    const scopes = this.db.prepare('SELECT DISTINCT story_id,asset_id FROM local_image_review_events').all();
+  allReviews(storyId=null) {
+    const scopes = this.db.prepare('SELECT DISTINCT story_id,asset_id FROM local_image_review_events'+(storyId?' WHERE story_id=?':'')).all(...(storyId?[storyId]:[]));
     return new Map(scopes.map(r => [JSON.stringify([r.story_id,r.asset_id]), this.review(r.story_id,r.asset_id)]));
   }
 
   tasteFeedback(){
-    return [...this.allReviews()].map(([key,review])=>{const [storyId,assetId]=JSON.parse(key),context=review.context;return {candidateId:'image-dialog:'+storyId+':'+assetId,subject:context?.subject||'Specific photograph '+assetId,decision:review.decision==='shortlist'?'approved':review.decision==='reject'?'rejected':'needs_research',reason:review.reason.slice(0,700),reviewer:'founder',basis:['factual_issue','source_issue','rights_issue','retrieval_issue','interface_issue'].includes(context?.decisionBasis)?'reported_'+context.decisionBasis:'editorial_taste',decisionBasis:context?.decisionBasis||'editorial_taste',scope:'specific_photograph_selection',origin:'image_dialog',photograph:{storyId,assetId,sourceUrl:context?.sourceUrl||'',previewSha256:context?.previewSha256||null,previewVersionRecorded:Boolean(context?.previewSha256),...(context?.photographicResearch?{research:context.photographicResearch}:{})},sourceRevision:context?.sourceRevision||null,workingVersion:context?.workingVersion??null,reviewVersion:review.version,createdAt:review.updatedAt};}).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,6);
+    return [...this.allReviews()].map(([key,review])=>{const [storyId,assetId]=JSON.parse(key),context=review.context;return {candidateId:'image-dialog:'+storyId+':'+assetId,subject:context?.subject||'Specific photograph '+assetId,decision:review.decision==='shortlist'?'approved':review.decision==='reject'?'rejected':'needs_research',reason:review.reason.slice(0,700),reviewer:'founder',basis:context?.decisionBasis==='project_relevance'?'project_relevance':['factual_issue','source_issue','rights_issue','retrieval_issue','interface_issue'].includes(context?.decisionBasis)?'reported_'+context.decisionBasis:'editorial_taste',decisionBasis:context?.decisionBasis||'editorial_taste',scope:'specific_photograph_selection',origin:'image_dialog',photograph:{storyId,assetId,sourceUrl:context?.sourceUrl||'',previewSha256:context?.previewSha256||null,previewVersionRecorded:Boolean(context?.previewSha256),...(context?.photographicResearch?{research:context.photographicResearch}:{})},sourceRevision:context?.sourceRevision||null,workingVersion:context?.workingVersion??null,reviewVersion:review.version,createdAt:review.updatedAt};}).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,6);
   }
 
   saveReview(storyId, assetId, input,{context=null}={}) {
@@ -198,8 +236,9 @@ export class LocalPreviewStore {
 
 export function attachLocalPreviews(workspace, previews) {
   if (!previews) return workspace;
-  const attachments = previews.all();
-  const reviews = previews.allReviews();
+  const storyId=workspace.stories.length===1?workspace.stories[0].id:null;
+  const attachments = previews.all(storyId);
+  const reviews = previews.allReviews(storyId);
   for (const story of workspace.stories) for (const asset of story.media) {
     const preview = attachments.get(JSON.stringify([story.id, asset.id])) || null;
     if (!Object.hasOwn(asset, 'sourcePreviewUrl')) asset.sourcePreviewUrl = asset.previewUrl;
@@ -207,6 +246,20 @@ export function attachLocalPreviews(workspace, previews) {
     asset.localPreview = preview;
     asset.localReview = reviews.get(JSON.stringify([story.id, asset.id])) || null;
     if (preview) asset.previewUrl = `/api/stories/${encodeURIComponent(story.id)}/assets/${encodeURIComponent(asset.id)}/preview?hash=${preview.sha256}`;
+  }
+  // Older selections may still name a search reference while a later search
+  // saved its publisher image under another asset ID. Display the exact saved
+  // copy without rewriting the selection, attaching files, or transferring any
+  // review/rights decision. A deliberate founder edit can use the saved asset.
+  for(const story of workspace.stories)for(const asset of story.media){
+    if(asset.localPreview)continue;
+    const page=safePhotoReference(asset.sourceUrl),image=safePhotoReference(asset.sourceImageUrl||asset.fileUrl);
+    if(!page||!image)continue;
+    const matches=story.media.filter(m=>m.id!==asset.id&&m.localPreview&&safePhotoReference(m.localPreview.sourceInspection?.sourceUrl)===page&&safePhotoReference(m.localPreview.sourceInspection?.imageUrl)===image);
+    if(!matches.length||new Set(matches.map(m=>m.localPreview.originalSha256)).size!==1)continue;
+    const match=matches[0];
+    asset.savedCopy={assetId:match.id,sha256:match.localPreview.sha256,width:match.localPreview.width,height:match.localPreview.height,basis:'exact_recorded_source_and_image_url',rightsGranted:false};
+    asset.previewUrl=match.previewUrl;
   }
   return workspace;
 }

@@ -68,3 +68,40 @@ test('per-use Generate Stories prepares an unpaid plan and never falls into a le
  const result=await launchSavedResearch({id:'saved'},{engine,api});assert.equal(result.proposal.state,'prepared');assert.deepEqual(calls,[['/api/research/requests/saved/generation/prepare',{}]]);assert.equal(researchAccess(engine).canStart,true);assert.equal(researchAccess({...engine,founderPolicy:{...engine.founderPolicy,state:'inactive'}}).canStart,false);assert.equal(researchAccess({...engine,founderPolicy:{...engine.founderPolicy,state:'inactive'}}).canReview,true);
  const html=discoverySetup({workspace:{engine}});assert.match(html,/no daily request quota/i);assert.match(html,/separate confirmation/);
 });
+
+test('founder-confirmed story plans never advertise or submit a legacy queued, linked or continuation request',async()=>{
+ const engine={configured:true,readOnly:true,founderPolicy:{mode:'founder_confirmed',enabled:true,state:'available',operations:{story:true}}};
+ for(const request of [{id:'queued',engineJob:{state:'queued',version:2}},{id:'running',engineJob:{state:'generating'}},{id:'linked',linkedStoryId:'CON-existing'},{id:'continuation',continuation:{origin:{storyId:'CON-existing'}}},null]){
+  let writes=0;await assert.rejects(launchSavedResearch(request,{engine,api:async()=>{writes++;}}));assert.equal(writes,0);
+ }
+ const html=discovery({workspace:{stories:[],engine,researchRequests:[{id:'queued',kind:'brief',prompt:'Retained native queued direction',engineJob:{state:'queued',version:2}}]}});
+ assert.ok(html.includes('Queued'));assert.ok(!html.includes('data-start-saved-research="queued"'));
+});
+
+test('generation stays accessible before the feed with or without proposals',()=>{
+ const story={id:'CON-new',title:'A genuine persisted proposal',origin:'n8n_development',revision:'r1',media:[],caption:'A retained draft.'};
+ const populated=discovery({workspace:{stories:[story],engine:{configured:false}}});assert.ok(populated.indexOf('discovery-start')<populated.indexOf('founder-inbox'));
+ const empty=discovery({workspace:{stories:[],engine:{configured:false}}});assert.ok(empty.indexOf('discovery-start')<empty.indexOf('founder-inbox'));
+});
+
+test('delivered generation receipts remain inspectable after the proposal without duplicating the full caption above it',()=>{
+ const story={id:'CON-new',title:'A real saved proposal',origin:'n8n_development',revision:'r1',media:[],caption:'A retained draft.'};
+ const proposal={id:'finished',state:'completed',resultStoryId:story.id,sourceLabel:'A retained direction',preview:{title:story.title,caption:'The complete operation receipt caption.',sources:[],claims:[],gaps:[]}};
+ const html=discovery({workspace:{stories:[story],researchRequests:[{id:'finished',generationProposal:proposal}],engine:{configured:false}}});
+ assert.match(html,/<details class="discovery-status"/);assert.equal((html.match(/data-story-generation-id=/g)||[]).length,1);assert.ok(html.includes('The complete operation receipt caption.'));
+ const pending=discovery({workspace:{stories:[story],researchRequests:[{id:'finished',generationProposal:{...proposal,deliveryPending:true}}],engine:{configured:false}}});
+ assert.ok(!pending.includes('discovery-receipt'));assert.ok(pending.indexOf('ai-operation-review')<pending.indexOf('founder-inbox'));assert.ok(pending.includes('The draft is recorded.'));
+});
+
+test('distinct saved directions show their actual labels and exact resume identities without exposing prompts as discoveries',()=>{
+ const engine={configured:true,readOnly:true,founderPolicy:{mode:'founder_confirmed',enabled:true,state:'available',operations:{story:true}}};
+ const requests=[{id:'source-one',kind:'brief',prompt:'Follow the original <project> page'},{id:'source-two',kind:'brief',prompt:'Compare this very different photographic series',preset:{name:'Private series theme'}}];
+ const html=discovery({workspace:{stories:[],engine,researchRequests:requests}});
+ assert.ok(html.includes('Follow the original &lt;project&gt; page'));assert.ok(html.includes('Private series theme'));assert.ok(html.includes('data-start-saved-research="source-one"'));assert.ok(html.includes('data-start-saved-research="source-two"'));assert.equal((html.match(/data-review-card=/g)||[]).length,0);
+});
+
+test('historical failures are deduplicated by request and kept inside one compact recovery area',()=>{
+ const p={id:'failed-one',state:'failed',message:'Stopped before AI started',sourceLabel:'Earlier research'};
+ const state={workspace:{stories:[],engine:{configured:true,delivery:{state:'unavailable'}},researchRequests:[{id:p.id,generationProposal:p,engineJob:{state:'failed',failure:{code:'RESEARCH_INPUT_BUDGET_EXCEEDED',stoppedBeforeModels:true}}}]}};
+ const html=discovery(state);assert.equal((html.match(/data-request-id="failed-one"/g)||[]).length,1);assert.equal((html.match(/class="discovery-status"/g)||[]).length,1);assert(html.indexOf('discovery-start')<html.indexOf('discovery-status'));assert.match(html,/No generation will be repeated/);assert.match(html,/Check recorded results/);
+});

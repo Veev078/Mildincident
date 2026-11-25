@@ -1,0 +1,11 @@
+# Saved-copy gallery handoff
+
+Retained native development candidate `b2519e61-cad1-4f94-bbc4-70eab1cb55fd` is Missy Elliott’s inflatable look in “The Rain”. Its four image records are page covers/social previews from two Vogue articles, each with an additional tracking-URL variant. The normal relevance classifier returns `unconfirmed`, with `page_membership_is_not_story_evidence`. Retrieval does not establish that those covers show the intended video costume, and URL similarity alone does not prove byte duplication.
+
+Build previously required direct project relevance for its Saved gallery, sending decoded but unconfirmed copies to Other material. The focused correction introduces **Saved to inspect**, shown by default when no accepted saved photographs exist. Each actual private file can be inspected and explicitly kept as relevant using the existing scoped image-review endpoint and append-only review history. No new search, workflow or approval system is introduced.
+
+The decision is bound to the exact private preview hash, story subject and source URL. The write checks source/working/review versions and the original file. It does not alter source-derived relevance, select slides, grant rights or modify acquisition evidence. Later harmless stage updates do not erase a still-matching photograph decision. File duplicates have one representative, selected assets retain priority, rejected copies remain outside the accepted gallery, and aesthetic shortlists do not count as project-relevance confirmation.
+
+## Verification boundary
+
+Read the actual retained candidate from n8n without executing it. Desktop/mobile browser replay uses its real title, subject, source URLs, asset IDs and classifications. Private custody was simulated with labelled generated JPEGs because Render’s receipt database/original bytes were inaccessible. Verified inspect → keep → select, unchanged rights, no additional search, and persistence after refresh in isolated storage. This is not inspection of the four hosted photograph files or their acquisition receipt. Those hashes, actual byte duplication and visual relevance remain unverified pending accessible Studio evidence. No founder Shell operation, deployment, paid AI, n8n mutation or publishing occurred.

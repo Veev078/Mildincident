@@ -27,6 +27,7 @@ function verifyRemote(attempt, observed) {
   requireThat(observed && typeof observed === 'object', 'UNVERIFIED_REMOTE', 'Provider read-back returned no post.');
   requireThat(observed.id === attempt.remote_id && observed.channelId === attempt.channel_id, 'REMOTE_MISMATCH', 'Provider read-back does not match the expected post/channel.');
   requireThat(observed.status === 'draft' && Object.hasOwn(observed, 'scheduledAt') && observed.scheduledAt === null, 'NOT_UNSCHEDULED_DRAFT', 'Provider did not verify an unscheduled draft. Review remotely without resending.');
+  if(attempt.native_execution_id)requireThat(Object.hasOwn(observed,'sentAt')&&observed.sentAt===null,'NOT_UNSCHEDULED_DRAFT','Native read-back must explicitly confirm no publication timestamp.');
   requireThat(observed.caption === attempt.expected.caption, 'REMOTE_MISMATCH', 'Remote draft caption differs from the approved package.');
   requireThat(Array.isArray(observed.assetHashes) && canonical(observed.assetHashes) === canonical(attempt.expected.assetHashes), 'REMOTE_MISMATCH', 'Remote draft media or slide order differs from the verified export.');
 }
@@ -50,11 +51,11 @@ async function readBack({ ledger, attempt, adapter }) {
  * One application action, with remote effects accessible only through an injected,
  * independently audited adapter. No production Buffer HTTP contract is assumed here.
  */
-export async function prepareAndSend({ manifest, inputRoot, privateRoot, ledger, adapter, readCurrentPackage, readExistingHandoffs }) {
+export async function prepareAndSend({ manifest, inputRoot, privateRoot, preserveVerifiedJpeg=false, ledger, adapter, readCurrentPackage, readExistingHandoffs }) {
   manifest = validateManifest(manifest); // Freeze a caller-owned selection before awaiting anything.
   assertAdapter(adapter);
   await assertCurrent(manifest, readCurrentPackage);
-  const prepared = await preparePackage(manifest, { inputRoot, privateRoot });
+  const prepared = await preparePackage(manifest, { inputRoot, privateRoot, preserveVerifiedJpeg });
   assertDraftRights(prepared);
   await assertCurrent(manifest, readCurrentPackage); // Export may have taken time.
   const verified = await verifyPrepared(prepared.directory);
@@ -76,6 +77,10 @@ export async function prepareAndSend({ manifest, inputRoot, privateRoot, ledger,
         assetId: slide.assetId,
       })),
     });
+    if(adapter.nativeCoordinator===true&&result?.state==='native_accepted'){
+      const pending=ledger.recordNativeAccepted(attempt.scope_key,{executionId:result.executionId,requestId:result.requestId});
+      return {attempt:pending,pending:true,reused:false,prepared};
+    }
     requireThat(typeof result?.id === 'string' && result.id.trim().length > 0 && result.id.length <= 300, 'UNVERIFIED_REMOTE', 'Create returned no usable remote ID.');
     ledger.recordRemoteId(attempt.scope_key, result.id);
   } catch (error) {
@@ -92,4 +97,17 @@ export async function reconcileKnownDraft({ ledger, key, adapter }) {
   requireThat(attempt, 'ATTEMPT_NOT_FOUND', 'No draft intent exists for this key.');
   requireThat(attempt.remote_id, 'REMOTE_ID_UNKNOWN', 'No provider ID was received. A read-only provider audit is required; matching captions alone cannot safely identify this attempt. No automatic reset or resend is available.');
   return readBack({ ledger, attempt, adapter });
+}
+
+/** Observe the one accepted native execution. This function never dispatches. */
+export async function reconcileNativeDraft({ledger,key,adapter}){
+ let attempt=ledger.get(key);requireThat(attempt&&adapter?.nativeCoordinator===true&&typeof adapter?.observeNativeExecution==='function','RECONCILIATION_REQUIRED','Use the recorded native dispatch for read-only reconciliation.');
+ if(attempt.remote_id)return readBack({ledger,attempt,adapter});
+ const observed=await adapter.observeNativeExecution(attempt);
+ if(!attempt.native_execution_id)attempt=ledger.recordNativeAccepted(key,{executionId:observed.executionId,requestId:observed.requestId});
+ requireThat(observed?.executionId===attempt.native_execution_id&&observed.requestId===attempt.native_request_id,'RECONCILIATION_REQUIRED','The native observation does not match this dispatch.');
+ if(observed.state==='running')return attempt;
+ if(observed.postId){const linked=ledger.recordNativeCandidate(key,{executionId:observed.executionId,requestId:observed.requestId,postId:observed.postId});return readBack({ledger,attempt:linked,adapter});}
+ ledger.markUncertain(key,observed.stoppedBeforeProvider===true?'NATIVE_STOPPED_BEFORE_BUFFER':'NATIVE_OUTCOME_UNCERTAIN');
+ throw new HandoffError('RECONCILIATION_REQUIRED',observed.stoppedBeforeProvider===true?'The native operation stopped before Buffer. Its intent and history are preserved; no automatic retry is allowed.':'Native delivery remains uncertain. Do not send again; inspect the existing execution and handoff.');
 }

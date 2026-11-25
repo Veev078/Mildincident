@@ -8,7 +8,7 @@ test('frame feedback binds the displayed selected hero rather than the first unr
 });
 test('generated photographic continuations remain labeled and linked to their parent instead of implying a new subject discovery',()=>{
  const html=founderQueue({workspace:{stories:[make('follow-up',{continuationOf:{storyId:'CON-parent',assetId:'exact-frame'}})]}});
- assert.ok(html.includes('Further photographic research · existing story'));assert.ok(html.includes('#/story/CON-parent/images'));assert.ok(html.includes('exact earlier frame exact-frame'));
+ assert.ok(html.includes('Further photographic research · existing story'));assert.ok(html.includes('#/story/CON-parent/build'));assert.ok(html.includes('exact earlier frame exact-frame'));
 });
 
 test('Discover has one clear direction form and truthful saved status without exposing operational controls as the main action',()=>{
@@ -23,4 +23,12 @@ test('saved proposals show their destination and source credit without implying 
  const html=founderQueue({workspace:{stories:[story],founderReviews:{'saved-source':{decision:'save',sourceRevision:'r1',workingVersion:0}}},reviewFilter:'saved'});
  assert.ok(!html.includes('Continue developing →'));assert.equal((html.match(/value="develop"/g)||[]).length,1);assert.ok(html.includes('Source-reported photographer'));assert.ok(html.includes('Original source'));
  assert.ok(html.includes('aria-pressed="true"'));assert.ok(html.includes('Metadata only · preview unavailable'));assert.ok(html.includes('does not authorize publication'));
+});
+
+test('saved, exploring, passed and history queues respect recoverable Trash and Archive without changing decisions',()=>{
+ for(const [filter,decision] of [['saved','save'],['research','explore'],['passed','pass'],['history','reset'],['existing','save']]){
+  const kept=make('kept',{recoveredHistory:filter==='history',...(filter==='existing'?{origin:'native'}:{})}),trashed={...kept,id:'trashed',organization:{trashed:true}},archived={...kept,id:'archived',organization:{archived:true}};
+  const workspace={stories:[kept,trashed,archived],founderReviews:Object.fromEntries([kept,trashed,archived].map(s=>[s.id,{decision,sourceRevision:'r1',workingVersion:0}]))},before=JSON.stringify(workspace);
+  const html=founderQueue({workspace,reviewFilter:filter});assert.ok(html.includes('data-review-card="kept"'),filter);assert.ok(!html.includes('data-review-card="trashed"'),filter);assert.ok(!html.includes('data-review-card="archived"'),filter);assert.equal(JSON.stringify(workspace),before);
+ }
 });

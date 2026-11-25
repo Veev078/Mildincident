@@ -1,17 +1,21 @@
+import {captureVisualExecution} from '../photography/visual-assessment.js';
+import {captureVisualFailure} from '../photography/visual-failure.js';
 import {selectEditorialFeedback} from '../editorial-feedback.js';
 import {randomUUID} from 'node:crypto';
 import {requireThat} from '../errors.js';
 import {captureEditorialEvidence} from '../editorial-evidence.js';
 import {requestFingerprint} from './editorial-engine-client.js';
 import {captionGenerationState,validateCaptionBinding,CAPTION_DIRECTIONS} from './caption-generation.js';
+import {captureResearchFailure} from './research-failure.js';
+import {editorialFailureCode} from '../n8n/editorial-failure.js';
 const COMPLETED_STATES=new Set(['ready_to_review','needs_research','approved','rejected']);
 const REMOTE_STATES=new Set(['queued','generating','ready_to_review','needs_research','failed','rejected','approved']);
 export class EditorialEngineService {
-  constructor({research,client,reloadClient=null,imageFeedback=()=>[],sourceLeads=()=>[],prepareSources=async()=>{}}){this.research=research;this.client=client;this.reloadClient=reloadClient;this.imageFeedback=imageFeedback;this.sourceLeads=sourceLeads;this.prepareSources=prepareSources;this.inspection={configured:Boolean(client),generationAvailable:false,generationApproved:false,workerActive:false};this.refreshing=null;}
+  constructor({research,client,reloadClient=null,imageFeedback=()=>[],performanceFeedback=()=>[],sourceLeads=()=>[],prepareSources=async()=>{}}){this.research=research;this.client=client;this.reloadClient=reloadClient;this.imageFeedback=imageFeedback;this.performanceFeedback=performanceFeedback;this.sourceLeads=sourceLeads;this.prepareSources=prepareSources;this.inspection={configured:Boolean(client),generationAvailable:false,generationApproved:false,workerActive:false};this.refreshing=null;}
   status(){const a=this.client?.connection?.authorization,remaining=a?this.research.authorizationRemaining(a):null;return {...this.inspection,...(a?{generationAvailable:this.inspection.generationAvailable===true&&remaining>0,authorizedRunsRemaining:remaining}:{}),delivery:this.research.deliveryState?.()||null,...(this.captionPilot?{founderPolicy:this.captionPilot.policyState('story')}: {})};}
   async inspect(){if(this.reloadClient){try{this.client=await this.reloadClient();}catch{this.inspection={...this.inspection,generationAvailable:false,generationApproved:false};throw Object.assign(new Error('Private connection needs review; saved work is preserved.'),{code:'INVALID_RESEARCH_CONNECTION'});}}requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');this.inspection=await this.client.inspect();return this.status();}
   captionStatus(story,requests=this.research.all()){const result=captionGenerationState(story,requests,this.client?.connection,this.status());return this.captionPilot?{...result,pilot:this.captionPilot.status(story)}:result;}
-  assertExecutionScope(request){if(['caption_policy','founder_policy'].includes(this.client?.connection?.executionScope)){const a=this.client.connection.captionAction;requireThat(a?.jobId===request.id&&a.requestHash===requestFingerprint(request)&&this.client.connection.authorization?.maxRuns===1,'CAPTION_SCOPE_MISMATCH','Each policy action requires its own exact request and single-use grant.');}
+  assertExecutionScope(request){this.client?.assertPerAction?.(request);if(['caption_policy','founder_policy'].includes(this.client?.connection?.executionScope)){const a=this.client.connection.captionAction;requireThat(a?.jobId===request.id&&a.requestHash===requestFingerprint(request)&&this.client.connection.authorization?.maxRuns===1,'CAPTION_SCOPE_MISMATCH','Each policy action requires its own exact request and single-use grant.');}
    if(this.client?.connection?.executionScope==='draft_only'){
     const b=validateCaptionBinding(this.client.connection.captionRecovery,requestFingerprint);
     requireThat(request.id===b.request.id&&requestFingerprint(request)===b.requestHash,'CAPTION_SCOPE_MISMATCH','This single-run connection is authorized only for its exact retained-evidence caption request.');
@@ -22,35 +26,57 @@ export class EditorialEngineService {
     const b=validateCaptionBinding(this.client.connection.captionRecovery,requestFingerprint),{id,...request}=b.request,r=this.research.create({...request,idempotencyKey:id},[]);
     await this.queue(r.id,{captionTarget:{storyId:story.id,sourceRevision:story.revision,workingVersion:input.workingVersion,sourceJobId:b.sourceJobId,sourceCandidateId:b.sourceCandidateId,sourceExecutionId:b.sourceExecutionId,evidenceSha256:b.evidenceSha256,direction}});return this.start(r.id,this.research.engineJob(r.id).version);
   }
-  async queue(id,{captionTarget,editorialContext}={}){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');requireThat(!this.client.readOnly,'ENGINE_READ_ONLY','This connection observes existing results; native queueing is disabled.');const request=this.research.get(id);requireThat(request,'RESEARCH_REQUEST_NOT_FOUND','Research request is unavailable.');const scoped=this.requestForEngine(request);if(editorialContext)scoped.editorialContext=editorialContext;this.assertExecutionScope(scoped);if(!request.engineJob&&!['draft_only','caption_policy','founder_policy'].includes(this.client.connection?.executionScope)){if(!request.continuation)await this.prepareSources();const context=this.editorialContext(request);if(context.preset||context.continuation||context.feedback.length||context.sourceLeads?.length)scoped.editorialContext=context;}const claim=this.research.claimEngineQueue(id,requestFingerprint(scoped));if(!claim.claimed)return claim.job;
+  async queue(id,{captionTarget,editorialContext}={}){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');requireThat(!this.client.readOnly,'ENGINE_READ_ONLY','This connection observes existing results; native queueing is disabled.');const request=this.research.get(id);requireThat(request,'RESEARCH_REQUEST_NOT_FOUND','Research request is unavailable.');const scoped=this.requestForEngine(request);if(editorialContext)scoped.editorialContext=editorialContext;this.assertExecutionScope(scoped);if(!request.engineJob&&!['draft_only','caption_policy','founder_policy','photo_vision','photo_vision_policy'].includes(this.client.connection?.executionScope)){if(!request.continuation)await this.prepareSources();const context=this.editorialContext(request);if(context.preset||context.continuation||context.feedback.length||context.sourceLeads?.length)scoped.editorialContext=context;}const claim=this.research.claimEngineQueue(id,requestFingerprint(scoped));if(!claim.claimed)return claim.job;
     if(captionTarget)this.research.recordEngineState(id,'queueing',{captionTarget});
-    if(scoped.editorialContext)this.research.recordEngineState(id,'queueing',{editorialContext:scoped.editorialContext});
+    if(scoped.editorialContext)this.research.recordEngineState(id,'queueing',{editorialContext:scoped.editorialContext,...(['photo_vision','photo_vision_policy'].includes(this.client.connection?.executionScope)?{photoGraphSha256:this.client.connection.approvedGraphSha256,photoWorkerVersion:this.client.connection.approvedWorkerVersion,...(this.client.connection.approvedExecutionGraphSha256?{photoExecutionGraphSha256:this.client.connection.approvedExecutionGraphSha256}:{})}:{})});
     try{const row=await this.client.queue(scoped);requireThat(REMOTE_STATES.has(row.status),'INVALID_ENGINE_RESULT','Remote job status is unknown.');return this.research.recordEngineState(id,row.status,{remoteRowId:String(row.id),executionId:String(row.execution_id||''),lastError:null});}
     catch(error){this.research.recordEngineState(id,'queue_uncertain',{lastError:error.code||'ENGINE_REQUEST_FAILED'});throw error;}
   }
-  async refresh(){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');if(this.refreshing)return this.refreshing;
+  async refresh({isolateRecordedErrors=false}={}){requireThat(this.client,'ENGINE_NOT_CONFIGURED','The private development engine connection is unavailable.');if(this.refreshing)return this.refreshing;
     this.refreshing=(async()=>{await this.inspect();const jobs=await this.client.rows(this.client.connection.jobsTableId);const candidates=await this.client.rows(this.client.connection.candidatesTableId);const {sanitizeDevelopmentCandidate}=await import('./editorial-engine-client.js');
       await this.adoptObservedResults(jobs,candidates,sanitizeDevelopmentCandidate);
-      for(const request of jobs.map(row=>this.research.get(row.job_id)).filter(Boolean)){const local=request.engineJob;if(!local)continue;const matches=jobs.filter(row=>row.job_id===request.id);requireThat(matches.length<=1,'AMBIGUOUS_ENGINE_JOB','Multiple remote rows share a request identity.');const row=matches[0];if(!row)continue;
+      const reconciliationIssues=[];
+      for(const request of jobs.map(row=>this.research.get(row.job_id)).filter(Boolean)){const local=request.engineJob;if(!local)continue;try{const matches=jobs.filter(row=>row.job_id===request.id);requireThat(matches.length<=1,'AMBIGUOUS_ENGINE_JOB','Multiple remote rows share a request identity.');const row=matches[0];if(!row)continue;
         requireThat(row.request_hash===requestFingerprint(this.requestForEngine(request))&&REMOTE_STATES.has(row.status),'INVALID_ENGINE_RESULT','Remote request identity or status does not match.');
+        const photoPacket=local.editorialContext?.photoAssessment;
+        if(photoPacket&&['ready_to_review','needs_research','approved','rejected'].includes(row.status)){
+          requireThat(row.status==='ready_to_review'&&row.result_count===0&&!candidates.some(c=>c.job_id===request.id),'INVALID_VISUAL_RESULT','A photo assessment cannot create a story candidate.');
+          const execution=await this.client.executionDetails(row.execution_id||local.receiptExecutionId),envelope=captureVisualExecution(execution,photoPacket,{approvedGraphSha256:local.photoGraphSha256,approvedExecutionGraphSha256:local.photoExecutionGraphSha256||null,approvedWorkerVersion:local.photoWorkerVersion||null});
+          requireThat(JSON.stringify(JSON.parse(row.result_json))===JSON.stringify(envelope),'INVALID_VISUAL_RESULT','The job result differs from its native execution.');
+          if(local.state!=='ready_to_review'||!local.photoResult)this.research.recordEngineState(request.id,'ready_to_review',{nativeStatus:row.status,executionId:String(execution.id),photoResult:envelope,candidates:[],resultPending:false,lastError:null});continue;
+        }
         const result=candidates.filter(c=>c.job_id===request.id).map(sanitizeDevelopmentCandidate);requireThat(result.length<=1,'AMBIGUOUS_ENGINE_RESULT','Development job produced more than its one-candidate budget.');
         const executionId=String(row.execution_id||local.receiptExecutionId||local.executionId||'');
         requireThat(!local.receiptExecutionId||!row.execution_id||String(row.execution_id)===local.receiptExecutionId,'INVALID_ENGINE_RESULT','Remote execution differs from the accepted dispatch receipt.');
         requireThat(!(local.candidates?.length&&!result.length),'ENGINE_RECONCILIATION_INCOMPLETE','An earlier imported result is missing from this read. The saved Studio result is preserved; refresh read-only.');
         requireThat(result.every(c=>c.provenance.kind===request.kind&&(!executionId||c.provenance.executionId===executionId)),'INVALID_ENGINE_RESULT','Candidate execution or mode does not match its job.');
         if(['ready_to_review','needs_research','approved','rejected'].includes(row.status))requireThat(result.length===1,'INVALID_ENGINE_RESULT','Completed development job is missing its correlated result.');
-        let observedState=row.status;let failure=row.error?'REMOTE_EXECUTION_FAILED':null;
+        let observedState=row.status;let failure=row.error?editorialFailureCode(row.error):null;
+        let failureDetail=local.failure||null,failureCheckedExecutionId=local.failureCheckedExecutionId||null,photoFailure=local.photoFailure||null;
+        if(photoPacket&&row.status==='failed'&&executionId&&!photoFailure&&failureCheckedExecutionId!==executionId){
+          failureCheckedExecutionId=executionId;
+          try{photoFailure=captureVisualFailure(await this.client.executionDetails(executionId),photoPacket,{approvedGraphSha256:local.photoGraphSha256,approvedExecutionGraphSha256:local.photoExecutionGraphSha256||null,approvedWorkerVersion:local.photoWorkerVersion||null});failure=photoFailure.code;}catch{/* Keep an unverified failure generic; never promote partial output or resend. */}
+        }
+        if(!photoPacket&&row.status==='failed'&&executionId&&failureDetail?.executionId!==executionId&&failureCheckedExecutionId!==executionId){
+          failureCheckedExecutionId=executionId;
+          try{failureDetail=captureResearchFailure(await this.client.executionDetails(executionId),{jobId:request.id,requestHash:row.request_hash});}catch{/* The confirmed failed row still stands when detailed evidence is unavailable. */}
+        }
+        if(row.status==='failed'&&failureDetail)failure=failureDetail.code;
         let resultPending=false;let resultMissingSince=local.resultMissingSince||null;
         if((row.status==='generating'||row.status==='queued'&&local.receiptExecutionId)&&executionId){const execution=await this.client.executionStatus(executionId);resultPending=execution.status==='success'&&!result.length;if(resultPending){resultMissingSince ||= new Date().toISOString();if(Date.now()-Date.parse(resultMissingSince)>60000){observedState='failed';failure='ENGINE_RESULT_MISSING';resultPending=false;}}else resultMissingSince=null;if(execution.status==='running'&&Date.parse(execution.startedAt)&&Date.now()-Date.parse(execution.startedAt)>360000){observedState='dispatch_uncertain';failure='ENGINE_EXECUTION_STALE';}if(['error','failed','crashed','canceled'].includes(execution.status)){observedState='failed';failure='REMOTE_EXECUTION_FAILED';}}
         if(row.status==='queued'&&['dispatching','dispatch_uncertain','generating','failed'].includes(local.state)&&observedState!=='failed')observedState=local.state;
+        if(local.dispatchReceipt?.status==='failed'&&['queued','generating'].includes(row.status)){observedState='failed';resultPending=false;failure=local.lastError||'DEVELOPMENT_EXECUTION_FAILED';}
         if(COMPLETED_STATES.has(local.state)&&!COMPLETED_STATES.has(row.status)&&result.length){observedState=local.state;failure='STALE_ENGINE_OBSERVATION';}
-        const data={nativeStatus:row.status,remoteRowId:String(row.id),executionId,candidates:result,resultPending,resultMissingSince,lastError:failure};
-        if(local.state!==observedState||local.nativeStatus!==row.status||local.lastError!==data.lastError||JSON.stringify(local.candidates||[])!==JSON.stringify(result)||local.executionId!==data.executionId||Boolean(local.resultPending)!==resultPending||local.resultMissingSince!==resultMissingSince)this.research.recordEngineState(request.id,observedState,data);
-      }if(this.captionPilot){await this.captionPilot.inspect();await this.captionPilot.captureUsage();}return this.status();})();try{return await this.refreshing;}finally{this.refreshing=null;}
+        if(photoFailure)failure=photoFailure.code;
+        const data={nativeStatus:row.status,remoteRowId:String(row.id),executionId,candidates:result,resultPending,resultMissingSince,lastError:failure,failure:failureDetail,failureCheckedExecutionId,...(photoFailure?{photoFailure}:{})};
+        if(local.state!==observedState||local.nativeStatus!==row.status||local.lastError!==data.lastError||local.failureCheckedExecutionId!==failureCheckedExecutionId||JSON.stringify(local.failure||null)!==JSON.stringify(failureDetail)||JSON.stringify(local.photoFailure||null)!==JSON.stringify(photoFailure)||JSON.stringify(local.candidates||[])!==JSON.stringify(result)||local.executionId!==data.executionId||Boolean(local.resultPending)!==resultPending||local.resultMissingSince!==resultMissingSince)this.research.recordEngineState(request.id,observedState,data);
+      }catch(error){const code=error.code||'';if(!isolateRecordedErrors||!(/^(?:INVALID_ENGINE_RESULT|INVALID_VISUAL_RESULT|ENGINE_RECONCILIATION_INCOMPLETE|ENGINE_HTTP_(?:404|410|5[0-9]{2}))$/.test(code)))throw error;reconciliationIssues.push({requestId:request.id,code});}
+      }this.inspection={...this.inspection,reconciliationIssues};if(this.captionPilot){await this.captionPilot.inspect();await this.captionPilot.captureUsage();}return this.status();})();try{return await this.refreshing;}finally{this.refreshing=null;}
   }
   async adoptObservedResults(jobs,candidates,sanitize){
     let imported=0,unlinked=0;
     for(const row of jobs){
+      if(row.editorial_context_json){try{if(Object.hasOwn(JSON.parse(row.editorial_context_json),'photoAssessment'))continue;}catch{}}
       if(this.research.engineJob(row.job_id))continue;
       if(jobs.filter(j=>j.job_id===row.job_id).length!==1){unlinked++;continue;}
       try{
@@ -81,7 +107,11 @@ export class EditorialEngineService {
   }
   requestForEngine(request){return {...request,...(request.engineJob?.editorialContext?{editorialContext:request.engineJob.editorialContext}:{})};}
   editorialContext(request){
-    const sourceLeads=request?.continuation?[]:this.sourceLeads().slice(0,6);const result={schemaVersion:1,...(request?.preset?{preset:{key:request.preset.key,version:request.preset.version,name:request.preset.name,selectionMode:'saved_brief'}}:{}),...(request?.continuation?{continuation:request.continuation}:{}),feedback:selectEditorialFeedback([...this.research.founderTasteFeedback(),...this.imageFeedback()]),...(sourceLeads.length?{sourceLeads}:{}),interpretation:'Specific editorial judgments, not factual findings, objective aesthetic measurements, or blanket genre bans.'};
+    const sourceLeads=request?.continuation?[]:this.sourceLeads().slice(0,6);
+    // Human taste retains priority. At most two identity-grounded observations can
+    // supplement it; the same existing total-context budget removes these first.
+    const measured=this.performanceFeedback().filter(note=>note?.kind==='publication_observation'&&note.reviewer==='provider'&&note.sourceRevision&&note.storyId&&note.publication?.bufferPostIds?.length&&note.observations?.length).slice(0,2);
+    const result={schemaVersion:1,...(request?.preset?{preset:{key:request.preset.key,version:request.preset.version,name:request.preset.name,selectionMode:'saved_brief'}}:{}),...(request?.continuation?{continuation:request.continuation}:{}),feedback:[...selectEditorialFeedback([...this.research.founderTasteFeedback(),...this.imageFeedback()]),...measured],...(sourceLeads.length?{sourceLeads}:{}),interpretation:'Founder/editor judgments retain their stated reviewer. Publication observations are descriptive provider measurements, not founder opinions, causal findings, proof that current edits were published, objective aesthetic measurements, or blanket genre bans.'};
     while(result.sourceLeads?.length&&JSON.stringify(result).length>9500)result.sourceLeads.pop();
     while(result.feedback.length&&JSON.stringify(result).length>9500){result.feedback.pop();result.omittedFeedbackCount=(result.omittedFeedbackCount||0)+1;}return result;
   }
@@ -89,9 +119,10 @@ export class EditorialEngineService {
   async acceptReceipt(id,dispatchId,receipt){
     const current=this.research.engineJob(id);requireThat(current?.dispatchId===dispatchId,'EDIT_CONFLICT','Dispatch ownership changed; reconcile read-only.');
     requireThat(!current.executionId||current.executionId===receipt.executionId,'INVALID_ENGINE_RESULT','Receipt execution conflicts with the observed job.');
-    this.research.recordEngineState(id,COMPLETED_STATES.has(current.state)||current.state==='failed'?current.state:'generating',{dispatchReceipt:receipt,receiptExecutionId:receipt.executionId,executionId:receipt.executionId,resultPending:!current.candidates?.length,lastError:null});
+    const failed=receipt.status==='failed';
+    this.research.recordEngineState(id,COMPLETED_STATES.has(current.state)||current.state==='failed'?current.state:failed?'failed':'generating',{dispatchReceipt:receipt,receiptExecutionId:receipt.executionId,executionId:receipt.executionId,resultPending:!failed&&!current.candidates?.length,lastError:failed?editorialFailureCode(receipt.failureCode):null});
     try{await this.refresh();}catch{
-      const latest=this.research.engineJob(id);this.research.recordEngineState(id,latest.state,{lastError:'ENGINE_RECONCILIATION_PENDING'});
+      const latest=this.research.engineJob(id);this.research.recordEngineState(id,latest.state,{lastError:failed?latest.lastError:'ENGINE_RECONCILIATION_PENDING'});
     }
   }
   async start(id,expectedVersion,{beforeClaim}={}){requireThat(Number.isSafeInteger(expectedVersion),'EDIT_CONFLICT','An expected engine-job version is required.');const inspection=await this.inspect();requireThat(inspection.generationAvailable,'GENERATION_NOT_APPROVED','The bounded AI worker is inactive or its exact version/spend has not been approved. Queueing alone does not spend credits.');const request=this.research.get(id);requireThat(request,'RESEARCH_REQUEST_NOT_FOUND','Research request is unavailable.');this.assertExecutionScope(this.requestForEngine(request));const dispatchId=randomUUID();const claimed=this.research.claimEngineDispatch(id,expectedVersion,dispatchId,this.client.connection.authorization||null,{beforeClaim:()=>{this.captionPilot?.guardLegacyStart(id);beforeClaim?.();}});
